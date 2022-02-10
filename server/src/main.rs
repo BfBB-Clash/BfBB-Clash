@@ -1,10 +1,19 @@
 use clash::protocol::{Connection, Message};
+use log::{debug, info, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
+    env_logger::Builder::new()
+        .format_level(true)
+        .format_module_path(true)
+        .format_target(false)
+        .format_indent(Some(4))
+        .format_timestamp_secs()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_env("CLASH_LOG")
+        .init();
     let listener = TcpListener::bind("127.0.0.1:42932").await.unwrap();
 
     loop {
@@ -25,8 +34,11 @@ async fn handle_new_connection(socket: TcpStream) {
         .await
         .unwrap();
 
+    info!("New connection for player id {auth_id:#X} opened");
+
     loop {
         let incoming = connection.read_frame().await.unwrap();
+        debug!("Received message from player id {auth_id:#X} \nMessage: {incoming:#?}",);
 
         match incoming {
             Message::GameHost { auth_id, lobby_id } => todo!(),
@@ -55,7 +67,7 @@ async fn handle_new_connection(socket: TcpStream) {
                 todo!()
             }
             m => {
-                println!("Client sent a server only message: {m:?}")
+                warn!("Player id {auth_id:#X} sent a server only message. \nMessage: {m:?}")
             }
         }
     }

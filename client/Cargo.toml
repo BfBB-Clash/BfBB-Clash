@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 clash = { path = ".." }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros"] }
+
+log = "0.4"
+env_logger = "0.9"
