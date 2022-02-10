@@ -9,3 +9,9 @@ members = ["client", "server"]
 
 [dependencies]
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros"] }
+serde = { version = "1", features = ["derive"] }
+bytes = "1.1"
+bincode = "1.3"
+
+thiserror = "1"
+anyhow = "1"

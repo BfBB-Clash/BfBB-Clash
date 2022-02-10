@@ -1,5 +1,4 @@
 use clash::protocol::{Connection, Message};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
@@ -9,8 +8,7 @@ async fn main() {
     let listener = TcpListener::bind("127.0.0.1:42932").await.unwrap();
 
     loop {
-        let (socket, port) = listener.accept().await.unwrap();
-        println!("{socket:?} \n{port:?}");
+        let (socket, _) = listener.accept().await.unwrap();
 
         spawn(async move { handle_new_connection(socket).await });
     }
@@ -24,10 +22,11 @@ async fn handle_new_connection(socket: TcpStream) {
     let auth_id = 1;
     connection
         .write_frame(Message::ConnectionAccept { auth_id })
-        .await;
+        .await
+        .unwrap();
 
     loop {
-        let incoming = connection.read_frame().await;
+        let incoming = connection.read_frame().await.unwrap();
 
         match incoming {
             Message::GameHost { auth_id, lobby_id } => todo!(),
