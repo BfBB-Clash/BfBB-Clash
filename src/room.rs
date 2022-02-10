@@ -1,0 +1,131 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum Room {
+    MainMenu,
+    IntroCutscene,
+
+    BikiniBottom,
+    SpongebobHouse,
+    SquidwardHouse,
+    PatrickHouse,
+    ShadyShoals,
+    PoliceStation,
+    Treedome,
+    KrustyKrab,
+    ChumBucket,
+    Theater,
+
+    Poseidome,
+    IndustrialPark,
+
+    JellyfishRock,
+    JellyfishCaves,
+    JellyfishLake,
+    JellyfishMountain,
+
+    DowntownStreets,
+    DowntownRooftops,
+    DowntownLighthouse,
+    DowntownSeaNeedle,
+
+    GooLagoonBeach,
+    GooLagoonCaves,
+    GooLagoonPier,
+
+    MermalairEntranceArea,
+    MermalairMainChamber,
+    MermalairSecurityTunnel,
+    MermalairBallroom,
+    MermalairVillianContainment,
+
+    RockBottomDowntown,
+    RockBottomMuseum,
+    RockBottomTrench,
+
+    SandMountainHub,
+    SandMountainSlide1,
+    SandMountainSlide2,
+    SandMountainSlide3,
+
+    KelpForest,
+    KelpSwamps,
+    KelpCaves,
+    KelpVines,
+
+    GraveyardLake,
+    GraveyardShipwreck,
+    GraveyardShip,
+    GraveyardBoss,
+
+    SpongebobsDream,
+    SandysDream,
+    SquidwardsDream,
+    KrabsDream,
+    PatricksDream,
+
+    ChumBucketLab,
+    ChumBucketBrain,
+
+    SpongeballArena,
+}
+
+impl Room {
+    const fn scene_id(&self) -> u32 {
+        match *self {
+            Room::MainMenu => u32::from_be_bytes(*b"MNU3"),
+            Room::IntroCutscene => u32::from_be_bytes(*b"HB00"),
+            Room::BikiniBottom => u32::from_be_bytes(*b"HB01"),
+            Room::SpongebobHouse => u32::from_be_bytes(*b"HB02"),
+            Room::SquidwardHouse => u32::from_be_bytes(*b"HB03"),
+            Room::PatrickHouse => u32::from_be_bytes(*b"HB04"),
+            Room::ShadyShoals => u32::from_be_bytes(*b"HB06"),
+            Room::PoliceStation => u32::from_be_bytes(*b"HB09"),
+            Room::Treedome => u32::from_be_bytes(*b"HB05"),
+            Room::KrustyKrab => u32::from_be_bytes(*b"HB07"),
+            Room::ChumBucket => u32::from_be_bytes(*b"HB08"),
+            Room::Theater => u32::from_be_bytes(*b"HB10"),
+            Room::Poseidome => u32::from_be_bytes(*b"B101"),
+            Room::IndustrialPark => u32::from_be_bytes(*b"B201"),
+            Room::JellyfishRock => u32::from_be_bytes(*b"JF01"),
+            Room::JellyfishCaves => u32::from_be_bytes(*b"JF02"),
+            Room::JellyfishLake => u32::from_be_bytes(*b"JF03"),
+            Room::JellyfishMountain => u32::from_be_bytes(*b"JF04"),
+            Room::DowntownStreets => u32::from_be_bytes(*b"BB01"),
+            Room::DowntownRooftops => u32::from_be_bytes(*b"BB02"),
+            Room::DowntownLighthouse => u32::from_be_bytes(*b"BB03"),
+            Room::DowntownSeaNeedle => u32::from_be_bytes(*b"BB04"),
+            Room::GooLagoonBeach => u32::from_be_bytes(*b"GL01"),
+            Room::GooLagoonCaves => u32::from_be_bytes(*b"GL02"),
+            Room::GooLagoonPier => u32::from_be_bytes(*b"GL03"),
+            Room::MermalairEntranceArea => u32::from_be_bytes(*b"BC01"),
+            Room::MermalairMainChamber => u32::from_be_bytes(*b"BC02"),
+            Room::MermalairSecurityTunnel => u32::from_be_bytes(*b"BC03"),
+            Room::MermalairBallroom => u32::from_be_bytes(*b"BC04"),
+            Room::MermalairVillianContainment => u32::from_be_bytes(*b"BC05"),
+            Room::RockBottomDowntown => u32::from_be_bytes(*b"RB01"),
+            Room::RockBottomMuseum => u32::from_be_bytes(*b"RB02"),
+            Room::RockBottomTrench => u32::from_be_bytes(*b"RB03"),
+            Room::SandMountainHub => u32::from_be_bytes(*b"SM01"),
+            Room::SandMountainSlide1 => u32::from_be_bytes(*b"SM02"),
+            Room::SandMountainSlide2 => u32::from_be_bytes(*b"SM03"),
+            Room::SandMountainSlide3 => u32::from_be_bytes(*b"SM04"),
+            Room::KelpForest => u32::from_be_bytes(*b"KF01"),
+            Room::KelpSwamps => u32::from_be_bytes(*b"KF02"),
+            Room::KelpCaves => u32::from_be_bytes(*b"KF04"),
+            Room::KelpVines => u32::from_be_bytes(*b"KF05"),
+            Room::GraveyardLake => u32::from_be_bytes(*b"GY01"),
+            Room::GraveyardShipwreck => u32::from_be_bytes(*b"GY02"),
+            Room::GraveyardShip => u32::from_be_bytes(*b"GY03"),
+            Room::GraveyardBoss => u32::from_be_bytes(*b"GY04"),
+            Room::SpongebobsDream => u32::from_be_bytes(*b"DB01"),
+            Room::SandysDream => u32::from_be_bytes(*b"DB02"),
+            Room::SquidwardsDream => u32::from_be_bytes(*b"DB03"),
+            Room::KrabsDream => u32::from_be_bytes(*b"DB04"),
+            Room::PatricksDream => u32::from_be_bytes(*b"DB06"),
+            Room::ChumBucketLab => u32::from_be_bytes(*b"B302"),
+            Room::ChumBucketBrain => u32::from_be_bytes(*b"B303"),
+            Room::SpongeballArena => u32::from_be_bytes(*b"PG12"),
+        }
+    }
+}

@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
+use crate::room::Room;
+
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
@@ -61,9 +63,6 @@ pub enum Item {
     Spatula,
     Fuse,
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Room {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Options {
