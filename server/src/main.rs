@@ -3,6 +3,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
+pub mod lobby;
+
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
@@ -12,11 +14,11 @@ async fn main() {
         let (socket, port) = listener.accept().await.unwrap();
         println!("{socket:?} \n{port:?}");
 
-        spawn(async move { handle_new_connection(socket).await });
+        spawn(async move { handle_connection(socket).await });
     }
 }
 
-async fn handle_new_connection(socket: TcpStream) {
+async fn handle_connection(socket: TcpStream) {
     let mut connection = Connection::new(socket);
 
     // Generate an auth id for this user

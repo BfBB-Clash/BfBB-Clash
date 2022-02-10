@@ -61,11 +61,7 @@ pub enum Item {
 #[derive(Debug)]
 pub enum Room {}
 
-#[derive(Debug)]
-pub struct Options {
-    pub max_spats: u8,
-    pub ng_plus: bool,
-}
+
 
 pub struct Connection {
     socket: TcpStream,
