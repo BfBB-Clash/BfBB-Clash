@@ -1,4 +1,4 @@
-use clash::player::Player;
+use clash::player::SharedPlayer;
 use clash::protocol::{self, Connection, Message};
 use log::{debug, error, info, warn};
 use rand::{thread_rng, Rng};
@@ -8,6 +8,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
 pub mod lobby;
+pub mod player;
 struct State {
     players: HashMap<u32, Player>,
 }
