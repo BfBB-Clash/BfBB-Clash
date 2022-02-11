@@ -1,16 +1,19 @@
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PlayerOptions {
     pub name: String,
     pub color: u32, //TODO: Implement this.
-    //Other options?
+    // Other options?
 }
 
-pub struct Player {
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SharedPlayer {
     options: PlayerOptions,
 }
 
-impl Player {
-    pub fn new(name: String) -> Self {
-        Self { name }
+impl SharedPlayer {
+    pub fn new(options: PlayerOptions) -> Self {
+        Self { options }
     }
 }

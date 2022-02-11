@@ -6,7 +6,7 @@ use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
 use crate::room::Room;
 use crate::lobby::LobbyOptions;
-use crate::player::
+use crate::player::PlayerOptions;
 
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize)]

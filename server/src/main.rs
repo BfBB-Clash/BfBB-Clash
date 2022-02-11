@@ -1,4 +1,4 @@
-use clash::player::SharedPlayer;
+use clash::player::{SharedPlayer, PlayerOptions};
 use clash::protocol::{self, Connection, Message};
 use log::{debug, error, info, warn};
 use rand::{thread_rng, Rng};
@@ -9,6 +9,9 @@ use tokio::spawn;
 
 pub mod lobby;
 pub mod player;
+
+use crate::player::Player;
+
 struct State {
     players: HashMap<u32, Player>,
 }
@@ -67,7 +70,7 @@ async fn handle_new_connection(state: Arc<RwLock<State>>, socket: TcpStream) {
         auth_id = state.gen_auth_id();
         state
             .players
-            .insert(auth_id, Player::new("TODO lol".into()));
+            .insert(auth_id, Player::new(SharedPlayer::new(PlayerOptions{name: String::new(), color: 0}), auth_id));
     }
 
     connection
@@ -100,6 +103,14 @@ async fn handle_new_connection(state: Arc<RwLock<State>>, socket: TcpStream) {
             Message::GameBegin { auth_id, lobby_id } => todo!(),
             Message::GameEnd { auth_id, lobby_id } => todo!(),
             Message::GameLeave { auth_id, lobby_id } => todo!(),
+            Message::PlayerOptions { auth_id, options } => {
+                todo!()
+                /*
+                let player = state
+                                 .players
+                                 .get(&auth_id);
+                */
+            },
             Message::GameOptions {
                 auth_id,
                 lobby_id,

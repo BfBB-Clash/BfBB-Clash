@@ -71,6 +71,71 @@ pub enum Room {
 }
 
 impl Room {
+    
+    const fn get_name(&self) -> &'static str {
+        todo!()
+    }
+
+    const fn from_scene_id(scene_id: u32) -> Self {
+        let str_scene_id = &scene_id.to_be_bytes();
+        match str_scene_id {
+            b"MNU3" => Room::MainMenu,
+            b"HB00" => Room::IntroCutscene,
+            b"HB01" => Room::BikiniBottom,
+            b"HB02" => Room::SpongebobHouse,
+            b"HB03" => Room::SquidwardHouse,
+            b"HB04" => Room::PatrickHouse,
+            b"HB06" => Room::ShadyShoals,
+            b"HB09" => Room::PoliceStation,
+            b"HB05" => Room::Treedome,
+            b"HB07" => Room::KrustyKrab,
+            b"HB08" => Room::ChumBucket,
+            b"HB10" => Room::Theater,
+            b"B101" => Room::Poseidome,
+            b"B201" => Room::IndustrialPark,
+            b"JF01" => Room::JellyfishRock,
+            b"JF02" => Room::JellyfishCaves,
+            b"JF03" => Room::JellyfishLake,
+            b"JF04" => Room::JellyfishMountain,
+            b"BB01" => Room::DowntownStreets,
+            b"BB02" => Room::DowntownRooftops,
+            b"BB03" => Room::DowntownLighthouse,
+            b"BB04" => Room::DowntownSeaNeedle,
+            b"GL01" => Room::GooLagoonBeach,
+            b"GL02" => Room::GooLagoonCaves,
+            b"GL03" => Room::GooLagoonPier,
+            b"BC01" => Room::MermalairEntranceArea,
+            b"BC02" => Room::MermalairMainChamber,
+            b"BC03" => Room::MermalairSecurityTunnel,
+            b"BC04" => Room::MermalairBallroom,
+            b"BC05" => Room::MermalairVillianContainment,
+            b"RB01" => Room::RockBottomDowntown,
+            b"RB02" => Room::RockBottomMuseum,
+            b"RB03" => Room::RockBottomTrench,
+            b"SM01" => Room::SandMountainHub,
+            b"SM02" => Room::SandMountainSlide1,
+            b"SM03" => Room::SandMountainSlide2,
+            b"SM04" => Room::SandMountainSlide3,
+            b"KF01" => Room::KelpForest,
+            b"KF02" => Room::KelpSwamps,
+            b"KF04" => Room::KelpCaves,
+            b"KF05" => Room::KelpVines,
+            b"GY01" => Room::GraveyardLake,
+            b"GY02" => Room::GraveyardShipwreck,
+            b"GY03" => Room::GraveyardShip,
+            b"GY04" => Room::GraveyardBoss,
+            b"DB01" => Room::SpongebobsDream,
+            b"DB02" => Room::SandysDream,
+            b"DB03" => Room::SquidwardsDream,
+            b"DB04" => Room::KrabsDream,
+            b"DB06" => Room::PatricksDream,
+            b"B302" => Room::ChumBucketLab,
+            b"B303" => Room::ChumBucketBrain,
+            b"PG12" => Room::SpongeballArena,
+            _ => Room::MainMenu,
+        }
+    }
+
     const fn scene_id(&self) -> u32 {
         match *self {
             Room::MainMenu => u32::from_be_bytes(*b"MNU3"),
