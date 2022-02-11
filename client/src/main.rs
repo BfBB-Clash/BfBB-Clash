@@ -1,3 +1,5 @@
+pub mod dolphin;
+
 use clash::protocol::Connection;
 use tokio::net::TcpStream;
 
@@ -12,8 +14,13 @@ async fn main() {
         .filter_level(log::LevelFilter::Warn)
         .parse_env("CLASH_LOG")
         .init();
+
+    dolphin::hook_it();
+
     let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(sock);
+
+    let accept = conn.read_frame().await.unwrap().unwrap();
 
     conn.write_frame(clash::protocol::Message::GameHost {
         auth_id: 1,
