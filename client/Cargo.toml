@@ -16,3 +16,6 @@ env_logger = "0.9"
 read-process-memory = "0.1" # For reading external process memory
 proc-maps = "0.2" # For querying memory maps
 sysinfo = "0.23" # For getting PID by name
+
+[target.'cfg(windows)'.dependencies]
+winapi = "0.3"
