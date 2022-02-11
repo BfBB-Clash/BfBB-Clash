@@ -74,6 +74,8 @@ pub struct Options {
 pub enum Error {
     #[error("Frame exceeded max length")]
     FrameLength,
+    #[error("Connection reset by peer")]
+    ConnectionReset,
 }
 
 #[derive(Debug)]
@@ -90,11 +92,20 @@ impl Connection {
         }
     }
 
-    pub async fn read_frame(&mut self) -> Result<Message> {
+    pub async fn read_frame(&mut self) -> Result<Option<Message>> {
         loop {
-            self.stream.read_buf(&mut self.buffer).await.unwrap();
             if let Some(frame) = self.parse_frame()? {
-                return Ok(frame);
+                return Ok(Some(frame));
+            }
+
+            if self.stream.read_buf(&mut self.buffer).await? == 0 {
+                if self.buffer.is_empty() {
+                    // Remote closed Connection
+                    return Ok(None);
+                } else {
+                    // Connection closed while still sending data
+                    return Err(Error::ConnectionReset.into());
+                }
             }
         }
     }
