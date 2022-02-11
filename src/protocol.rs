@@ -5,13 +5,18 @@ use thiserror::Error;
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
 use crate::room::Room;
-use crate::lobby::Options;
+use crate::lobby::LobbyOptions;
+use crate::player::
 
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
     ConnectionAccept {
         auth_id: u32,
+    },
+    PlayerOptions {
+        auth_id: u32,
+        options: PlayerOptions,
     },
     GameHost {
         auth_id: u32,
@@ -24,7 +29,7 @@ pub enum Message {
     GameOptions {
         auth_id: u32,
         lobby_id: u32,
-        options: Options,
+        options: LobbyOptions,
     },
     GameLobbyInfo {
         auth_id: u32,
@@ -69,6 +74,8 @@ pub enum Item {
 pub enum Error {
     #[error("Frame exceeded max length")]
     FrameLength,
+    #[error("Connection reset by peer")]
+    ConnectionReset,
 }
 
 #[derive(Debug)]
@@ -85,11 +92,20 @@ impl Connection {
         }
     }
 
-    pub async fn read_frame(&mut self) -> Result<Message> {
+    pub async fn read_frame(&mut self) -> Result<Option<Message>> {
         loop {
-            self.stream.read_buf(&mut self.buffer).await.unwrap();
             if let Some(frame) = self.parse_frame()? {
-                return Ok(frame);
+                return Ok(Some(frame));
+            }
+
+            if self.stream.read_buf(&mut self.buffer).await? == 0 {
+                if self.buffer.is_empty() {
+                    // Remote closed Connection
+                    return Ok(None);
+                } else {
+                    // Connection closed while still sending data
+                    return Err(Error::ConnectionReset.into());
+                }
             }
         }
     }
