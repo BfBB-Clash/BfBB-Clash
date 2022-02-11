@@ -1,5 +1,8 @@
+use std::num::NonZeroU32;
+
 use log::{debug, error, trace};
 use sysinfo::{PidExt, ProcessExt, System, SystemExt};
+use thiserror::Error;
 
 const REGION_SIZE: usize = 0x2000000;
 
@@ -9,22 +12,67 @@ const PROCESS_NAME: &str = "dolphin";
 #[cfg(windows)]
 const PROCESS_NAME: &str = "Dolphin";
 
-pub fn hook_it() {
-    let mut sys = System::new();
-    sys.refresh_processes();
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("The emulated memory region could not be found. Make sure Dolphin is running and the game is open.")]
+    RegionNotFound,
+}
 
-    let dol = sys.processes_by_name(PROCESS_NAME).next().unwrap();
-    let pid = dol.pid().as_u32();
-    trace!("Dolphin found with pid {pid}");
+pub struct Dolphin {
+    system: System,
+    base_address: Option<usize>,
+    pid: Option<NonZeroU32>,
+}
 
-    let base_address = get_emulated_base_address(pid);
-    debug!("Found emulated memory region {base_address:#?}");
+impl Default for Dolphin {
+    fn default() -> Self {
+        Self {
+            system: System::new(),
+            base_address: None,
+            pid: None,
+        }
+    }
+}
+
+impl Dolphin {
+    pub fn is_hooked(&self) -> bool {
+        self.base_address.is_some()
+    }
+
+    pub fn hook(&mut self) -> Result<(), Error> {
+        if self.is_hooked() {
+            return Ok(());
+        }
+        self.system.refresh_processes();
+
+        let procs = self.system.processes_by_name(PROCESS_NAME);
+        for proc in procs {
+            let pid = proc.pid().as_u32();
+            trace!("{} found with pid {pid}", proc.name());
+
+            if let Some(addr) = get_emulated_base_address(pid) {
+                debug!("Found emulated memory region at {addr:#X}");
+                self.base_address = Some(addr);
+                self.pid = Some(pid.try_into().expect("Dolphin pid was 0"));
+                return Ok(());
+            }
+        }
+
+        Err(Error::RegionNotFound)
+    }
 }
 
 #[cfg(unix)]
 fn get_emulated_base_address(pid: u32) -> Option<usize> {
     use proc_maps::get_process_maps;
-    let maps = get_process_maps(pid as proc_maps::Pid).unwrap();
+    let maps = match get_process_maps(pid as proc_maps::Pid) {
+        Err(e) => {
+            error!("Could not get dolphin process maps\n{e:?}");
+            return None;
+        }
+        Ok(maps) => maps,
+    };
+
     let map = maps.iter().find(|m| {
         m.size() == REGION_SIZE
             && m.filename()
