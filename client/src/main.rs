@@ -3,6 +3,7 @@ pub mod game_interface;
 
 use clash::protocol::Connection;
 use dolphin::Dolphin;
+use game_interface::GameInterface;
 use tokio::net::TcpStream;
 
 #[tokio::main]
@@ -19,7 +20,7 @@ async fn main() {
 
     let mut dolphin = Dolphin::default();
     let _ = dolphin.hook();
-    println!("{}", dolphin.is_hooked());
+    dolphin.mark_task_complete(clash::spatula::Spatula::OnTopOfThePineapple);
 
     let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(sock);
