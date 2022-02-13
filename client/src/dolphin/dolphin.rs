@@ -94,14 +94,15 @@ impl GameInterface for Dolphin {
         let world_addr = base + 0x2F63C8 + world_idx as usize * 0x24C;
         let taskarr_addr = world_addr + 0xC;
         let task_addr = taskarr_addr + idx as usize * 0x48;
-        let counter_addr = task_addr + 20;
+        let counter_addr = task_addr + 0x14;
+
         let mut counter_ptr = [0u8; 4];
         handle.copy_address(counter_addr, &mut counter_ptr).unwrap();
         let counter_ptr =
             u32::from_be_bytes(counter_ptr) as usize - 0x80000000 + self.base_address.unwrap();
 
         handle
-            .put_address(counter_ptr + 20, &2u16.to_be_bytes())
+            .put_address(counter_ptr + 0x14, &2u16.to_be_bytes())
             .unwrap();
     }
 }
