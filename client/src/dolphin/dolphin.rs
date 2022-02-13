@@ -1,10 +1,12 @@
-use clash::spatula::Spatula;
+use clash::{room::Room, spatula::Spatula};
 use log::{debug, error, trace};
-use process_memory::{CopyAddress, ProcessHandle, PutAddress, TryIntoProcessHandle};
+use process_memory::{Memory, ProcessHandle, TryIntoProcessHandle};
 use sysinfo::{PidExt, ProcessExt, System, SystemExt};
 use thiserror::Error;
 
 use crate::game_interface::GameInterface;
+
+use super::DataMember;
 
 const REGION_SIZE: usize = 0x2000000;
 
@@ -66,44 +68,89 @@ impl Dolphin {
 
         Err(Error::RegionNotFound)
     }
+
+    pub fn unhook(&mut self) {
+        self.base_address = None;
+        self.handle = None;
+    }
 }
 
+const WHEREAMI_ADDRESS: usize = 0x803CB8A8;
+const SCENE_PTR_ADDRESS: usize = 0x803C2518;
+const SPATULA_COUNT_ADDRESS: usize = 0x803C205C;
+const SWORLD_BASE: usize = 0x802F63C8;
+const LAB_DOOR_ADDRESS: usize = 0x804F6CB8;
+
 // TODO: Don't panic when dolphin isn't hooked
+// TODO: Cache DataMembers; they contain a Vec so it isn't the best idea to be making new ones
+//       every time we interact with the game.
 impl GameInterface for Dolphin {
     fn start_new_game(&self) {
+        let ptr = DataMember::<u32>::new_offset(
+            self.handle.unwrap(),
+            self.base_address.unwrap(),
+            vec![WHEREAMI_ADDRESS],
+        );
+        ptr.write(&12u32.to_be()).unwrap();
+    }
+
+    fn get_current_level(&self) -> Room {
         let base = self.base_address.unwrap();
-        self.handle
-            .unwrap()
-            .put_address(base + 0x3CB8A8, &12u32.to_be_bytes())
-            .unwrap();
+        let ptr = DataMember::<[u8; 4]>::new_offset(
+            self.handle.unwrap(),
+            base,
+            vec![SCENE_PTR_ADDRESS, 0],
+        );
+
+        ptr.read().unwrap().try_into().unwrap()
+    }
+
+    fn get_spatula_count(&self) -> u32 {
+        let ptr = DataMember::<u32>::new_offset(
+            self.handle.unwrap(),
+            self.base_address.unwrap(),
+            vec![SPATULA_COUNT_ADDRESS],
+        );
+
+        ptr.read().unwrap().swap_bytes()
     }
 
     fn set_spatula_count(&self, value: u32) {
-        let base = self.base_address.unwrap();
-        self.handle
-            .unwrap()
-            .put_address(base + 0x3C205C, &value.to_be_bytes())
-            .unwrap();
+        let ptr = DataMember::<u32>::new_offset(
+            self.handle.unwrap(),
+            self.base_address.unwrap(),
+            vec![SPATULA_COUNT_ADDRESS],
+        );
+        ptr.write(&value.to_be()).unwrap();
     }
 
     fn mark_task_complete(&self, spatula: Spatula) {
         let (world_idx, idx) = spatula.into();
 
         let handle = self.handle.unwrap();
-        let base = self.base_address.unwrap();
-        let world_addr = base + 0x2F63C8 + world_idx as usize * 0x24C;
-        let taskarr_addr = world_addr + 0xC;
-        let task_addr = taskarr_addr + idx as usize * 0x48;
-        let counter_addr = task_addr + 0x14;
 
-        let mut counter_ptr = [0u8; 4];
-        handle.copy_address(counter_addr, &mut counter_ptr).unwrap();
-        let counter_ptr =
-            u32::from_be_bytes(counter_ptr) as usize - 0x80000000 + self.base_address.unwrap();
+        // TODO: reduce magic numbers
+        let mut base = SWORLD_BASE;
+        base += world_idx as usize * 0x24C;
+        base += 0xC;
+        base += idx as usize * 0x48;
+        base += 0x14;
 
-        handle
-            .put_address(counter_ptr + 0x14, &2u16.to_be_bytes())
-            .unwrap();
+        let ptr =
+            DataMember::<u16>::new_offset(handle, self.base_address.unwrap(), vec![base, 0x14]);
+        ptr.write(&2u16.to_be()).unwrap();
+    }
+
+    fn set_lab_door(&self, value: u32) {
+        let ptr = DataMember::<u32>::new_offset(
+            self.handle.unwrap(),
+            self.base_address.unwrap(),
+            vec![LAB_DOOR_ADDRESS],
+        );
+
+        // The game uses a greater than check so we need to subtract three instead of two
+        let cost = value - 3;
+        ptr.write(&cost.to_be()).unwrap();
     }
 }
 
