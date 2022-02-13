@@ -1,4 +1,3 @@
-use log::debug;
 use process_memory::{Architecture, CopyAddress, Memory, ProcessHandle, PutAddress};
 
 const GCN_BASE_ADDRESS: usize = 0x80000000;
@@ -57,16 +56,13 @@ impl<T: Sized + Copy> Memory<T> for DataMember<T> {
             offset += next_offset;
             offset -= GCN_BASE_ADDRESS;
             offset += self.emulated_region_address;
-            debug!("reading offset {offset:#X}");
             self.process.copy_address(offset, &mut copy)?;
             offset = u32::from_be_bytes(copy) as usize;
-            debug!("read {offset:#X}");
         }
 
         offset += self.offsets[noffsets - 1];
         offset -= GCN_BASE_ADDRESS;
         offset += self.emulated_region_address;
-        debug!("final offset {offset:#X}");
         Ok(offset)
     }
 
