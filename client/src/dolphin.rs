@@ -1,8 +1,10 @@
-use std::num::NonZeroU32;
-
+use clash::spatula::Spatula;
 use log::{debug, error, trace};
+use process_memory::{CopyAddress, ProcessHandle, PutAddress, TryIntoProcessHandle};
 use sysinfo::{PidExt, ProcessExt, System, SystemExt};
 use thiserror::Error;
+
+use crate::game_interface::GameInterface;
 
 const REGION_SIZE: usize = 0x2000000;
 
@@ -16,22 +18,21 @@ const PROCESS_NAME: &str = "Dolphin";
 pub enum Error {
     #[error("The emulated memory region could not be found. Make sure Dolphin is running and the game is open.")]
     RegionNotFound,
+    #[error("Dolphin memory could not be accessed.")]
+    IO,
 }
 
+impl From<std::io::Error> for Error {
+    fn from(_: std::io::Error) -> Self {
+        Self::IO
+    }
+}
+
+#[derive(Default)]
 pub struct Dolphin {
     system: System,
     base_address: Option<usize>,
-    pid: Option<NonZeroU32>,
-}
-
-impl Default for Dolphin {
-    fn default() -> Self {
-        Self {
-            system: System::new(),
-            base_address: None,
-            pid: None,
-        }
-    }
+    handle: Option<ProcessHandle>,
 }
 
 impl Dolphin {
@@ -46,23 +47,66 @@ impl Dolphin {
         self.system.refresh_processes();
 
         let procs = self.system.processes_by_name(PROCESS_NAME);
-        for proc in procs {
-            let pid = proc.pid().as_u32();
-            trace!("{} found with pid {pid}", proc.name());
+        let (pid, addr) = procs
+            .into_iter()
+            .map(|p| {
+                let pid = p.pid().as_u32();
+                trace!("{} found with pid {pid}", p.name());
+                (pid, get_emulated_base_address(pid))
+            })
+            .find(|(_, addr)| addr.is_some())
+            .unwrap_or((0, None));
 
-            if let Some(addr) = get_emulated_base_address(pid) {
-                debug!("Found emulated memory region at {addr:#X}");
-                self.base_address = Some(addr);
-                self.pid = Some(pid.try_into().expect("Dolphin pid was 0"));
-                return Ok(());
-            }
+        if let Some(addr) = addr {
+            debug!("Found emulated memory region at {addr:#X}");
+            self.base_address = Some(addr);
+            self.handle = Some(pid.try_into_process_handle()?);
+            return Ok(());
         }
 
         Err(Error::RegionNotFound)
     }
 }
 
-#[cfg(unix)]
+// TODO: Don't panic when dolphin isn't hooked
+impl GameInterface for Dolphin {
+    fn start_new_game(&self) {
+        let base = self.base_address.unwrap();
+        self.handle
+            .unwrap()
+            .put_address(base + 0x3CB8A8, &12u32.to_be_bytes())
+            .unwrap();
+    }
+
+    fn set_spatula_count(&self, value: u32) {
+        let base = self.base_address.unwrap();
+        self.handle
+            .unwrap()
+            .put_address(base + 0x3C205C, &value.to_be_bytes())
+            .unwrap();
+    }
+
+    fn mark_task_complete(&self, spatula: Spatula) {
+        let (world_idx, idx) = spatula.into();
+
+        let handle = self.handle.unwrap();
+        let base = self.base_address.unwrap();
+        let world_addr = base + 0x2F63C8 + world_idx as usize * 0x24C;
+        let taskarr_addr = world_addr + 0xC;
+        let task_addr = taskarr_addr + idx as usize * 0x48;
+        let counter_addr = task_addr + 20;
+        let mut counter_ptr = [0u8; 4];
+        handle.copy_address(counter_addr, &mut counter_ptr).unwrap();
+        let counter_ptr =
+            u32::from_be_bytes(counter_ptr) as usize - 0x80000000 + self.base_address.unwrap();
+
+        handle
+            .put_address(counter_ptr + 20, &2u16.to_be_bytes())
+            .unwrap();
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn get_emulated_base_address(pid: u32) -> Option<usize> {
     use proc_maps::get_process_maps;
     let maps = match get_process_maps(pid as proc_maps::Pid) {
@@ -82,7 +126,7 @@ fn get_emulated_base_address(pid: u32) -> Option<usize> {
     map.map(|m| m.start())
 }
 
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 fn get_emulated_base_address(pid: u32) -> Option<usize> {
     use winapi::um::handleapi::CloseHandle;
     use winapi::um::memoryapi::VirtualQueryEx;

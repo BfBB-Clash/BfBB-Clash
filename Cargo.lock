@@ -156,7 +156,7 @@ dependencies = [
  "env_logger",
  "log",
  "proc-maps",
- "read-process-memory",
+ "process-memory",
  "sysinfo",
  "thiserror",
  "tokio",
@@ -462,6 +462,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "process-memory"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61d7c67e1d5e7e8e100ce1240b08e3a7249fe7d02b04232f006f8f60f27791fe"
+dependencies = [
+ "libc",
+ "mach",
+ "winapi",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -533,18 +544,6 @@ dependencies = [
  "crossbeam-utils",
  "lazy_static",
  "num_cpus",
-]
-
-[[package]]
-name = "read-process-memory"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a103589f0c267c68328595f1ff45647e9d4b3ee6b9c1c51dcdc9b4b55ca504c5"
-dependencies = [
- "libc",
- "log",
- "mach",
- "winapi",
 ]
 
 [[package]]
