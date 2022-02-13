@@ -2,8 +2,6 @@ pub mod dolphin;
 pub mod game_interface;
 
 use clash::protocol::Connection;
-use dolphin::Dolphin;
-use game_interface::GameInterface;
 use tokio::net::TcpStream;
 
 #[tokio::main]
@@ -18,14 +16,10 @@ async fn main() {
         .parse_env("CLASH_LOG")
         .init();
 
-    let mut dolphin = Dolphin::default();
-    let _ = dolphin.hook();
-    dolphin.mark_task_complete(clash::spatula::Spatula::OnTopOfThePineapple);
-
     let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(sock);
 
-    let accept = conn.read_frame().await.unwrap().unwrap();
+    let _accept = conn.read_frame().await.unwrap().unwrap();
 
     conn.write_frame(clash::protocol::Message::GameHost {
         auth_id: 1,
