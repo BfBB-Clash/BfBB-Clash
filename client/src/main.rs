@@ -1,9 +1,7 @@
-pub mod dolphin;
-pub mod game_interface;
-
 use clash::protocol::Connection;
-use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
 use tokio::net::TcpStream;
+
+mod gui;
 
 fn main() {
     env_logger::Builder::new()
@@ -24,7 +22,7 @@ fn main() {
     let _network_thread = std::thread::spawn(start_network);
 
     // Start gui on the main thread
-    start_gui();
+    gui::run();
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -32,36 +30,10 @@ async fn start_network() {
     let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(sock);
 
-    let _accept = conn.read_frame().await.unwrap().unwrap();
-
     conn.write_frame(clash::protocol::Message::GameHost {
         auth_id: 1,
         lobby_id: 2,
     })
     .await
     .unwrap();
-}
-
-struct Clash {
-    buf: String,
-}
-
-impl App for Clash {
-    fn update(&mut self, ctx: &eframe::egui::CtxRef, frame: &eframe::epi::Frame) {
-        CentralPanel::default().show(ctx, |ui| {
-            ui.text_edit_singleline(&mut self.buf);
-        });
-    }
-
-    fn name(&self) -> &str {
-        "BfBB Clash"
-    }
-}
-
-fn start_gui() {
-    let mut window_options = NativeOptions::default();
-    window_options.initial_window_size = Some((600., 720.).into());
-    window_options.resizable = false;
-
-    run_native(Box::new(Clash { buf: String::new() }), window_options);
 }

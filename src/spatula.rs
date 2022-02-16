@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use strum_macros::EnumIter;
+
+#[derive(EnumIter, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Spatula {
     // Bikini Bottom
     OnTopOfThePineapple,
