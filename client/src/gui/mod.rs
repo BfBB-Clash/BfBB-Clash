@@ -1,7 +1,7 @@
 use clash::spatula::Spatula;
 use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
 use egui::{
-    Align, Color32, FontData, FontDefinitions, FontFamily, Layout, SidePanel, TopBottomPanel,
+    Align, Color32, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style, TopBottomPanel,
 };
 use strum::IntoEnumIterator;
 
@@ -64,6 +64,12 @@ impl App for Clash {
         );
 
         ctx.set_fonts(font_def);
+
+        //
+        let mut style = Style::default();
+        style.spacing.button_padding = (PADDING, PADDING).into();
+        style.spacing.item_spacing = (PADDING, PADDING).into();
+        ctx.set_style(style);
     }
 
     fn update(&mut self, ctx: &eframe::egui::CtxRef, frame: &eframe::epi::Frame) {
@@ -74,7 +80,6 @@ impl App for Clash {
                         ui.with_layout(Layout::top_down(Align::Center), |ui| {
                             ui.add_space(BORDER);
                             ui.label("Battle for Bikini Bottom");
-                            ui.add_space(PADDING);
                             ui.heading("CLASH!");
                         });
                     });
@@ -83,11 +88,9 @@ impl App for Clash {
                         if ui.button("Quit").clicked() {
                             frame.quit();
                         }
-                        ui.add_space(PADDING);
                         if ui.button("Join Game").clicked() {
                             self.state = Menu::Join;
                         }
-                        ui.add_space(PADDING);
                         if ui.button("Host Game").clicked() {
                             self.state = Menu::Host;
                         }
@@ -101,16 +104,13 @@ impl App for Clash {
                 TopBottomPanel::bottom("Join Panel").show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Name: ");
-                        ui.add_space(PADDING);
                         ui.text_edit_singleline(&mut self.name);
                     });
-                    ui.add_space(PADDING);
                     ui.add_enabled_ui(!self.name.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
                             self.state = Menu::Game;
                         }
                     });
-                    ui.add_space(PADDING);
                     if ui.button("Back").clicked() {
                         self.state = Menu::Main;
                     }
@@ -124,22 +124,17 @@ impl App for Clash {
                 TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Name: ");
-                        ui.add_space(PADDING);
                         ui.text_edit_singleline(&mut self.name);
                     });
-                    ui.add_space(PADDING);
                     ui.horizontal(|ui| {
                         ui.label("Lobby ID: ");
-                        ui.add_space(PADDING);
                         ui.text_edit_singleline(&mut self.lobby_id);
                     });
-                    ui.add_space(PADDING);
                     ui.add_enabled_ui(!self.name.is_empty() && !self.lobby_id.is_empty(), |ui| {
                         if ui.button("Join Game").clicked() {
                             self.state = Menu::Game;
                         }
                     });
-                    ui.add_space(PADDING);
                     if ui.button("Back").clicked() {
                         self.state = Menu::Main;
                     }
