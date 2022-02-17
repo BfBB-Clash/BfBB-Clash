@@ -1,9 +1,12 @@
-use clash::spatula::Spatula;
+mod game_menu;
+mod player_widget;
+
 use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
 use egui::{
     Align, Color32, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style, TopBottomPanel,
 };
-use strum::IntoEnumIterator;
+
+use self::{game_menu::GameMenu, player_widget::PlayerUi};
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
@@ -57,6 +60,10 @@ impl App for Clash {
         font_def.family_and_size.insert(
             eframe::egui::TextStyle::Body,
             (FontFamily::Proportional, 32.),
+        );
+        font_def.family_and_size.insert(
+            eframe::egui::TextStyle::Small,
+            (FontFamily::Proportional, 24.),
         );
         font_def.family_and_size.insert(
             eframe::egui::TextStyle::Button,
@@ -143,21 +150,48 @@ impl App for Clash {
             }
             Menu::Game => {
                 SidePanel::left("Player List")
-                    .resizable(false)
+                    .resizable(true)
                     .show(ctx, |ui| {
-                        ui.label(&self.name);
-                        ui.set_min_size((100., 0.).into());
-                        ui.set_max_size((100., 0.).into());
+                        ui.add_space(PADDING);
+                        ui.add(PlayerUi::new(
+                            self.name.as_str().into(),
+                            3,
+                            "over here".into(),
+                            Color32::from_rgb(100, 120, 180),
+                        ));
+                        ui.add(PlayerUi::new(
+                            "Not Square".into(),
+                            4,
+                            "over there".into(),
+                            Color32::from_rgb(180, 100, 120),
+                        ));
+                        ui.add(PlayerUi::new(
+                            "Not Square".into(),
+                            4,
+                            "over there".into(),
+                            Color32::from_rgb(180, 100, 120),
+                        ));
+                        ui.add(PlayerUi::new(
+                            "Not Square".into(),
+                            4,
+                            "over there".into(),
+                            Color32::from_rgb(180, 100, 120),
+                        ));
+                        ui.add(PlayerUi::new(
+                            "Not Square".into(),
+                            4,
+                            "over there".into(),
+                            Color32::from_rgb(180, 100, 120),
+                        ));
+                        ui.add(PlayerUi::new(
+                            "Not Square".into(),
+                            4,
+                            "over there".into(),
+                            Color32::from_rgb(180, 100, 120),
+                        ));
                     });
                 CentralPanel::default().show(ctx, |ui| {
-                    for spat in Spatula::iter() {
-                        let (y, x) = spat.into();
-                        ui.painter().circle_filled(
-                            (x as f32 * 40. + 140., y as f32 * 40. + 20.).into(),
-                            16.,
-                            Color32::from_rgb(50, 50, 50),
-                        )
-                    }
+                    ui.add(GameMenu::new());
                 });
             }
         }
