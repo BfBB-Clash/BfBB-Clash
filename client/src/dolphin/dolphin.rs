@@ -4,7 +4,7 @@ use process_memory::{Memory, ProcessHandle, TryIntoProcessHandle};
 use sysinfo::{PidExt, ProcessExt, System, SystemExt};
 use thiserror::Error;
 
-use crate::game_interface::GameInterface;
+use crate::game::GameInterface;
 
 use super::DataMember;
 
@@ -75,6 +75,7 @@ impl Dolphin {
     }
 }
 
+const LOADING_ADDRESS: usize = 0x803CB7B0;
 const WHEREAMI_ADDRESS: usize = 0x803CB8A8;
 const SCENE_PTR_ADDRESS: usize = 0x803C2518;
 const SPATULA_COUNT_ADDRESS: usize = 0x803C205C;
@@ -85,6 +86,15 @@ const LAB_DOOR_ADDRESS: usize = 0x804F6CB8;
 // TODO: Cache DataMembers; they contain a Vec so it isn't the best idea to be making new ones
 //       every time we interact with the game.
 impl GameInterface for Dolphin {
+    fn is_loading(&self) -> bool {
+        let ptr = DataMember::<u32>::new_offset(
+            self.handle.unwrap(),
+            self.base_address.unwrap(),
+            vec![LOADING_ADDRESS],
+        );
+        ptr.read().unwrap().swap_bytes() != 0
+    }
+
     fn start_new_game(&self) {
         let ptr = DataMember::<u32>::new_offset(
             self.handle.unwrap(),
@@ -139,6 +149,23 @@ impl GameInterface for Dolphin {
         let ptr =
             DataMember::<u16>::new_offset(handle, self.base_address.unwrap(), vec![base, 0x14]);
         ptr.write(&2u16.to_be()).unwrap();
+    }
+
+    fn is_task_complete(&self, spatula: Spatula) -> bool {
+        let handle = self.handle.unwrap();
+
+        // TODO: reduce magic numbers
+        let offset = spatula.get_offset() as usize * 4;
+
+        let ptr = DataMember::<u32>::new_offset(
+            handle,
+            self.base_address.unwrap(),
+            vec![SCENE_PTR_ADDRESS, 0x78, offset, 0x16C],
+        );
+        let res = ptr.read().unwrap().swap_bytes() & 4;
+        debug!("{spatula:?} is {res}");
+
+        ptr.read().unwrap().swap_bytes() & 4 != 0
     }
 
     fn set_lab_door(&self, value: u32) {

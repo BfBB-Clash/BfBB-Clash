@@ -1,6 +1,8 @@
 use clash::protocol::Connection;
 use tokio::net::TcpStream;
 
+mod dolphin;
+mod game;
 mod gui;
 
 fn main() {
@@ -20,6 +22,9 @@ fn main() {
     //       have a single connection. Unfortunately for now we need to use it since the shared
     //       library is async.
     let _network_thread = std::thread::spawn(start_network);
+
+    // Start Game Thread
+    let _game_thread = std::thread::spawn(game::start_game);
 
     // Start gui on the main thread
     gui::run();
