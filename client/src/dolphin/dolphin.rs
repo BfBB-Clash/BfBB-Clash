@@ -152,6 +152,23 @@ impl GameInterface for Dolphin {
     }
 
     fn is_task_complete(&self, spatula: Spatula) -> bool {
+        let (world_idx, idx) = spatula.into();
+
+        let handle = self.handle.unwrap();
+
+        // TODO: reduce magic numbers
+        let mut base = SWORLD_BASE;
+        base += world_idx as usize * 0x24C;
+        base += 0xC;
+        base += idx as usize * 0x48;
+        base += 0x14;
+
+        let ptr =
+            DataMember::<u16>::new_offset(handle, self.base_address.unwrap(), vec![base, 0x14]);
+        ptr.read().unwrap().swap_bytes() == 2
+    }
+
+    fn is_spatula_being_collected(&self, spatula: Spatula) -> bool {
         let handle = self.handle.unwrap();
 
         // TODO: reduce magic numbers
@@ -162,8 +179,6 @@ impl GameInterface for Dolphin {
             self.base_address.unwrap(),
             vec![SCENE_PTR_ADDRESS, 0x78, offset, 0x16C],
         );
-        let res = ptr.read().unwrap().swap_bytes() & 4;
-        debug!("{spatula:?} is {res}");
 
         ptr.read().unwrap().swap_bytes() & 4 != 0
     }
