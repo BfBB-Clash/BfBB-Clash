@@ -14,7 +14,10 @@ pub trait GameInterface {
     fn set_spatula_count(&self, value: u32);
     /// Marks a spatula as "completed" in the pause menu. This has the effect of giving the player access to the task warp.
     fn mark_task_complete(&self, spatula: Spatula);
+    /// True when `spatula` is shown as gold in the pause menu.
     fn is_task_complete(&self, spatula: Spatula) -> bool;
+    /// True when `spatula`'s collected animation is playing
+    fn is_spatula_being_collected(&self, spatula: Spatula) -> bool;
     /// Changes the number of spatulas required to enter the Chum Bucket Lab. This needs to be called when in the Chum Bucket
     /// Or it will be overwritten on level load.
     fn set_lab_door(&self, value: u32);

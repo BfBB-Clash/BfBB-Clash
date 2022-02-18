@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use clash::spatula::Spatula;
-use log::{debug, info};
+use log::info;
 use strum::IntoEnumIterator;
 
 use crate::game::GameInterface;
@@ -32,8 +32,13 @@ impl<T: GameInterface> GameState<T> {
             if self.spatulas.contains(&spat) {
                 continue;
             }
-            debug!("Checking for {spat:?}");
-            if self.interface.is_task_complete(spat) {
+            if spat != Spatula::TheSmallShallRuleOrNot
+                && spat != Spatula::KahRahTae
+                && self.interface.is_spatula_being_collected(spat)
+            {
+                self.spatulas.insert(spat);
+                info!("Collected {spat:?}");
+            } else if self.interface.is_task_complete(spat) {
                 self.spatulas.insert(spat);
                 info!("Collected {spat:?}");
             }
