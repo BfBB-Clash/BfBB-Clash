@@ -92,7 +92,7 @@ impl GameInterface for Dolphin {
             self.base_address.unwrap(),
             vec![LOADING_ADDRESS],
         );
-        ptr.read().unwrap().swap_bytes() != 0
+        u32::from_be(ptr.read().unwrap()) != 0
     }
 
     fn start_new_game(&self) {
@@ -122,7 +122,7 @@ impl GameInterface for Dolphin {
             vec![SPATULA_COUNT_ADDRESS],
         );
 
-        ptr.read().unwrap().swap_bytes()
+        u32::from_be(ptr.read().unwrap())
     }
 
     fn set_spatula_count(&self, value: u32) {
@@ -165,7 +165,7 @@ impl GameInterface for Dolphin {
 
         let ptr =
             DataMember::<u16>::new_offset(handle, self.base_address.unwrap(), vec![base, 0x14]);
-        ptr.read().unwrap().swap_bytes() == 2
+        u16::from_be(ptr.read().unwrap()) == 2
     }
 
     fn collect_spatula(&self, spatula: Spatula) {
@@ -185,11 +185,11 @@ impl GameInterface for Dolphin {
             vec![SCENE_PTR_ADDRESS, 0x78, offset, 0x16C],
         );
 
-        let mut flags = ptr_flags.read().unwrap().swap_bytes();
+        let mut flags = ptr_flags.read().unwrap();
         flags &= !1; // Disable the entity
 
         // Set some model flags
-        let mut state = ptr_state.read().unwrap().swap_bytes();
+        let mut state = u32::from_be(ptr_state.read().unwrap());
         state |= 8;
         state &= !4;
         state &= !2;
@@ -210,7 +210,7 @@ impl GameInterface for Dolphin {
             vec![SCENE_PTR_ADDRESS, 0x78, offset, 0x16C],
         );
 
-        ptr.read().unwrap().swap_bytes() & 4 != 0
+        u32::from_be(ptr.read().unwrap()) & 4 != 0
     }
 
     fn set_lab_door(&self, value: u32) {
