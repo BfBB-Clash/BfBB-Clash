@@ -54,14 +54,24 @@ impl<T: Sized + Copy> Memory<T> for DataMember<T> {
         let mut copy = [0u8; Architecture::Arch32Bit as usize];
         for next_offset in self.offsets.iter().take(noffsets - 1) {
             offset += next_offset;
-            offset -= GCN_BASE_ADDRESS;
+            offset = offset
+                .checked_sub(GCN_BASE_ADDRESS)
+                .ok_or(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Attempt to dereference an invalid pointer.",
+                ))?;
             offset += self.emulated_region_address;
             self.process.copy_address(offset, &mut copy)?;
             offset = u32::from_be_bytes(copy) as usize;
         }
 
         offset += self.offsets[noffsets - 1];
-        offset -= GCN_BASE_ADDRESS;
+        offset = offset
+            .checked_sub(GCN_BASE_ADDRESS)
+            .ok_or(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Attempt to dereference an invalid pointer.",
+            ))?;
         offset += self.emulated_region_address;
         Ok(offset)
     }
