@@ -21,10 +21,14 @@ fn main() {
     //       simply use std's blocking networking in a new thread, since we should only ever
     //       have a single connection. Unfortunately for now we need to use it since the shared
     //       library is async.
-    let _network_thread = std::thread::spawn(start_network);
+    let _network_thread = std::thread::Builder::new()
+        .name("Network".into())
+        .spawn(start_network);
 
     // Start Game Thread
-    let _game_thread = std::thread::spawn(game::start_game);
+    let _game_thread = std::thread::Builder::new()
+        .name("Logic".into())
+        .spawn(game::start_game);
 
     // Start gui on the main thread
     gui::run();
