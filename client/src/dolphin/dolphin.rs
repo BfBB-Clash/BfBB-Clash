@@ -168,6 +168,36 @@ impl GameInterface for Dolphin {
         ptr.read().unwrap().swap_bytes() == 2
     }
 
+    fn collect_spatula(&self, spatula: Spatula) {
+        let handle = self.handle.unwrap();
+
+        // TODO: reduce magic numbers
+        let offset = spatula.get_offset() as usize * 4;
+
+        let ptr_flags = DataMember::<u8>::new_offset(
+            handle,
+            self.base_address.unwrap(),
+            vec![SCENE_PTR_ADDRESS, 0x78, offset, 0x18],
+        );
+        let ptr_state = DataMember::<u32>::new_offset(
+            handle,
+            self.base_address.unwrap(),
+            vec![SCENE_PTR_ADDRESS, 0x78, offset, 0x16C],
+        );
+
+        let mut flags = ptr_flags.read().unwrap().swap_bytes();
+        flags &= !1; // Disable the entity
+
+        // Set some model flags
+        let mut state = ptr_state.read().unwrap().swap_bytes();
+        state |= 8;
+        state &= !4;
+        state &= !2;
+
+        ptr_flags.write(&flags.to_be()).unwrap();
+        ptr_state.write(&state.to_be()).unwrap();
+    }
+
     fn is_spatula_being_collected(&self, spatula: Spatula) -> bool {
         let handle = self.handle.unwrap();
 
