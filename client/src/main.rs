@@ -1,4 +1,6 @@
-use clash::protocol::Connection;
+use std::sync::mpsc::channel;
+
+use clash::{protocol::Connection, spatula::Spatula};
 use tokio::net::TcpStream;
 
 mod dolphin;
@@ -26,12 +28,13 @@ fn main() {
         .spawn(start_network);
 
     // Start Game Thread
+    let (sender, receiver) = channel::<Spatula>();
     let _game_thread = std::thread::Builder::new()
         .name("Logic".into())
-        .spawn(game::start_game);
+        .spawn(move || game::start_game(sender));
 
     // Start gui on the main thread
-    gui::run();
+    gui::run(receiver);
 }
 
 #[tokio::main(flavor = "current_thread")]
