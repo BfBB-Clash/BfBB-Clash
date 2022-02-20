@@ -1,12 +1,14 @@
 mod game_menu;
 mod player_widget;
 
+use self::{game_menu::GameMenu, player_widget::PlayerUi};
+use crate::game::GameState;
+use clash::spatula::Spatula;
 use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
 use egui::{
     Align, Color32, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style, TopBottomPanel,
 };
-
-use self::{game_menu::GameMenu, player_widget::PlayerUi};
+use std::sync::mpsc::Receiver;
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
@@ -22,14 +24,18 @@ pub struct Clash {
     state: Menu,
     name: String,
     lobby_id: String,
+    game_state: GameState,
+    receiver: Receiver<Spatula>,
 }
 
-impl Default for Clash {
-    fn default() -> Self {
+impl Clash {
+    fn new(receiver: Receiver<Spatula>) -> Self {
         Self {
             state: Menu::Main,
             name: Default::default(),
             lobby_id: Default::default(),
+            game_state: GameState::default(),
+            receiver,
         }
     }
 }
@@ -149,13 +155,16 @@ impl App for Clash {
                 });
             }
             Menu::Game => {
+                while let Ok(s) = self.receiver.try_recv() {
+                    self.game_state.spatulas.insert(s);
+                }
                 SidePanel::left("Player List")
                     .resizable(true)
                     .show(ctx, |ui| {
                         ui.add_space(PADDING);
                         ui.add(PlayerUi::new(
                             self.name.as_str().into(),
-                            3,
+                            self.game_state.spatulas.len() as u32,
                             "over here".into(),
                             Color32::from_rgb(100, 120, 180),
                         ));
@@ -191,8 +200,9 @@ impl App for Clash {
                         ));
                     });
                 CentralPanel::default().show(ctx, |ui| {
-                    ui.add(GameMenu::new());
+                    ui.add(GameMenu::new(&self.game_state));
                 });
+                ctx.request_repaint();
             }
         }
     }
@@ -202,12 +212,12 @@ impl App for Clash {
     }
 }
 
-pub fn run() {
+pub fn run(gui_receiver: Receiver<Spatula>) {
     let window_options = NativeOptions {
         initial_window_size: Some((600., 720.).into()),
         resizable: false,
         ..Default::default()
     };
 
-    run_native(Box::new(Clash::default()), window_options);
+    run_native(Box::new(Clash::new(gui_receiver)), window_options);
 }

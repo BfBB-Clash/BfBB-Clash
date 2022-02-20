@@ -2,14 +2,18 @@ use clash::spatula::Spatula;
 use egui::{Color32, Sense, Widget};
 use strum::IntoEnumIterator;
 
-pub struct GameMenu {}
+use crate::game::GameState;
 
-impl GameMenu {
-    pub fn new() -> Self {
-        Self {}
+pub struct GameMenu<'a> {
+    game: &'a GameState,
+}
+
+impl<'a> GameMenu<'a> {
+    pub fn new(game: &'a GameState) -> Self {
+        Self { game }
     }
 }
-impl Widget for GameMenu {
+impl<'a> Widget for GameMenu<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         let available_size = ui.available_size();
 
@@ -22,6 +26,12 @@ impl Widget for GameMenu {
             ui.allocate_exact_size(ui.available_size(), Sense::focusable_noninteractive());
 
         for spat in Spatula::iter() {
+            let color = if self.game.spatulas.contains(&spat) {
+                Color32::from_rgb(100, 120, 180)
+            } else {
+                Color32::from_rgb(50, 50, 50)
+            };
+
             let (y, x) = spat.into();
             ui.painter().circle_filled(
                 (
@@ -30,7 +40,7 @@ impl Widget for GameMenu {
                 )
                     .into(),
                 radius,
-                Color32::from_rgb(50, 50, 50),
+                color,
             )
         }
 

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::mpsc::Sender};
 
 use clash::spatula::Spatula;
 use log::info;
@@ -6,21 +6,20 @@ use strum::IntoEnumIterator;
 
 use crate::game::GameInterface;
 
-pub struct GameState<T: GameInterface> {
-    interface: T,
-    spatulas: HashSet<Spatula>,
+pub struct GameState {
+    pub spatulas: HashSet<Spatula>,
 }
 
-impl<T: GameInterface> GameState<T> {
-    pub fn new(interface: T) -> Self {
+impl Default for GameState {
+    fn default() -> Self {
         Self {
-            interface,
             spatulas: HashSet::default(),
         }
     }
+}
 
-    pub fn update(&mut self) {
-        let game = &self.interface;
+impl GameState {
+    pub fn update<T: GameInterface>(&mut self, game: &T, gui_sender: &mut Sender<Spatula>) {
         if game.is_loading() {
             return;
         }
@@ -34,12 +33,14 @@ impl<T: GameInterface> GameState<T> {
             }
             if spat != Spatula::TheSmallShallRuleOrNot
                 && spat != Spatula::KahRahTae
-                && self.interface.is_spatula_being_collected(spat)
+                && game.is_spatula_being_collected(spat)
             {
                 self.spatulas.insert(spat);
+                let _ = gui_sender.send(spat);
                 info!("Collected {spat:?}");
-            } else if self.interface.is_task_complete(spat) {
+            } else if game.is_task_complete(spat) {
                 self.spatulas.insert(spat);
+                let _ = gui_sender.send(spat);
                 info!("Collected {spat:?}");
             }
         }
