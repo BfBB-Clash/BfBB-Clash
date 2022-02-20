@@ -1,19 +1,23 @@
-use clash::player::{SharedPlayer, PlayerOptions};
+use std::sync::{self, Arc, Mutex, RwLock, mpsc::Sender};
 
+use clash::player::{PlayerOptions, SharedPlayer};
+use clash::protocol::Message;
+
+#[derive(Debug)]
 pub struct Player {
-    shared: SharedPlayer,
-    auth_id: u32,
-    lobby_id: u32,
-
+    pub shared: SharedPlayer,
+    pub auth_id: u32,
+    pub lobby_id: u32,
+    pub send: Mutex<Sender<Message>>,
 }
 
 impl Player {
-    pub fn new(shared: SharedPlayer, auth_id: u32) -> Self
-    {
+    pub fn new(shared: SharedPlayer, auth_id: u32, send: Mutex<Sender<Message>>) -> Self {
         Self {
             shared,
             auth_id,
             lobby_id: 0,
+            send
         }
     }
 }
