@@ -1,5 +1,6 @@
 use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
@@ -8,6 +9,7 @@ use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 use crate::lobby::{LobbyOptions, SharedLobby};
 use crate::player::PlayerOptions;
 use crate::room::Room;
+use crate::spatula::Spatula;
 
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -60,7 +62,7 @@ pub enum Message {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Item {
-    Spatula,
+    Spatula(Spatula),
     Fuse,
 }
 
@@ -91,31 +93,28 @@ impl<'a> Connection<'a> {
         }
     }
 
-    pub fn read_frame(&mut self) -> Result<Option<Message>, tokio::io::Error> {
-        if let Some(frame) = self.parse_frame()? {
-            return Ok(Some(frame));
-        }
-        if self.read_stream.try_read(&mut self.buffer)? == 0 {
-            if self.buffer.is_empty() {
-                // Remote closed Connection
-                return Ok(None);
-            } else {
-                // Connection closed while still sending data
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    Error::ConnectionReset,
-                ));
+    pub async fn read_frame(&mut self) -> Result<Option<Message>> {
+        loop {
+            if let Some(frame) = self.parse_frame()? {
+                return Ok(Some(frame));
+            }
+
+            if self.read_stream.read_buf(&mut self.buffer).await? == 0 {
+                if self.buffer.is_empty() {
+                    // Remote closed Connection
+                    return Ok(None);
+                } else {
+                    // Connection closed while still sending data
+                    return Err(Error::ConnectionReset.into());
+                }
             }
         }
-
-        todo!()
     }
 
     fn parse_frame(&mut self) -> Result<Option<Message>, tokio::io::Error> {
         if self.buffer.len() < 2 {
             return Ok(None);
         }
-
         let len = self.buffer.get_u16().into();
         if self.buffer.remaining() < len {
             return Ok(None);
@@ -124,6 +123,7 @@ impl<'a> Connection<'a> {
         let message = bincode::deserialize::<Message>(&self.buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         self.buffer.advance(len);
+
         Ok(Some(message))
     }
 
@@ -132,9 +132,9 @@ impl<'a> Connection<'a> {
         if bytes.len() > u16::MAX.into() {
             return Err(Error::FrameLength.into());
         }
-        let len: u16 = bytes.len() as u16;
-        let mut len = len.to_be_bytes();
-        self.write_stream.write(&mut len).await?;
+        let len = bytes.len() as u16;
+        let len = len.to_be_bytes();
+        self.write_stream.write(&len).await?;
         self.write_stream.write_buf(&mut bytes).await?;
         self.write_stream.flush().await?;
         Ok(())

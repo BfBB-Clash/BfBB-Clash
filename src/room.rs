@@ -71,6 +71,7 @@ pub enum Room {
 }
 
 impl Room {
+    #[allow(dead_code)]
     const fn get_name(&self) -> &'static str {
         todo!()
     }

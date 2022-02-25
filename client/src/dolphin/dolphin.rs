@@ -69,6 +69,7 @@ impl Dolphin {
         Err(Error::RegionNotFound)
     }
 
+    #[allow(dead_code)]
     pub fn unhook(&mut self) {
         self.base_address = None;
         self.handle = None;
