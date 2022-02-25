@@ -26,7 +26,7 @@ impl<'a> Widget for GameMenu<'a> {
             ui.allocate_exact_size(ui.available_size(), Sense::focusable_noninteractive());
 
         for spat in Spatula::iter() {
-            let color = if self.game.spatulas.contains(&spat) {
+            let color = if self.game.spatulas.contains_key(&spat) {
                 Color32::from_rgb(100, 120, 180)
             } else {
                 Color32::from_rgb(50, 50, 50)

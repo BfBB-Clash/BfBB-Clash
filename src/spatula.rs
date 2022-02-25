@@ -1,8 +1,9 @@
-use strum_macros::EnumIter;
+use serde::{Deserialize, Serialize};
+use strum_macros::{EnumCount, EnumIter};
 
 use crate::room::Room;
 
-#[derive(EnumIter, Hash, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(EnumIter, EnumCount, Hash, Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
 pub enum Spatula {
     // Bikini Bottom
     OnTopOfThePineapple,

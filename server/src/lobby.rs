@@ -1,68 +1,62 @@
 use clash::lobby::{LobbyOptions, SharedLobby};
-use clash::player::SharedPlayer;
 use clash::protocol::Message;
 use clash::MAX_PLAYERS;
-
-use log::{debug, error, info, warn};
-use std::iter::Iterator;
-use std::sync::{self, mpsc::Sender, Arc, Mutex};
+use std::collections::HashMap;
+use thiserror::Error;
+use tokio::sync::broadcast::Sender;
+use tokio::sync::broadcast::{channel, Receiver};
 
 use crate::player::Player;
-use crate::State;
+
+#[derive(Copy, Clone, Debug, Error)]
+pub enum LobbyError {
+    #[error("Attempted to add a player to a full lobby")]
+    LobbyFull,
+    #[error("Attempted to add a invalid player to a lobby")]
+    PlayerInvalid,
+}
 
 pub struct Lobby {
     pub shared: SharedLobby,
     pub player_ids: Vec<u32>,
     pub host_id: u32,
+    pub sender: Sender<Message>,
 }
 
 impl Lobby {
     pub fn new(new_options: LobbyOptions, host_id: u32) -> Self {
+        let (sender, _) = channel(100);
         Self {
             shared: SharedLobby {
                 lobby_id: 1,
                 options: new_options,
                 is_started: false,
                 players: Vec::new(),
-                host_index: 0,
+                host_index: None,
                 player_count: 0,
             },
-            host_id: host_id,
-            player_ids: vec![0; MAX_PLAYERS],
+            host_id,
+            player_ids: vec![0; MAX_PLAYERS as usize],
+            sender,
         }
     }
 
-    pub fn add_player(&mut self, state: &mut State, auth_id: u32) -> Result<(), ()> {
-        if self.shared.player_count < 6 {
-            if let p = state.players.get_mut(&auth_id).unwrap() {
+    pub fn add_player(
+        &mut self,
+        players: &mut HashMap<u32, Player>,
+        auth_id: u32,
+    ) -> Result<(Sender<Message>, Receiver<Message>), LobbyError> {
+        if self.shared.player_count < MAX_PLAYERS {
+            // TODO: Check this.
+            if let Some(p) = players.get_mut(&auth_id) {
                 self.shared.player_count += 1;
                 self.shared.players.push(p.shared.clone());
                 self.player_ids.push(auth_id);
-                p.shared.lobby_index =
-                    i8::try_from(self.player_ids.len()).expect("This shouldn't break.");
-                return Ok(());
+                p.shared.lobby_index = Some(self.player_ids.len());
+                return Ok((self.sender.clone(), self.sender.subscribe()));
             }
-            return Err(());
+            return Err(LobbyError::PlayerInvalid);
         }
-        Err(())
-    }
-
-    pub fn broadcast_message(&self, state: &mut State, message: Message) -> Result<(), ()> {
-        for &auth_id in self.player_ids.iter() {
-            if auth_id != 0 {
-                match state.players.get_mut(&auth_id) {
-                    Some(p) => {
-                        // TODO: remove unwrap/ok.
-                        p.send.lock().unwrap().send(message.clone()).ok();
-                    }
-                    None => {
-                        //TODO: Freak out more probably.
-                        info!("Unknown player id {auth_id:#X}");
-                        continue;
-                    }
-                };
-            }
-        }
-        Ok(())
+        Err(LobbyError::LobbyFull)
     }
 }

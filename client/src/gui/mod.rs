@@ -156,7 +156,7 @@ impl App for Clash {
             }
             Menu::Game => {
                 while let Ok(s) = self.receiver.try_recv() {
-                    self.game_state.spatulas.insert(s);
+                    self.game_state.spatulas.insert(s, None);
                 }
                 SidePanel::left("Player List")
                     .resizable(true)

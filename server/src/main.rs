@@ -1,11 +1,12 @@
 use clash::player::{PlayerOptions, SharedPlayer};
-use clash::protocol::{self, Connection, Message};
+use clash::protocol::{Connection, Message};
 use log::{debug, error, info, warn};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
-use std::sync::{self, Arc, Mutex, RwLock, mpsc::Sender};
+use std::sync::{Arc, RwLock};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::spawn;
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::{select, spawn};
 
 pub mod lobby;
 pub mod player;
@@ -25,7 +26,7 @@ impl State {
             lobbies: HashMap::new(),
         }
     }
-    pub fn add_player(&mut self, send: Mutex<Sender<Message>>) -> u32 {
+    pub fn add_player(&mut self) -> u32 {
         let auth_id = self.gen_auth_id();
         self.players.insert(
             auth_id,
@@ -35,7 +36,6 @@ impl State {
                     color: 0,
                 }),
                 auth_id,
-                send
             ),
         );
         auth_id
@@ -51,6 +51,7 @@ impl State {
         }
         auth_id
     }
+    #[allow(dead_code)]
     fn gen_lobby_id(&self) -> u32 {
         let mut lobby_id;
         loop {
@@ -71,7 +72,7 @@ async fn main() {
         .format_target(false)
         .format_indent(Some(4))
         .format_timestamp_secs()
-        .filter_level(log::LevelFilter::Warn)
+        .filter_level(log::LevelFilter::Debug)
         .parse_env("CLASH_LOG")
         .init();
     let listener = TcpListener::bind("127.0.0.1:42932").await.unwrap();
@@ -83,146 +84,53 @@ async fn main() {
         let (socket, _) = listener.accept().await.unwrap();
 
         let state = state.clone();
-        create_new_player(state, socket);
+        spawn(handle_new_connection(state, socket));
     }
 }
 
-fn create_new_player(state: Arc<RwLock<State>>, mut socket: TcpStream) {
-    let (sender, receiver) = std::sync::mpsc::channel::<Message>();
-    let sender = Mutex::new(sender);
+async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream, ) {
+    // Add new player
     let auth_id = {
         let mut state = state.write().expect("Failed to lock State");
-        state.add_player(sender)
+        state.add_player()
     };
-    spawn(async move { handle_new_connection(state, socket, auth_id, receiver).await });
-}
-
-async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream, auth_id: u32, receiver: std::sync::mpsc::Receiver<Message>) {
-    // Add new player
     let mut connection = Connection::new(&mut socket);
+    
     // Inform player of their auth_id
     if let Err(e) = connection
         .write_frame(Message::ConnectionAccept { auth_id })
         .await
     {
-        error!("Couldn't communicate with new player {auth_id:#X}.");
+        error!("Couldn't communicate with new player {auth_id:#X}.\n{e:?}");
         return;
     }
     info!("New connection for player id {auth_id:#X} opened");
-    let mut send_message_buf = vec![];
+
+    let (mut lobby_send, mut lobby_recv): (Option<Sender<Message>>, Option<Receiver<Message>>) =
+        (None, None);
     loop {
-        loop {
-            match receiver.try_recv() {
-                Ok(m) => {
-                    send_message_buf.push(m);
-                }
-                Err(e) => {
-                    break;
-                }
+        select! {
+            m = async { lobby_recv.as_mut().unwrap().recv().await }, if lobby_recv.is_some() => {
+                let _ = connection.write_frame(m.unwrap()).await;
             }
-        }
-
-        for m in send_message_buf.drain(..) {
-            let _ = connection.write_frame(m).await;
-        }
-
-        let incoming = match connection.read_frame() {
-            Ok(Some(x)) => x,
-            Ok(None) => {
-                info!("Player id {auth_id:#X} disconnected");
-                break;
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                continue;
-            }
-            Err(e) => {
-                error!(
-                    "Error reading message from player id {auth_id:#X}. Closing connection\n{e:?}"
-                );
-                break;
+            incoming = connection.read_frame() => {
+                let incoming = match incoming {
+                    Ok(Some(x)) => x,
+                    Ok(None) => {
+                        info!("Player id {auth_id:#X} disconnected");
+                        break;
+                    }
+                    Err(e) => {
+                        error!(
+                            "Error reading message from player id {auth_id:#X}. Closing connection\n{e:?}"
+                        );
+                        break;
+                    }
+                };
+                debug!("Received message from player id {auth_id:#X} \nMessage: {incoming:#X?}",);
+                process_incoming(state.clone(), auth_id, incoming, &mut lobby_send, &mut lobby_recv).await;
             }
         };
-
-        debug!("Received message from player id {auth_id:#X} \nMessage: {incoming:#?}",);
-        {
-            match incoming {
-                Message::GameHost { auth_id, lobby_id } => todo!(),
-                Message::GameJoin { auth_id, lobby_id } => todo!(),
-                Message::GameLobbyInfo { auth_id, lobby } => todo!(),
-                Message::GameBegin { auth_id } => todo!(),
-                Message::GameEnd { auth_id } => todo!(),
-                Message::GameLeave { auth_id } => todo!(),
-                Message::PlayerOptions { auth_id, options } => {
-                    let state = &mut *state.write().unwrap();
-
-                    let player = match state.players.get_mut(&auth_id) {
-                        Some(p) => {
-                            p.shared.options = options.clone();
-                            p
-                        }
-                        None => {
-                            info!("Invalid player id {auth_id:#X}");
-                            //TODO: Kick player?
-                            continue;
-                        }
-                    };
-                    /*
-                    match state.lobbies.get_mut(&player.lobby_id) {
-                        Some(l) => {
-                            if player.shared.lobby_index > -1
-                                && player.shared.lobby_index < l.shared.player_count as i8
-                            {
-                                l.shared.players[player.shared.lobby_index as usize] =
-                                    player.shared.clone();
-                                let message = Message::PlayerOptions {
-                                    auth_id: 0,
-                                    options: options.clone(),
-                                };
-                                l.broadcast_message(&mut state, message);
-                            }
-                        }
-                        None => {
-                            info!("Invalid lobby id {:#X}", player.lobby_id);
-                        }
-                    }
-                    */
-                }
-                Message::GameOptions { auth_id, options } => {
-                    //match state.players.get_mut(&auth_id) {
-                    //    Some(p) => {
-                    //        let lobby_id = p.shared.current_lobby;
-                    //        match state.lobbies.get_mut(&lobby_id) {
-                    //            Some(l) => {
-                    //                if l.host_id == auth_id {
-                    //                    l.shared.options = options;
-                    //                    let message = Message::GameOptions {
-                    //                        auth_id: 0,
-                    //                        options,
-                    //                    };
-                    //                    l.broadcast_message(&mut state, message);
-                    //                }
-                    //            }
-                    //            None => {
-                    //                info!("Invalid lobby id {lobby_id:#X}");
-                    //            }
-                    //        };
-                    //    }
-                    //    None => {
-                    //        info!("Invalid player id {auth_id:#X}");
-                    //        //TODO: Ditto
-                    //        continue;
-                    //    }
-                    //};
-                }
-                Message::GameCurrentRoom { auth_id, room } => todo!(),
-                Message::GameItemCollected { auth_id, item } => {
-                    todo!()
-                }
-                m => {
-                    warn!("Player id {auth_id:#X} sent a server only message. \nMessage: {m:?}")
-                }
-            }
-        }
     }
 
     // Clean up player
@@ -230,6 +138,123 @@ async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream,
     state.players.remove(&auth_id);
 }
 
-async fn handle_player_queue(receiver: sync::mpsc::Receiver<Message>, connection: &Connection<'_>) {
-    todo!()
+async fn process_incoming(
+    state: Arc<RwLock<State>>,
+    auth_id: u32,
+    incoming: Message,
+    lobby_send: &mut Option<Sender<Message>>,
+    lobby_recv: &mut Option<Receiver<Message>>,
+) {
+    match incoming {
+        Message::GameHost {
+            auth_id: _,
+            lobby_id: _,
+        } => {}
+        Message::GameJoin { auth_id, lobby_id } => {
+            let state = &mut *state.write().unwrap();
+
+            let lobby = match state.lobbies.get_mut(&lobby_id) {
+                None => {
+                    error!("Attempted to join lobby with an invalid id '{lobby_id}'");
+                    return;
+                }
+                Some(l) => l,
+            };
+
+            // TODO: Waiting for destructuring assignment
+            let tmp = lobby.add_player(&mut state.players, auth_id).unwrap();
+            *lobby_send = Some(tmp.0);
+            *lobby_recv = Some(tmp.1);
+
+            lobby_send
+                .as_mut()
+                .unwrap()
+                .send(Message::GameJoin { auth_id, lobby_id })
+                .unwrap();
+        }
+        Message::GameLobbyInfo {
+            auth_id: _,
+            lobby: _,
+        } => todo!(),
+        Message::GameBegin { auth_id: _ } => todo!(),
+        Message::GameEnd { auth_id: _ } => todo!(),
+        Message::GameLeave { auth_id: _ } => todo!(),
+        Message::PlayerOptions { auth_id, options } => {
+            let state = &mut *state.write().unwrap();
+
+            let player = match state.players.get_mut(&auth_id) {
+                Some(p) => {
+                    p.shared.options = options.clone();
+                    p
+                }
+                None => {
+                    info!("Invalid player id {auth_id:#X}");
+                    //TODO: Kick player?
+                    return;
+                }
+            };
+            match state.lobbies.get_mut(&player.lobby_id) {
+                Some(l) => {
+                    if let Some(index) = player.shared.lobby_index {
+                        if index < l.shared.player_count as usize {
+                            l.shared.players[index] = player.shared.clone();
+                        }
+                    }
+                }
+                None => {
+                    info!("Invalid lobby id {:#X}", player.lobby_id);
+                }
+            }
+
+            if let Some(lobby_send) = lobby_send.as_mut() {
+                let message = Message::PlayerOptions {
+                    auth_id: 0,
+                    options,
+                };
+                lobby_send.send(message).unwrap();
+            }
+        }
+        Message::GameOptions { auth_id, options } => {
+            let state = &mut *state.write().unwrap();
+            let lobby_id = match state.players.get_mut(&auth_id) {
+                Some(p) => p.shared.current_lobby,
+                None => {
+                    info!("Invalid player id {auth_id:#X}");
+                    //TODO: Ditto
+                    return;
+                }
+            };
+
+            if let Some(lobby_send) = lobby_send {
+                match state.lobbies.get_mut(&lobby_id) {
+                    Some(l) => {
+                        if l.host_id == auth_id {
+                            l.shared.options = options.clone();
+                            let message = Message::GameOptions {
+                                auth_id: 0,
+                                options,
+                            };
+                            lobby_send.send(message).unwrap();
+                        }
+                    }
+                    None => {
+                        info!("Invalid lobby id {lobby_id:#X}");
+                    }
+                }
+            }
+        }
+        Message::GameCurrentRoom {
+            auth_id: _,
+            room: _,
+        } => todo!(),
+        Message::GameItemCollected {
+            auth_id: _,
+            item: _,
+        } => {
+            todo!()
+        }
+        m => {
+            warn!("Player id {auth_id:#X} sent a server only message. \nMessage: {m:?}");
+        }
+    }
 }
