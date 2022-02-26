@@ -31,13 +31,13 @@ impl From<std::io::Error> for Error {
 }
 
 #[derive(Default)]
-pub struct Dolphin {
+pub struct DolphinInterface {
     system: System,
     base_address: Option<usize>,
     handle: Option<ProcessHandle>,
 }
 
-impl Dolphin {
+impl DolphinInterface {
     pub fn is_hooked(&self) -> bool {
         self.base_address.is_some()
     }
@@ -86,7 +86,7 @@ const LAB_DOOR_ADDRESS: usize = 0x804F6CB8;
 // TODO: Don't panic when dolphin isn't hooked
 // TODO: Cache DataMembers; they contain a Vec so it isn't the best idea to be making new ones
 //       every time we interact with the game.
-impl GameInterface for Dolphin {
+impl GameInterface for DolphinInterface {
     fn is_loading(&self) -> bool {
         let ptr = DataMember::<u32>::new_offset(
             self.handle.unwrap(),
