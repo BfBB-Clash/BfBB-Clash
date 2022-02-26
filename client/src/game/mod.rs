@@ -8,7 +8,7 @@ pub use game_interface::GameInterface;
 pub use game_state::GameState;
 use spin_sleep::LoopHelper;
 
-use crate::dolphin::Dolphin;
+use crate::dolphin::DolphinInterface;
 
 pub fn start_game(
     mut gui_sender: Sender<Spatula>,
@@ -18,7 +18,7 @@ pub fn start_game(
     let mut loop_helper = LoopHelper::builder()
         .report_interval_s(0.5)
         .build_with_target_rate(126);
-    let mut dolphin = Dolphin::default();
+    let mut dolphin = DolphinInterface::default();
     let _ = dolphin.hook();
     let mut game = GameState::default();
 

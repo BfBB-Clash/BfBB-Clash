@@ -1,5 +1,5 @@
 mod data_member;
-mod dolphin;
+mod dolphin_interface;
 
-pub use data_member::DataMember;
-pub use dolphin::Dolphin;
+pub(self) use data_member::DataMember;
+pub use dolphin_interface::DolphinInterface;
