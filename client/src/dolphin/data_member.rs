@@ -15,16 +15,6 @@ pub struct DataMember<T> {
 
 impl<T: Sized + Copy> DataMember<T> {
     #[must_use]
-    pub fn new(handle: ProcessHandle, emulated_region_address: usize) -> Self {
-        Self {
-            offsets: Vec::new(),
-            process: handle,
-            emulated_region_address,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    #[must_use]
     pub fn new_offset(
         handle: ProcessHandle,
         emulated_region_address: usize,
@@ -54,24 +44,24 @@ impl<T: Sized + Copy> Memory<T> for DataMember<T> {
         let mut copy = [0u8; Architecture::Arch32Bit as usize];
         for next_offset in self.offsets.iter().take(noffsets - 1) {
             offset += next_offset;
-            offset = offset
-                .checked_sub(GCN_BASE_ADDRESS)
-                .ok_or(std::io::Error::new(
+            offset = offset.checked_sub(GCN_BASE_ADDRESS).ok_or_else(|| {
+                std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "Attempt to dereference an invalid pointer.",
-                ))?;
+                )
+            })?;
             offset += self.emulated_region_address;
             self.process.copy_address(offset, &mut copy)?;
             offset = u32::from_be_bytes(copy) as usize;
         }
 
         offset += self.offsets[noffsets - 1];
-        offset = offset
-            .checked_sub(GCN_BASE_ADDRESS)
-            .ok_or(std::io::Error::new(
+        offset = offset.checked_sub(GCN_BASE_ADDRESS).ok_or_else(|| {
+            std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Attempt to dereference an invalid pointer.",
-            ))?;
+            )
+        })?;
         offset += self.emulated_region_address;
         Ok(offset)
     }
@@ -92,6 +82,6 @@ impl<T: Sized + Copy> Memory<T> for DataMember<T> {
         let offset = self.get_offset()?;
         let buffer =
             unsafe { slice::from_raw_parts(value as *const _ as _, std::mem::size_of::<T>()) };
-        self.process.put_address(offset, &buffer)
+        self.process.put_address(offset, buffer)
     }
 }

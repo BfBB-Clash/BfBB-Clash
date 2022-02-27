@@ -4,7 +4,7 @@ mod game_state;
 use std::sync::mpsc::{Receiver, Sender};
 
 use clash::{protocol::Message, spatula::Spatula};
-pub use game_interface::GameInterface;
+pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
 pub use game_state::GameState;
 use spin_sleep::LoopHelper;
 
@@ -18,18 +18,23 @@ pub fn start_game(
     let mut loop_helper = LoopHelper::builder()
         .report_interval_s(0.5)
         .build_with_target_rate(126);
+
+    // TODO: Report hooking errors to user/stdout
     let mut dolphin = DolphinInterface::default();
     let _ = dolphin.hook();
     let mut game = GameState::default();
 
     loop {
         loop_helper.loop_start();
-        game.update(
+        if let Err(InterfaceError::Unhooked) = game.update(
             &dolphin,
             &mut gui_sender,
             &mut network_sender,
             &mut logic_receiver,
-        );
-        loop_helper.loop_sleep();
+        ) {
+            // Attempt to rehook
+            let _ = dolphin.hook();
+        }
+        loop_helper.loop_start_s();
     }
 }
