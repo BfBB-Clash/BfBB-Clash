@@ -223,8 +223,8 @@ impl GameInterface for DolphinInterface {
             vec![LAB_DOOR_ADDRESS],
         );
 
-        // The game uses a greater than check so we need to subtract three instead of two
-        let cost = value - 3;
+        // The game uses a greater than check so we need to subtract by one
+        let cost = value - 1;
         ptr.write(&cost.to_be())?;
         Ok(())
     }

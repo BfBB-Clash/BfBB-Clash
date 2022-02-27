@@ -1,6 +1,8 @@
 use crate::game::{GameInterface, InterfaceResult};
 use clash::{
+    lobby::LobbyOptions,
     protocol::{Item, Message},
+    room::Room,
     spatula::Spatula,
 };
 use log::info;
@@ -11,12 +13,14 @@ use std::{
 use strum::{EnumCount, IntoEnumIterator};
 
 pub struct GameState {
+    pub options: LobbyOptions,
     pub spatulas: HashMap<Spatula, Option<usize>>,
 }
 
 impl Default for GameState {
     fn default() -> Self {
         Self {
+            options: LobbyOptions::default(),
             spatulas: HashMap::with_capacity(Spatula::COUNT),
         }
     }
@@ -46,7 +50,11 @@ impl GameState {
             return Ok(());
         }
 
+        // Set the cost to unlock the lab door
         let curr_room = game.get_current_level()?;
+        if curr_room == Room::ChumBucket {
+            game.set_lab_door(self.options.lab_door_cost.into())?;
+        }
 
         // Check for newly collected spatulas
         for spat in Spatula::iter().filter(|s| s.get_room() == curr_room) {
