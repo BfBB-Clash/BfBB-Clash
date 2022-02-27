@@ -1,6 +1,8 @@
+use std::fmt::Formatter;
+
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Copy, Clone)]
 pub enum Room {
     MainMenu,
     IntroCutscene,
@@ -74,6 +76,66 @@ impl Room {
     #[allow(dead_code)]
     const fn get_name(&self) -> &'static str {
         todo!()
+    }
+}
+
+impl std::fmt::Display for Room {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match *self {
+            Room::MainMenu => write!(fmt, "Main Menu"),
+            Room::IntroCutscene => write!(fmt, "Intro Cutscene"),
+            Room::BikiniBottom => write!(fmt, "Bikini Bottom"),
+            Room::SpongebobHouse => write!(fmt, "Spongebob's House"),
+            Room::SquidwardHouse => write!(fmt, "Squidward's House"),
+            Room::PatrickHouse => write!(fmt, "Patrick's House"),
+            Room::ShadyShoals => write!(fmt, "Shady Shoals"),
+            Room::PoliceStation => write!(fmt, "Police Station"),
+            Room::Treedome => write!(fmt, "Treedome"),
+            Room::KrustyKrab => write!(fmt, "Krusty Krab"),
+            Room::ChumBucket => write!(fmt, "Chum Bucket"),
+            Room::Theater => write!(fmt, "Theater"),
+            Room::Poseidome => write!(fmt, "Poseidome"),
+            Room::IndustrialPark => write!(fmt, "Industrial Park"),
+            Room::JellyfishRock => write!(fmt, "Jellyfish Rock"),
+            Room::JellyfishCaves => write!(fmt, "Jellyfish Caves"),
+            Room::JellyfishLake => write!(fmt, "Jellyfish Lake"),
+            Room::JellyfishMountain => write!(fmt, "Jellyfish Mountain"),
+            Room::DowntownStreets => write!(fmt, "Downtown Streets"),
+            Room::DowntownRooftops => write!(fmt, "Downtown Rooftops"),
+            Room::DowntownLighthouse => write!(fmt, "Downtown Lighthouse"),
+            Room::DowntownSeaNeedle => write!(fmt, "Downtown Sea Needle"),
+            Room::GooLagoonBeach => write!(fmt, "Goo Lagoon Beach"),
+            Room::GooLagoonCaves => write!(fmt, "Goo Lagoon Caves"),
+            Room::GooLagoonPier => write!(fmt, "Goo Lagoon Pier"),
+            Room::MermalairEntranceArea => write!(fmt, "Mermalair Entrance Area"),
+            Room::MermalairMainChamber => write!(fmt, "Mermalair Main Chamber"),
+            Room::MermalairSecurityTunnel => write!(fmt, "Mermalair Security Tunnel"),
+            Room::MermalairBallroom => write!(fmt, "Mermalair Ballroom"),
+            Room::MermalairVillianContainment => write!(fmt, "Mermalair Villian Containment"),
+            Room::RockBottomDowntown => write!(fmt, "Rock Bottom Downtown"),
+            Room::RockBottomMuseum => write!(fmt, "Rock Bottom Museum"),
+            Room::RockBottomTrench => write!(fmt, "Rock Bottom Trench"),
+            Room::SandMountainHub => write!(fmt, "Ski Lodge"),
+            Room::SandMountainSlide1 => write!(fmt, "Guppy Mound"),
+            Room::SandMountainSlide2 => write!(fmt, "Flounder Hill"),
+            Room::SandMountainSlide3 => write!(fmt, "Sand Mountain"),
+            Room::KelpForest => write!(fmt, "Kelp Forest"),
+            Room::KelpSwamps => write!(fmt, "Kelp Swamps"),
+            Room::KelpCaves => write!(fmt, "Kelp Caves"),
+            Room::KelpVines => write!(fmt, "Kelp Vines"),
+            Room::GraveyardLake => write!(fmt, "Graveyard Lake"),
+            Room::GraveyardShipwreck => write!(fmt, "Graveyard of Ships"),
+            Room::GraveyardShip => write!(fmt, "Dutchman's Ship"),
+            Room::GraveyardBoss => write!(fmt, "Flying Dutchman Battle"),
+            Room::SpongebobsDream => write!(fmt, "Spongebob's Dream"),
+            Room::SandysDream => write!(fmt, "Sandy's Dream"),
+            Room::SquidwardsDream => write!(fmt, "Squidward's Dream"),
+            Room::KrabsDream => write!(fmt, "Krab's Dream"),
+            Room::PatricksDream => write!(fmt, "Patrick's Dream"),
+            Room::ChumBucketLab => write!(fmt, "Chum Bucket Lab"),
+            Room::ChumBucketBrain => write!(fmt, "Chum Bucket Brain"),
+            Room::SpongeballArena => write!(fmt, "Spongeball Arena"),
+        }
     }
 }
 

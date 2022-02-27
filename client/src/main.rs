@@ -3,7 +3,6 @@ use std::sync::mpsc::{channel, Sender};
 use clash::{
     player::PlayerOptions,
     protocol::{Connection, Message},
-    spatula::Spatula,
 };
 use log::{debug, error, info};
 use tokio::{net::TcpStream, select};
@@ -35,7 +34,7 @@ fn main() {
         .spawn(move || start_network(network_receiver, logic_sender));
 
     // Start Game Thread
-    let (gui_sender, gui_receiver) = channel::<Spatula>();
+    let (gui_sender, gui_receiver) = channel();
     let _game_thread = std::thread::Builder::new()
         .name("Logic".into())
         .spawn(move || game::start_game(gui_sender, network_sender, logic_receiver));

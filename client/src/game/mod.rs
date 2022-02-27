@@ -3,15 +3,15 @@ mod game_state;
 
 use std::sync::mpsc::{Receiver, Sender};
 
-use clash::{protocol::Message, spatula::Spatula};
+use clash::protocol::Message;
 pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
 pub use game_state::GameState;
 use spin_sleep::LoopHelper;
 
-use crate::dolphin::DolphinInterface;
+use crate::{dolphin::DolphinInterface, gui::GuiMessage};
 
 pub fn start_game(
-    mut gui_sender: Sender<Spatula>,
+    mut gui_sender: Sender<GuiMessage>,
     mut network_sender: tokio::sync::mpsc::Sender<Message>,
     mut logic_receiver: Receiver<Message>,
 ) {
@@ -33,6 +33,7 @@ pub fn start_game(
             &mut logic_receiver,
         ) {
             // Attempt to rehook
+            let _ = gui_sender.send(GuiMessage::Room(None));
             let _ = dolphin.hook();
         }
         loop_helper.loop_start_s();
