@@ -7,8 +7,7 @@ edition = "2021"
 
 [dependencies]
 clash = { path = ".." }
-egui = "0.16"
-eframe = "0.16"
+eframe = "0.17"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
 strum = "0.23"
 spin_sleep = "1"

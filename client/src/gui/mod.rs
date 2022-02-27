@@ -4,10 +4,13 @@ mod player_widget;
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use crate::game::GameState;
 use clash::{room::Room, spatula::Spatula};
-use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
-use egui::{
-    Align, Color32, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style, TopBottomPanel,
+use eframe::egui::{
+    Align, Color32, Context, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style,
+    TextStyle, TopBottomPanel,
 };
+use eframe::epaint::FontId;
+use eframe::epi::{Frame, Storage};
+use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
 use std::sync::mpsc::Receiver;
 
 const BORDER: f32 = 32.;
@@ -59,12 +62,7 @@ impl Clash {
 }
 
 impl App for Clash {
-    fn setup(
-        &mut self,
-        ctx: &egui::CtxRef,
-        _frame: &eframe::epi::Frame,
-        _storage: Option<&dyn eframe::epi::Storage>,
-    ) {
+    fn setup(&mut self, ctx: &Context, _frame: &Frame, _storage: Option<&dyn Storage>) {
         let mut font_def = FontDefinitions::default();
         font_def.font_data.insert(
             "spongebob".into(),
@@ -72,27 +70,8 @@ impl App for Clash {
             FontData::from_static(include_bytes!("..\\..\\fonts\\Some.Time.Later.otf")),
         );
         font_def
-            .fonts_for_family
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(0, "spongebob".into());
-
-        font_def.family_and_size.insert(
-            eframe::egui::TextStyle::Heading,
-            (FontFamily::Proportional, 42.),
-        );
-        font_def.family_and_size.insert(
-            eframe::egui::TextStyle::Body,
-            (FontFamily::Proportional, 32.),
-        );
-        font_def.family_and_size.insert(
-            eframe::egui::TextStyle::Small,
-            (FontFamily::Proportional, 24.),
-        );
-        font_def.family_and_size.insert(
-            eframe::egui::TextStyle::Button,
-            (FontFamily::Proportional, 40.),
-        );
+            .families
+            .insert(FontFamily::Proportional, vec!["spongebob".into()]);
 
         ctx.set_fonts(font_def);
 
@@ -100,10 +79,39 @@ impl App for Clash {
         let mut style = Style::default();
         style.spacing.button_padding = (PADDING, PADDING).into();
         style.spacing.item_spacing = (PADDING, PADDING).into();
+        style.text_styles.insert(
+            TextStyle::Heading,
+            FontId {
+                size: 42.,
+                family: FontFamily::Proportional,
+            },
+        );
+        style.text_styles.insert(
+            TextStyle::Body,
+            FontId {
+                size: 32.,
+                family: FontFamily::Proportional,
+            },
+        );
+        style.text_styles.insert(
+            TextStyle::Small,
+            FontId {
+                size: 24.,
+                family: FontFamily::Proportional,
+            },
+        );
+        style.text_styles.insert(
+            TextStyle::Button,
+            FontId {
+                size: 40.,
+                family: FontFamily::Proportional,
+            },
+        );
+
         ctx.set_style(style);
     }
 
-    fn update(&mut self, ctx: &eframe::egui::CtxRef, frame: &eframe::epi::Frame) {
+    fn update(&mut self, ctx: &Context, frame: &Frame) {
         match self.state {
             Menu::Main => {
                 CentralPanel::default().show(ctx, |ui| {
@@ -239,7 +247,7 @@ impl App for Clash {
 pub fn run(gui_receiver: Receiver<GuiMessage>) {
     let window_options = NativeOptions {
         initial_window_size: Some((600., 720.).into()),
-        resizable: false,
+        resizable: true,
         ..Default::default()
     };
 

@@ -1,4 +1,7 @@
-use egui::{Align2, Color32, Response, Sense, Stroke, TextStyle, Vec2, Widget, WidgetText};
+use eframe::{
+    egui::{Align2, Color32, Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget, WidgetText},
+    epaint::{FontFamily, FontId},
+};
 
 pub struct PlayerUi {
     name: WidgetText,
@@ -19,7 +22,7 @@ impl PlayerUi {
 }
 
 impl Widget for PlayerUi {
-    fn ui(self, ui: &mut egui::Ui) -> Response {
+    fn ui(self, ui: &mut Ui) -> Response {
         let PlayerUi {
             name,
             score,
@@ -43,21 +46,21 @@ impl Widget for PlayerUi {
                 name_pos,
                 Align2::LEFT_TOP,
                 name.text(),
-                TextStyle::Body,
+                TextStyle::Body.resolve(ui.style()),
                 color,
             );
             ui.painter().text(
                 spat_pos,
                 Align2::LEFT_CENTER,
                 format!("Spatulas: {score}"),
-                TextStyle::Body,
+                TextStyle::Body.resolve(ui.style()),
                 color,
             );
             ui.painter().text(
                 location_pos,
                 Align2::LEFT_BOTTOM,
                 location.text(),
-                TextStyle::Small,
+                TextStyle::Small.resolve(ui.style()),
                 color,
             );
         }

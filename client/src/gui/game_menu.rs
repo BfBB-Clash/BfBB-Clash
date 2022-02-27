@@ -1,5 +1,5 @@
 use clash::spatula::Spatula;
-use egui::{Color32, Sense, Widget};
+use eframe::egui::{Color32, Response, Sense, Ui, Widget};
 use strum::IntoEnumIterator;
 
 use crate::game::GameState;
@@ -14,7 +14,7 @@ impl<'a> GameMenu<'a> {
     }
 }
 impl<'a> Widget for GameMenu<'a> {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+    fn ui(self, ui: &mut Ui) -> Response {
         let available_size = ui.available_size();
 
         // Determine largest radius without overflowing bounds
