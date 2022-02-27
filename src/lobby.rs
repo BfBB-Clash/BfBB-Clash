@@ -3,8 +3,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LobbyOptions {
-    pub max_spats: u8,
+    pub lab_door_cost: u8,
     pub ng_plus: bool,
+}
+
+impl Default for LobbyOptions {
+    fn default() -> Self {
+        Self {
+            lab_door_cost: 75,
+            ng_plus: false,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
