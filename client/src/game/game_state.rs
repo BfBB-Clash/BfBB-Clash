@@ -64,19 +64,30 @@ impl GameState {
         }
 
         // Check for newly collected spatulas
-        for spat in Spatula::iter().filter(|s| Some(s.get_room()) == self.current_room) {
+        for spat in Spatula::iter() {
+            // Skip already collected spatulas
             if self.spatulas.contains_key(&spat) {
                 continue;
             }
+
+            // Check menu for any potentially missed collection events
+            if game.is_task_complete(spat)? {
+                self.spatulas.insert(spat, None);
+                let _ = gui_sender.send(GuiMessage::Spatula(spat));
+                info!("Collected (from menu) {spat:?}");
+            }
+
+            // Skip spatulas that aren't in the current room
+            if self.current_room != Some(spat.get_room()) {
+                continue;
+            }
+
+            // Detect spatula collection events
             if spat != Spatula::TheSmallShallRuleOrNot
                 && spat != Spatula::KahRahTae
                 && game.is_spatula_being_collected(spat)?
             {
                 // TODO: Don't make this None.
-                self.spatulas.insert(spat, None);
-                let _ = gui_sender.send(GuiMessage::Spatula(spat));
-                info!("Collected {spat:?}");
-            } else if game.is_task_complete(spat)? {
                 self.spatulas.insert(spat, None);
                 let _ = gui_sender.send(GuiMessage::Spatula(spat));
                 info!("Collected {spat:?}");
