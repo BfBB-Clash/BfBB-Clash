@@ -3,7 +3,7 @@ mod player_widget;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use crate::game::GameState;
-use clash::spatula::Spatula;
+use clash::{room::Room, spatula::Spatula};
 use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
 use egui::{
     Align, Color32, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style, TopBottomPanel,
@@ -12,6 +12,11 @@ use std::sync::mpsc::Receiver;
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
+
+pub enum GuiMessage {
+    Spatula(Spatula),
+    Room(Option<Room>),
+}
 
 pub enum Menu {
     Main,
@@ -25,17 +30,30 @@ pub struct Clash {
     name: String,
     lobby_id: String,
     game_state: GameState,
-    receiver: Receiver<Spatula>,
+    receiver: Receiver<GuiMessage>,
 }
 
 impl Clash {
-    fn new(receiver: Receiver<Spatula>) -> Self {
+    fn new(receiver: Receiver<GuiMessage>) -> Self {
         Self {
             state: Menu::Main,
             name: Default::default(),
             lobby_id: Default::default(),
             game_state: GameState::default(),
             receiver,
+        }
+    }
+
+    fn process_messages(&mut self) {
+        while let Ok(message) = self.receiver.try_recv() {
+            match message {
+                GuiMessage::Spatula(s) => {
+                    self.game_state.spatulas.insert(s, None);
+                }
+                GuiMessage::Room(r) => {
+                    self.game_state.current_room = r;
+                }
+            }
         }
     }
 }
@@ -155,9 +173,12 @@ impl App for Clash {
                 });
             }
             Menu::Game => {
-                while let Ok(s) = self.receiver.try_recv() {
-                    self.game_state.spatulas.insert(s, None);
-                }
+                // Continuously repaint
+                ctx.request_repaint();
+
+                // Receive gamestate updates
+                self.process_messages();
+
                 SidePanel::left("Player List")
                     .resizable(true)
                     .show(ctx, |ui| {
@@ -165,7 +186,11 @@ impl App for Clash {
                         ui.add(PlayerUi::new(
                             self.name.as_str().into(),
                             self.game_state.spatulas.len() as u32,
-                            "over here".into(),
+                            self.game_state
+                                .current_room
+                                .map(|r| format!("{r}"))
+                                .unwrap_or_else(|| "? ? ?".to_string())
+                                .into(),
                             Color32::from_rgb(100, 120, 180),
                         ));
                         ui.add(PlayerUi::new(
@@ -202,7 +227,6 @@ impl App for Clash {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.add(GameMenu::new(&self.game_state));
                 });
-                ctx.request_repaint();
             }
         }
     }
@@ -212,7 +236,7 @@ impl App for Clash {
     }
 }
 
-pub fn run(gui_receiver: Receiver<Spatula>) {
+pub fn run(gui_receiver: Receiver<GuiMessage>) {
     let window_options = NativeOptions {
         initial_window_size: Some((600., 720.).into()),
         resizable: false,
