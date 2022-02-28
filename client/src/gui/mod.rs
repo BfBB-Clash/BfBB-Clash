@@ -96,7 +96,7 @@ impl App for Clash {
         style.text_styles.insert(
             TextStyle::Small,
             FontId {
-                size: 24.,
+                size: 18.,
                 family: FontFamily::Proportional,
             },
         );
@@ -188,47 +188,43 @@ impl App for Clash {
                 self.process_messages();
 
                 SidePanel::left("Player List")
-                    .resizable(true)
+                    .resizable(false)
                     .show(ctx, |ui| {
                         ui.add_space(PADDING);
                         ui.add(PlayerUi::new(
-                            self.name.as_str().into(),
+                            self.name.as_str(),
                             self.game_state.spatulas.len() as u32,
-                            self.game_state
-                                .current_room
-                                .map(|r| format!("{r}"))
-                                .unwrap_or_else(|| "? ? ?".to_string())
-                                .into(),
+                            self.game_state.current_room,
                             Color32::from_rgb(100, 120, 180),
                         ));
                         ui.add(PlayerUi::new(
-                            "Not Square".into(),
+                            "Not Square",
                             4,
-                            "over there".into(),
+                            None,
                             Color32::from_rgb(180, 100, 120),
                         ));
                         ui.add(PlayerUi::new(
-                            "Not Square".into(),
+                            "Not Square",
                             4,
-                            "over there".into(),
+                            None,
                             Color32::from_rgb(180, 100, 120),
                         ));
                         ui.add(PlayerUi::new(
-                            "Not Square".into(),
+                            "Not Square",
                             4,
-                            "over there".into(),
+                            None,
                             Color32::from_rgb(180, 100, 120),
                         ));
                         ui.add(PlayerUi::new(
-                            "Not Square".into(),
+                            "Not Square",
                             4,
-                            "over there".into(),
+                            None,
                             Color32::from_rgb(180, 100, 120),
                         ));
                         ui.add(PlayerUi::new(
-                            "Not Square".into(),
+                            "Not Square",
                             4,
-                            "over there".into(),
+                            None,
                             Color32::from_rgb(180, 100, 120),
                         ));
                     });

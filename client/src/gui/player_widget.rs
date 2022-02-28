@@ -1,17 +1,15 @@
-use eframe::{
-    egui::{Align2, Color32, Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget, WidgetText},
-    epaint::{FontFamily, FontId},
-};
+use clash::room::Room;
+use eframe::egui::{Color32, Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
-pub struct PlayerUi {
-    name: WidgetText,
+pub struct PlayerUi<'a> {
+    name: &'a str,
     score: u32,
-    location: WidgetText,
+    location: Option<Room>,
     color: Color32,
 }
 
-impl PlayerUi {
-    pub fn new(name: WidgetText, score: u32, location: WidgetText, color: Color32) -> Self {
+impl<'a> PlayerUi<'a> {
+    pub fn new(name: &'a str, score: u32, location: Option<Room>, color: Color32) -> Self {
         Self {
             name,
             score,
@@ -21,7 +19,7 @@ impl PlayerUi {
     }
 }
 
-impl Widget for PlayerUi {
+impl<'a> Widget for PlayerUi<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
         let PlayerUi {
             name,
@@ -30,39 +28,58 @@ impl Widget for PlayerUi {
             color,
         } = self;
 
-        // TODO: Use TextGalleys and avoid hardcoding height.
-        let desired_size = (ui.available_width(), 110.).into();
+        // Use individual layouts instead of a single one to be able to add padding between each line
+        let name_galley = ui.painter().layout_no_wrap(
+            name.to_string(),
+            TextStyle::Body.resolve(ui.style()),
+            color,
+        );
+        let score_galley = ui.painter().layout_no_wrap(
+            format!("Spatulas: {score}"),
+            TextStyle::Body.resolve(ui.style()),
+            color,
+        );
+        let room_galley = ui.painter().layout_no_wrap(
+            location
+                .map(|r| r.to_string())
+                .unwrap_or_else(|| "? ? ?".to_string()),
+            TextStyle::Small.resolve(ui.style()),
+            color,
+        );
+
+        let name_size = name_galley.size();
+        let score_size = score_galley.size();
+        let room_size = room_galley.size();
+        // Use longest level name for the overall width
+        let longest_width = ui
+            .painter()
+            .layout_no_wrap(
+                Room::MermalairVillianContainment.to_string(),
+                TextStyle::Small.resolve(ui.style()),
+                color,
+            )
+            .size()
+            .x;
+
+        let padding = ui.spacing().button_padding;
+        let desired_size = Vec2::new(
+            longest_width + 4. * padding.x,
+            name_size.y + score_size.y + room_size.y + 4. * padding.y,
+        );
         let (rect, response) =
             ui.allocate_exact_size(desired_size, Sense::focusable_noninteractive());
 
-        let offset = Vec2::new(4., 0.);
-        let name_pos = rect.left_top() + offset;
-        let spat_pos = rect.left_center() + offset;
-        let location_pos = rect.left_bottom() + offset;
-
         if ui.is_rect_visible(rect) {
             ui.painter().rect_stroke(rect, 0., Stroke::new(2., color));
-            ui.painter().text(
-                name_pos,
-                Align2::LEFT_TOP,
-                name.text(),
-                TextStyle::Body.resolve(ui.style()),
-                color,
-            );
-            ui.painter().text(
-                spat_pos,
-                Align2::LEFT_CENTER,
-                format!("Spatulas: {score}"),
-                TextStyle::Body.resolve(ui.style()),
-                color,
-            );
-            ui.painter().text(
-                location_pos,
-                Align2::LEFT_BOTTOM,
-                location.text(),
-                TextStyle::Small.resolve(ui.style()),
-                color,
-            );
+            let mut text_pos = rect.left_top() + padding;
+
+            ui.painter().galley(text_pos, name_galley);
+            text_pos.y += name_size.y + padding.y;
+
+            ui.painter().galley(text_pos, score_galley);
+            text_pos.y += score_size.y + padding.y;
+
+            ui.painter().galley(text_pos, room_galley);
         }
 
         response
