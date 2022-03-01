@@ -1,3 +1,4 @@
+use clash::lobby::LobbyOptions;
 use clash::player::{PlayerOptions, SharedPlayer};
 use clash::protocol::{Connection, Message};
 use log::{debug, error, info, warn};
@@ -88,14 +89,14 @@ async fn main() {
     }
 }
 
-async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream, ) {
+async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream) {
     // Add new player
     let auth_id = {
         let mut state = state.write().expect("Failed to lock State");
         state.add_player()
     };
     let mut connection = Connection::new(&mut socket);
-    
+
     // Inform player of their auth_id
     if let Err(e) = connection
         .write_frame(Message::ConnectionAccept { auth_id })
@@ -128,7 +129,9 @@ async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream,
                     }
                 };
                 debug!("Received message from player id {auth_id:#X} \nMessage: {incoming:#X?}",);
-                process_incoming(state.clone(), auth_id, incoming, &mut lobby_send, &mut lobby_recv).await;
+                if !process_incoming(state.clone(), auth_id, incoming, &mut lobby_send, &mut lobby_recv).await {
+                    break;
+                }
             }
         };
     }
@@ -144,33 +147,68 @@ async fn process_incoming(
     incoming: Message,
     lobby_send: &mut Option<Sender<Message>>,
     lobby_recv: &mut Option<Receiver<Message>>,
-) {
+) -> bool {
     match incoming {
         Message::GameHost {
             auth_id: _,
             lobby_id: _,
-        } => {}
+        } => {
+            let state = &mut *state.write().unwrap();
+            if state.players.contains_key(&auth_id) {
+                let gen_lobby_id = state.gen_lobby_id();
+                state.lobbies.insert(
+                    gen_lobby_id,
+                    Lobby::new(LobbyOptions::default(), gen_lobby_id, auth_id),
+                );
+
+                let lobby = match state.lobbies.get_mut(&gen_lobby_id) {
+                    None => {
+                        error!("Attempted to join lobby with an invalid id '{gen_lobby_id}'");
+                        return true;
+                    }
+                    Some(l) => l,
+                };
+
+                let tmp = lobby.add_player(&mut state.players, auth_id).unwrap();
+                *lobby_send = Some(tmp.0);
+                *lobby_recv = Some(tmp.1);
+
+                lobby_send
+                    .as_mut()
+                    .unwrap()
+                    .send(Message::GameJoin {
+                        auth_id: 0,
+                        lobby_id: gen_lobby_id,
+                    })
+                    .unwrap();
+            }
+        }
         Message::GameJoin { auth_id, lobby_id } => {
             let state = &mut *state.write().unwrap();
 
-            let lobby = match state.lobbies.get_mut(&lobby_id) {
-                None => {
-                    error!("Attempted to join lobby with an invalid id '{lobby_id}'");
-                    return;
-                }
-                Some(l) => l,
-            };
+            if state.players.contains_key(&auth_id) {
+                let lobby = match state.lobbies.get_mut(&lobby_id) {
+                    None => {
+                        error!("Attempted to join lobby with an invalid id '{lobby_id}'");
+                        return true;
+                    }
+                    Some(l) => l,
+                };
 
-            // TODO: Waiting for destructuring assignment
-            let tmp = lobby.add_player(&mut state.players, auth_id).unwrap();
-            *lobby_send = Some(tmp.0);
-            *lobby_recv = Some(tmp.1);
+                // TODO: Waiting for destructuring assignment
+                let tmp = lobby.add_player(&mut state.players, auth_id).unwrap();
+                *lobby_send = Some(tmp.0);
+                *lobby_recv = Some(tmp.1);
 
-            lobby_send
-                .as_mut()
-                .unwrap()
-                .send(Message::GameJoin { auth_id, lobby_id })
-                .unwrap();
+                lobby_send
+                    .as_mut()
+                    .unwrap()
+                    .send(Message::GameLobbyInfo {
+                        auth_id: 0,
+                        lobby: lobby.shared.clone(),
+                    })
+                    .unwrap();
+            }
         }
         Message::GameLobbyInfo {
             auth_id: _,
@@ -178,7 +216,26 @@ async fn process_incoming(
         } => todo!(),
         Message::GameBegin { auth_id: _ } => todo!(),
         Message::GameEnd { auth_id: _ } => todo!(),
-        Message::GameLeave { auth_id: _ } => todo!(),
+        Message::GameLeave { auth_id: _ } => {
+            let state = &mut *state.write().unwrap();
+
+            let lobby_id = match state.players.get_mut(&auth_id) {
+                Some(p) => p.lobby_id,
+                None => {
+                    info!("Invalid player id {auth_id:#X}");
+                    //TODO: Kick player?
+                    return false;
+                }
+            };
+
+            let lobby = match state.lobbies.get_mut(&lobby_id) {
+                None => {
+                    error!("Attempted to join lobby with an invalid id '{lobby_id}'");
+                    return true;
+                }
+                Some(l) => l,
+            };
+        }
         Message::PlayerOptions { auth_id, options } => {
             let state = &mut *state.write().unwrap();
 
@@ -190,7 +247,7 @@ async fn process_incoming(
                 None => {
                     info!("Invalid player id {auth_id:#X}");
                     //TODO: Kick player?
-                    return;
+                    return false;
                 }
             };
             match state.lobbies.get_mut(&player.lobby_id) {
@@ -221,7 +278,7 @@ async fn process_incoming(
                 None => {
                     info!("Invalid player id {auth_id:#X}");
                     //TODO: Ditto
-                    return;
+                    return false;
                 }
             };
 
@@ -257,4 +314,5 @@ async fn process_incoming(
             warn!("Player id {auth_id:#X} sent a server only message. \nMessage: {m:?}");
         }
     }
+    true
 }

@@ -24,11 +24,11 @@ pub struct Lobby {
 }
 
 impl Lobby {
-    pub fn new(new_options: LobbyOptions, host_id: u32) -> Self {
+    pub fn new(new_options: LobbyOptions, lobby_id: u32, host_id: u32) -> Self {
         let (sender, _) = channel(100);
         Self {
             shared: SharedLobby {
-                lobby_id: 1,
+                lobby_id,
                 options: new_options,
                 is_started: false,
                 players: Vec::new(),
@@ -41,6 +41,33 @@ impl Lobby {
         }
     }
 
+    pub fn is_player_in_lobby(&mut self, auth_id: &u32) -> bool {
+        let mut iter = self.player_ids.iter();
+        for p in iter.next() {
+            if *p == *auth_id {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn rem_player(
+        &mut self,
+        players: &mut HashMap<u32, Player>,
+        auth_id: u32,
+    ) -> Result<(), LobbyError> {
+        // TODO: Check this.
+        if let Some(p) = players.get_mut(&auth_id) {
+            if self.is_player_in_lobby(&auth_id) {
+                self.shared.player_count -= 1;
+                self.shared.players.remove(p.shared.lobby_index.expect("If the player is in the lobby, they should have a lobby_index."));
+                self.player_ids.remove(p.shared.lobby_index.expect("If the player is in the lobby, they should have a lobby_index."));
+                return Ok(());
+            }
+        }
+        return Err(LobbyError::PlayerInvalid);
+    }
+
     pub fn add_player(
         &mut self,
         players: &mut HashMap<u32, Player>,
@@ -49,11 +76,13 @@ impl Lobby {
         if self.shared.player_count < MAX_PLAYERS {
             // TODO: Check this.
             if let Some(p) = players.get_mut(&auth_id) {
-                self.shared.player_count += 1;
-                self.shared.players.push(p.shared.clone());
-                self.player_ids.push(auth_id);
-                p.shared.lobby_index = Some(self.player_ids.len());
-                return Ok((self.sender.clone(), self.sender.subscribe()));
+                if !self.is_player_in_lobby(&auth_id) {
+                    self.shared.player_count += 1;
+                    self.shared.players.push(p.shared.clone());
+                    self.player_ids.push(auth_id);
+                    p.shared.lobby_index = Some(self.player_ids.len());
+                    return Ok((self.sender.clone(), self.sender.subscribe()));
+                }
             }
             return Err(LobbyError::PlayerInvalid);
         }
