@@ -1,6 +1,6 @@
 use clash::lobby::LobbyOptions;
 use clash::player::{PlayerOptions, SharedPlayer};
-use clash::protocol::{Connection, Message};
+use clash::protocol::{Connection, Item, Message};
 use log::{debug, error, info, warn};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -222,7 +222,7 @@ async fn process_incoming(
             let lobby_id = match state.players.get_mut(&auth_id) {
                 Some(p) => p.lobby_id,
                 None => {
-                    info!("Invalid player id {auth_id:#X}");
+                    error!("Invalid player id {auth_id:#X}");
                     //TODO: Kick player?
                     return false;
                 }
@@ -249,7 +249,7 @@ async fn process_incoming(
                     p
                 }
                 None => {
-                    info!("Invalid player id {auth_id:#X}");
+                    error!("Invalid player id {auth_id:#X}");
                     //TODO: Kick player?
                     return false;
                 }
@@ -263,7 +263,7 @@ async fn process_incoming(
                     }
                 }
                 None => {
-                    info!("Invalid lobby id {:#X}", player.lobby_id);
+                    error!("Invalid lobby id {:#X}", player.lobby_id);
                 }
             }
 
@@ -280,7 +280,7 @@ async fn process_incoming(
             let lobby_id = match state.players.get_mut(&auth_id) {
                 Some(p) => p.shared.current_lobby,
                 None => {
-                    info!("Invalid player id {auth_id:#X}");
+                    error!("Invalid player id {auth_id:#X}");
                     //TODO: Ditto
                     return false;
                 }
@@ -299,7 +299,7 @@ async fn process_incoming(
                         }
                     }
                     None => {
-                        info!("Invalid lobby id {lobby_id:#X}");
+                        error!("Invalid lobby id {lobby_id:#X}");
                     }
                 }
             }
@@ -308,11 +308,36 @@ async fn process_incoming(
             auth_id: _,
             room: _,
         } => todo!(),
-        Message::GameItemCollected {
-            auth_id: _,
-            item: _,
-        } => {
-            todo!()
+        Message::GameItemCollected { auth_id, item } => {
+            let state = &mut *state.write().unwrap();
+
+            let (lobby_id, index) = match state.players.get_mut(&auth_id) {
+                Some(p) => (p.lobby_id, p.shared.lobby_index),
+                None => {
+                    error!("Invalid player id {auth_id:#X}");
+                    return false;
+                }
+            };
+
+            let lobby = match state.lobbies.get_mut(&lobby_id) {
+                Some(l) => {
+                    if let Item::Spatula(spat) = item {
+                        l.shared.game_state.spatulas.insert(spat, index);
+                        info!("Player {auth_id:#X} collected {spat:?}");
+                    }
+                    l.shared.clone()
+                }
+                None => {
+                    error!("Invalid lobby id {lobby_id:#X}");
+                    return false;
+                }
+            };
+
+            if let Some(lobby_send) = lobby_send {
+                lobby_send
+                    .send(Message::GameLobbyInfo { auth_id: 0, lobby })
+                    .unwrap();
+            }
         }
         m => {
             warn!("Player id {auth_id:#X} sent a server only message. \nMessage: {m:?}");
