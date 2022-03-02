@@ -305,8 +305,8 @@ impl App for Clash {
 
 pub fn run(gui_receiver: Receiver<GuiMessage>) {
     let window_options = NativeOptions {
-        initial_window_size: Some((600., 720.).into()),
-        resizable: true,
+        initial_window_size: Some((600., 742.).into()),
+        resizable: false,
         ..Default::default()
     };
 
