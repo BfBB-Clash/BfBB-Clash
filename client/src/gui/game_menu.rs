@@ -1,5 +1,8 @@
 use clash::spatula::Spatula;
-use eframe::egui::{Color32, Response, Sense, Ui, Widget};
+use eframe::{
+    egui::{Color32, Response, Sense, Ui, Widget},
+    epaint::Vec2,
+};
 use strum::IntoEnumIterator;
 
 use crate::game::GameState;
@@ -21,9 +24,10 @@ impl<'a> Widget for GameMenu<'a> {
         let width_radius = (available_size.x - 8. * 7.) / 8. / 2.;
         let height_radius = (available_size.y - 8. * 12.) / 13. / 2.;
         let radius = f32::min(width_radius, height_radius);
+        let desired_size = Vec2::new(radius * 2. * 8. + (8. * 7.), radius * 2. * 13. + (8. * 12.));
 
         let (rect, response) =
-            ui.allocate_exact_size(ui.available_size(), Sense::focusable_noninteractive());
+            ui.allocate_exact_size(desired_size, Sense::focusable_noninteractive());
 
         for spat in Spatula::iter() {
             let color = if self.game.spatulas.contains_key(&spat) {
