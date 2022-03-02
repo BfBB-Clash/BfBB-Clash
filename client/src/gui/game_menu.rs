@@ -1,11 +1,9 @@
-use clash::spatula::Spatula;
+use clash::{game_state::GameState, spatula::Spatula};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
 };
 use strum::IntoEnumIterator;
-
-use crate::game::GameState;
 
 pub struct GameMenu<'a> {
     game: &'a GameState,

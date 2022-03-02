@@ -1,37 +1,30 @@
 use crate::game::{GameInterface, InterfaceResult};
 use crate::gui::GuiMessage;
+use clash::game_state::GameState;
 use clash::{
-    lobby::LobbyOptions,
     protocol::{Item, Message},
     room::Room,
     spatula::Spatula,
 };
 use log::info;
-use std::{
-    collections::HashMap,
-    sync::mpsc::{Receiver, Sender},
-};
-use strum::{EnumCount, IntoEnumIterator};
+use std::sync::mpsc::{Receiver, Sender};
+use strum::IntoEnumIterator;
 
-pub struct GameState {
-    pub options: LobbyOptions,
-    pub spatulas: HashMap<Spatula, Option<usize>>,
-    pub current_room: Option<Room>,
+pub trait GameStateExt {
+    fn update<T: GameInterface>(
+        &mut self,
+        game: &T,
+        gui_sender: &mut Sender<GuiMessage>,
+        _network_sender: &mut tokio::sync::mpsc::Sender<Message>,
+        logic_receiver: &mut Receiver<Message>,
+    ) -> InterfaceResult<()>;
+
+    fn can_start(&self) -> bool;
 }
 
-impl Default for GameState {
-    fn default() -> Self {
-        Self {
-            options: LobbyOptions::default(),
-            spatulas: HashMap::with_capacity(Spatula::COUNT),
-            current_room: None,
-        }
-    }
-}
-
-impl GameState {
+impl GameStateExt for GameState {
     /// Process state updates from the server and report back any actions of the local player
-    pub fn update<T: GameInterface>(
+    fn update<T: GameInterface>(
         &mut self,
         game: &T,
         gui_sender: &mut Sender<GuiMessage>,
@@ -61,7 +54,7 @@ impl GameState {
             let _ = gui_sender.send(GuiMessage::Room(room));
         }
         if self.current_room == Some(Room::ChumBucket) {
-            game.set_lab_door(self.options.lab_door_cost.into())?;
+            game.set_lab_door(self.lobby.options.lab_door_cost.into())?;
         }
 
         // Check for newly collected spatulas
@@ -99,7 +92,7 @@ impl GameState {
     }
 
     /// True when all connected players are on the Main Menu
-    pub fn can_start(&self) -> bool {
+    fn can_start(&self) -> bool {
         // TODO: Solve the "Demo Cutscene" issue. We can probably detect when players are on the autosave preference screen instead.
         self.current_room == Some(Room::MainMenu)
     }

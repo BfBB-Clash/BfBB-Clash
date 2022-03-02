@@ -1,14 +1,18 @@
 mod game_interface;
 mod game_state;
 
-use std::sync::mpsc::{Receiver, Sender};
-
-use clash::protocol::Message;
+pub use self::game_state::GameStateExt;
 pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
-pub use game_state::GameState;
-use spin_sleep::LoopHelper;
 
 use crate::{dolphin::DolphinInterface, gui::GuiMessage};
+use clash::{
+    game_state::GameState,
+    lobby::{LobbyOptions, SharedLobby},
+    protocol::Message,
+};
+
+use spin_sleep::LoopHelper;
+use std::sync::mpsc::{Receiver, Sender};
 
 pub fn start_game(
     mut gui_sender: Sender<GuiMessage>,
@@ -22,7 +26,7 @@ pub fn start_game(
     // TODO: Report hooking errors to user/stdout
     let mut dolphin = DolphinInterface::default();
     let _ = dolphin.hook();
-    let mut game = GameState::default();
+    let mut game = GameState::new(SharedLobby::new(0, LobbyOptions::default(), None));
 
     loop {
         loop_helper.loop_start();
