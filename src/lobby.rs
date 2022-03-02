@@ -1,4 +1,4 @@
-use crate::player::SharedPlayer;
+use crate::{game_state::GameState, player::SharedPlayer};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -18,6 +18,7 @@ impl Default for LobbyOptions {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SharedLobby {
+    pub game_state: GameState,
     pub lobby_id: u32,
     pub options: LobbyOptions,
     pub players: Vec<SharedPlayer>,
@@ -29,6 +30,7 @@ pub struct SharedLobby {
 impl SharedLobby {
     pub fn new(lobby_id: u32, options: LobbyOptions, host_index: Option<usize>) -> Self {
         Self {
+            game_state: GameState::default(),
             lobby_id,
             options,
             players: Vec::new(),

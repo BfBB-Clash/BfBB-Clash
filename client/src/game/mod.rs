@@ -6,7 +6,6 @@ pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
 
 use crate::{dolphin::DolphinInterface, gui::GuiMessage};
 use clash::{
-    game_state::GameState,
     lobby::{LobbyOptions, SharedLobby},
     protocol::Message,
 };
@@ -26,7 +25,7 @@ pub fn start_game(
     // TODO: Report hooking errors to user/stdout
     let mut dolphin = DolphinInterface::default();
     let _ = dolphin.hook();
-    let mut game = GameState::new(SharedLobby::new(0, LobbyOptions::default(), None));
+    let mut game = SharedLobby::new(0, LobbyOptions::default(), None);
 
     loop {
         loop_helper.loop_start();

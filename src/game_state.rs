@@ -1,19 +1,19 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use strum::EnumCount;
 
-use crate::{lobby::SharedLobby, room::Room, spatula::Spatula};
+use crate::{room::Room, spatula::Spatula};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
-    pub lobby: SharedLobby,
     pub spatulas: HashMap<Spatula, Option<usize>>,
     pub current_room: Option<Room>,
 }
 
-impl GameState {
-    pub fn new(lobby: SharedLobby) -> Self {
+impl Default for GameState {
+    fn default() -> Self {
         Self {
-            lobby,
             spatulas: HashMap::with_capacity(Spatula::COUNT),
             current_room: None,
         }

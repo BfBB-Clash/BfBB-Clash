@@ -1,6 +1,5 @@
 use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
-use log::debug;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::net::tcp::{ReadHalf, WriteHalf};

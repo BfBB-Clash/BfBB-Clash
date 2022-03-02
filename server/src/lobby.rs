@@ -1,3 +1,4 @@
+use clash::game_state::GameState;
 use clash::lobby::{LobbyOptions, SharedLobby};
 use clash::protocol::Message;
 use clash::MAX_PLAYERS;
@@ -28,6 +29,7 @@ impl Lobby {
         let (sender, _) = channel(100);
         Self {
             shared: SharedLobby {
+                game_state: GameState::default(),
                 lobby_id,
                 options: new_options,
                 is_started: false,

@@ -4,7 +4,6 @@ mod player_widget;
 use crate::game::GameStateExt;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
-use clash::game_state::GameState;
 use clash::lobby::{LobbyOptions, SharedLobby};
 use clash::{room::Room, spatula::Spatula};
 use std::sync::mpsc::Receiver;
@@ -39,7 +38,7 @@ pub struct Clash {
     lab_door_string: String,
     lab_door_num: Option<u8>,
     game_active: bool,
-    game_state: GameState,
+    lobby: SharedLobby,
     receiver: Receiver<GuiMessage>,
 }
 
@@ -52,7 +51,7 @@ impl Clash {
             lab_door_string: Default::default(),
             lab_door_num: None,
             game_active: false,
-            game_state: GameState::new(SharedLobby::new(0, LobbyOptions::default(), None)),
+            lobby: SharedLobby::new(0, LobbyOptions::default(), None),
             receiver,
         }
     }
@@ -61,10 +60,10 @@ impl Clash {
         while let Ok(message) = self.receiver.try_recv() {
             match message {
                 GuiMessage::Spatula(s) => {
-                    self.game_state.spatulas.insert(s, None);
+                    self.lobby.game_state.spatulas.insert(s, None);
                 }
                 GuiMessage::Room(r) => {
-                    self.game_state.current_room = r;
+                    self.lobby.game_state.current_room = r;
                 }
             }
         }
@@ -74,13 +73,10 @@ impl Clash {
         ui.heading("Lobby Options");
         ui.separator();
 
-        ui.add(Checkbox::new(
-            &mut self.game_state.lobby.options.ng_plus,
-            "New Game+",
-        ))
-        .on_hover_text(
-            "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
-        );
+        ui.add(Checkbox::new(&mut self.lobby.options.ng_plus, "New Game+"))
+            .on_hover_text(
+                "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
+            );
 
         if ui
             .horizontal(|ui| {
@@ -103,14 +99,14 @@ impl Clash {
 
         let mut start_game_response = ui
             .add_enabled(
-                self.game_state.can_start() && self.lab_door_num.is_some(),
+                self.lobby.can_start() && self.lab_door_num.is_some(),
                 Button::new("Start Game"),
             )
             .on_hover_text("Starts a new game for all connected players.");
 
         // We unfortunately have to check these conditions twice since we need the Response to add the
         // tooltips but need to enable/disable the button before we can get the response
-        if !self.game_state.can_start() {
+        if !self.lobby.can_start() {
             start_game_response =
                 start_game_response.on_disabled_hover_text("All players must be on the Main Menu.")
         }
@@ -254,8 +250,8 @@ impl App for Clash {
                         ui.add_space(PADDING);
                         ui.add(PlayerUi::new(
                             self.name.as_str(),
-                            self.game_state.spatulas.len() as u32,
-                            self.game_state.current_room,
+                            self.lobby.game_state.spatulas.len() as u32,
+                            self.lobby.game_state.current_room,
                             Color32::from_rgb(100, 120, 180),
                         ));
                         ui.add(PlayerUi::new(
@@ -291,7 +287,7 @@ impl App for Clash {
                     });
                 CentralPanel::default().show(ctx, |ui| {
                     if self.game_active {
-                        ui.add(GameMenu::new(&self.game_state));
+                        ui.add(GameMenu::new(&self.lobby.game_state));
                     } else {
                         // TODO: Restrict these to the host
                         self.paint_options(ui);
