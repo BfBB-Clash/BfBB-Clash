@@ -30,6 +30,7 @@ impl Default for GameState {
 }
 
 impl GameState {
+    /// Process state updates from the server and report back any actions of the local player
     pub fn update<T: GameInterface>(
         &mut self,
         game: &T,
@@ -95,5 +96,11 @@ impl GameState {
         }
 
         Ok(())
+    }
+
+    /// True when all connected players are on the Main Menu
+    pub fn can_start(&self) -> bool {
+        // TODO: Solve the "Demo Cutscene" issue. We can probably detect when players are on the autosave preference screen instead.
+        self.current_room == Some(Room::MainMenu)
     }
 }

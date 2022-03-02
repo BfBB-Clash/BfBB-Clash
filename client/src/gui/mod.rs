@@ -4,14 +4,15 @@ mod player_widget;
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use crate::game::GameState;
 use clash::{room::Room, spatula::Spatula};
+use std::sync::mpsc::Receiver;
+
 use eframe::egui::{
-    Align, Color32, Context, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style,
-    TextEdit, TextStyle, TopBottomPanel,
+    Align, Button, CentralPanel, Checkbox, Color32, Context, FontData, FontDefinitions, FontFamily,
+    Layout, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
 };
 use eframe::epaint::FontId;
-use eframe::epi::{Frame, Storage};
-use eframe::{egui::CentralPanel, epi::App, run_native, NativeOptions};
-use std::sync::mpsc::Receiver;
+use eframe::epi::{App, Frame, Storage};
+use eframe::{run_native, NativeOptions};
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
@@ -32,6 +33,9 @@ pub struct Clash {
     state: Menu,
     name: String,
     lobby_id: String,
+    lab_door_string: String,
+    lab_door_num: Option<u8>,
+    game_active: bool,
     game_state: GameState,
     receiver: Receiver<GuiMessage>,
 }
@@ -42,6 +46,9 @@ impl Clash {
             state: Menu::Main,
             name: Default::default(),
             lobby_id: Default::default(),
+            lab_door_string: Default::default(),
+            lab_door_num: None,
+            game_active: false,
             game_state: GameState::default(),
             receiver,
         }
@@ -57,6 +64,62 @@ impl Clash {
                     self.game_state.current_room = r;
                 }
             }
+        }
+    }
+
+    fn paint_options(&mut self, ui: &mut Ui) {
+        ui.heading("Lobby Options");
+        ui.separator();
+
+        ui.add(Checkbox::new(
+            &mut self.game_state.options.ng_plus,
+            "New Game+",
+        ))
+        .on_hover_text(
+            "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
+        );
+
+        if ui
+            .horizontal(|ui| {
+                if self.lab_door_num.is_none() {
+                    ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
+                }
+                ui.label("Lab Door Cost: ");
+                ui.text_edit_singleline(&mut self.lab_door_string)
+            })
+            .inner
+            .changed()
+        {
+            // Validate input
+            self.lab_door_num = self
+                .lab_door_string
+                .parse::<u8>()
+                .ok()
+                .filter(|&n| n > 0 && n <= 82);
+        }
+
+        let mut start_game_response = ui
+            .add_enabled(
+                self.game_state.can_start() && self.lab_door_num.is_some(),
+                Button::new("Start Game"),
+            )
+            .on_hover_text("Starts a new game for all connected players.");
+
+        // We unfortunately have to check these conditions twice since we need the Response to add the
+        // tooltips but need to enable/disable the button before we can get the response
+        if !self.game_state.can_start() {
+            start_game_response =
+                start_game_response.on_disabled_hover_text("All players must be on the Main Menu.")
+        }
+
+        if self.lab_door_num.is_none() {
+            start_game_response = start_game_response
+                .on_disabled_hover_text("'Lab Door Cost' must be a number from 1-82");
+        }
+
+        if start_game_response.clicked() {
+            // TODO: Send a message to the network thread to start the game.
+            self.game_active = true;
         }
     }
 }
@@ -224,7 +287,12 @@ impl App for Clash {
                         ));
                     });
                 CentralPanel::default().show(ctx, |ui| {
-                    ui.add(GameMenu::new(&self.game_state));
+                    if self.game_active {
+                        ui.add(GameMenu::new(&self.game_state));
+                    } else {
+                        // TODO: Restrict these to the host
+                        self.paint_options(ui);
+                    }
                 });
             }
         }
