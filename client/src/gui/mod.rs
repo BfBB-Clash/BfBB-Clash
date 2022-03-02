@@ -6,7 +6,7 @@ use crate::game::GameState;
 use clash::{room::Room, spatula::Spatula};
 use eframe::egui::{
     Align, Color32, Context, FontData, FontDefinitions, FontFamily, Layout, SidePanel, Style,
-    TextStyle, TopBottomPanel,
+    TextEdit, TextStyle, TopBottomPanel,
 };
 use eframe::epaint::FontId;
 use eframe::epi::{Frame, Storage};
@@ -141,10 +141,7 @@ impl App for Clash {
                     ui.vertical_centered(|ui| ui.label("Host Game"));
                 });
                 TopBottomPanel::bottom("Join Panel").show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Name: ");
-                        ui.text_edit_singleline(&mut self.name);
-                    });
+                    ui.add(TextEdit::singleline(&mut self.name).hint_text("Name"));
                     ui.add_enabled_ui(!self.name.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
                             self.state = Menu::Game;
@@ -162,12 +159,10 @@ impl App for Clash {
                 });
                 TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label("Name: ");
-                        ui.text_edit_singleline(&mut self.name);
+                        ui.add(TextEdit::singleline(&mut self.name).hint_text("Name"));
                     });
                     ui.horizontal(|ui| {
-                        ui.label("Lobby ID: ");
-                        ui.text_edit_singleline(&mut self.lobby_id);
+                        ui.add(TextEdit::singleline(&mut self.lobby_id).hint_text("Lobby ID"));
                     });
                     ui.add_enabled_ui(!self.name.is_empty() && !self.lobby_id.is_empty(), |ui| {
                         if ui.button("Join Game").clicked() {
