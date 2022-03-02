@@ -1,8 +1,11 @@
 mod game_menu;
 mod player_widget;
 
+use crate::game::GameStateExt;
+
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
-use crate::game::GameState;
+use clash::game_state::GameState;
+use clash::lobby::{LobbyOptions, SharedLobby};
 use clash::{room::Room, spatula::Spatula};
 use std::sync::mpsc::Receiver;
 
@@ -49,7 +52,7 @@ impl Clash {
             lab_door_string: Default::default(),
             lab_door_num: None,
             game_active: false,
-            game_state: GameState::default(),
+            game_state: GameState::new(SharedLobby::new(0, LobbyOptions::default(), None)),
             receiver,
         }
     }
@@ -72,7 +75,7 @@ impl Clash {
         ui.separator();
 
         ui.add(Checkbox::new(
-            &mut self.game_state.options.ng_plus,
+            &mut self.game_state.lobby.options.ng_plus,
             "New Game+",
         ))
         .on_hover_text(
