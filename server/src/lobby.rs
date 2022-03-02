@@ -51,6 +51,8 @@ impl Lobby {
         false
     }
 
+    pub fn start_game() {}
+
     pub fn rem_player(
         &mut self,
         players: &mut HashMap<u32, Player>,
@@ -60,8 +62,16 @@ impl Lobby {
         if let Some(p) = players.get_mut(&auth_id) {
             if self.is_player_in_lobby(&auth_id) {
                 self.shared.player_count -= 1;
-                self.shared.players.remove(p.shared.lobby_index.expect("If the player is in the lobby, they should have a lobby_index."));
-                self.player_ids.remove(p.shared.lobby_index.expect("If the player is in the lobby, they should have a lobby_index."));
+                self.shared.players.remove(
+                    p.shared
+                        .lobby_index
+                        .expect("If the player is in the lobby, they should have a lobby_index."),
+                );
+                self.player_ids.remove(
+                    p.shared
+                        .lobby_index
+                        .expect("If the player is in the lobby, they should have a lobby_index."),
+                );
                 return Ok(());
             }
         }

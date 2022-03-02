@@ -230,11 +230,15 @@ async fn process_incoming(
 
             let lobby = match state.lobbies.get_mut(&lobby_id) {
                 None => {
-                    error!("Attempted to join lobby with an invalid id '{lobby_id}'");
+                    error!("Attempted to leave lobby with an invalid id '{lobby_id}'");
                     return true;
                 }
                 Some(l) => l,
             };
+
+            if lobby.is_player_in_lobby(&auth_id) {
+                lobby.rem_player(&mut state.players, auth_id);
+            }
         }
         Message::PlayerOptions { auth_id, options } => {
             let state = &mut *state.write().unwrap();
