@@ -1,6 +1,7 @@
 use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 use thiserror::Error;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
@@ -41,7 +42,7 @@ pub enum Message {
     },
     GameCurrentRoom {
         auth_id: u32,
-        room: Room,
+        room: Option<Room>,
     },
     GameForceWarp {
         auth_id: u32,

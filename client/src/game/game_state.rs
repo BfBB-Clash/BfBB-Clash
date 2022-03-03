@@ -1,5 +1,4 @@
 use crate::game::{GameInterface, InterfaceResult};
-use crate::gui::GuiMessage;
 use clash::lobby::SharedLobby;
 use clash::{
     protocol::{Item, Message},
@@ -14,9 +13,7 @@ pub trait GameStateExt {
     fn update<T: GameInterface>(
         &mut self,
         game: &T,
-        gui_sender: &mut Sender<GuiMessage>,
-        _network_sender: &mut tokio::sync::mpsc::Sender<Message>,
-        logic_receiver: &mut Receiver<Message>,
+        network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()>;
 
     fn can_start(&self) -> bool;
@@ -27,22 +24,8 @@ impl GameStateExt for SharedLobby {
     fn update<T: GameInterface>(
         &mut self,
         game: &T,
-        gui_sender: &mut Sender<GuiMessage>,
-        _network_sender: &mut tokio::sync::mpsc::Sender<Message>,
-        logic_receiver: &mut Receiver<Message>,
+        network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()> {
-        while let Ok(m) = logic_receiver.try_recv() {
-            if let Message::GameItemCollected {
-                auth_id: _,
-                item: Item::Spatula(spat),
-            } = m
-            {
-                self.game_state.spatulas.insert(spat, None);
-                game.mark_task_complete(spat)?;
-                let _ = gui_sender.send(GuiMessage::Spatula(spat));
-                info!("Collected {spat:?}");
-            }
-        }
         if game.is_loading()? {
             return Ok(());
         }
@@ -51,7 +34,9 @@ impl GameStateExt for SharedLobby {
         let room = Some(game.get_current_level()?);
         if self.game_state.current_room != room {
             self.game_state.current_room = room;
-            let _ = gui_sender.send(GuiMessage::Room(room));
+            network_sender
+                .blocking_send(Message::GameCurrentRoom { auth_id: 0, room })
+                .unwrap();
         }
         if self.game_state.current_room == Some(Room::ChumBucket) {
             game.set_lab_door(self.options.lab_door_cost.into())?;
@@ -67,7 +52,12 @@ impl GameStateExt for SharedLobby {
             // Check menu for any potentially missed collection events
             if game.is_task_complete(spat)? {
                 self.game_state.spatulas.insert(spat, None);
-                let _ = gui_sender.send(GuiMessage::Spatula(spat));
+                network_sender
+                    .blocking_send(Message::GameItemCollected {
+                        auth_id: 0,
+                        item: Item::Spatula(spat),
+                    })
+                    .unwrap();
                 info!("Collected (from menu) {spat:?}");
             }
 
@@ -81,9 +71,13 @@ impl GameStateExt for SharedLobby {
                 && spat != Spatula::KahRahTae
                 && game.is_spatula_being_collected(spat)?
             {
-                // TODO: Don't make this None.
                 self.game_state.spatulas.insert(spat, None);
-                let _ = gui_sender.send(GuiMessage::Spatula(spat));
+                network_sender
+                    .blocking_send(Message::GameItemCollected {
+                        auth_id: 0,
+                        item: Item::Spatula(spat),
+                    })
+                    .unwrap();
                 info!("Collected {spat:?}");
             }
         }

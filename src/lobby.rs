@@ -21,8 +21,8 @@ pub struct SharedLobby {
     pub game_state: GameState,
     pub lobby_id: u32,
     pub options: LobbyOptions,
+    // TODO: Think about a player handle/id instead of duplicating SharedPlayers, or put it in an Arc
     pub players: Vec<SharedPlayer>,
-    pub player_count: u32, //Probably will never be larger than a u8 :)
     pub is_started: bool,
     pub host_index: Option<usize>,
 }
@@ -34,7 +34,6 @@ impl SharedLobby {
             lobby_id,
             options,
             players: Vec::new(),
-            player_count: 1,
             is_started: false,
             host_index,
         }

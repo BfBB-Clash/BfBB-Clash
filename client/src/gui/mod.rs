@@ -5,7 +5,6 @@ use crate::game::GameStateExt;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use clash::lobby::{LobbyOptions, SharedLobby};
-use clash::{room::Room, spatula::Spatula};
 use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
@@ -18,11 +17,6 @@ use eframe::{run_native, NativeOptions};
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
-
-pub enum GuiMessage {
-    Spatula(Spatula),
-    Room(Option<Room>),
-}
 
 pub enum Menu {
     Main,
@@ -39,11 +33,11 @@ pub struct Clash {
     lab_door_num: Option<u8>,
     game_active: bool,
     lobby: SharedLobby,
-    receiver: Receiver<GuiMessage>,
+    receiver: Receiver<SharedLobby>,
 }
 
 impl Clash {
-    fn new(receiver: Receiver<GuiMessage>) -> Self {
+    fn new(receiver: Receiver<SharedLobby>) -> Self {
         Self {
             state: Menu::Main,
             name: Default::default(),
@@ -53,19 +47,6 @@ impl Clash {
             game_active: false,
             lobby: SharedLobby::new(0, LobbyOptions::default(), None),
             receiver,
-        }
-    }
-
-    fn process_messages(&mut self) {
-        while let Ok(message) = self.receiver.try_recv() {
-            match message {
-                GuiMessage::Spatula(s) => {
-                    self.lobby.game_state.spatulas.insert(s, None);
-                }
-                GuiMessage::Room(r) => {
-                    self.lobby.game_state.current_room = r;
-                }
-            }
         }
     }
 
@@ -242,7 +223,9 @@ impl App for Clash {
                 ctx.request_repaint();
 
                 // Receive gamestate updates
-                self.process_messages();
+                while let Ok(new_lobby) = self.receiver.try_recv() {
+                    self.lobby = new_lobby;
+                }
 
                 SidePanel::left("Player List")
                     .resizable(false)
@@ -302,7 +285,7 @@ impl App for Clash {
     }
 }
 
-pub fn run(gui_receiver: Receiver<GuiMessage>) {
+pub fn run(gui_receiver: Receiver<SharedLobby>) {
     let window_options = NativeOptions {
         initial_window_size: Some((600., 742.).into()),
         resizable: false,
