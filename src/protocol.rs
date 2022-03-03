@@ -111,17 +111,24 @@ impl<'a> Connection<'a> {
     }
 
     fn parse_frame(&mut self) -> Result<Option<Message>, tokio::io::Error> {
+        // Use a Cursor to avoid advancing the internal cursor of self.buffer
+        let mut buf = Cursor::new(&self.buffer[..]);
+
         if self.buffer.len() < 2 {
             return Ok(None);
         }
-        let len = self.buffer.get_u16().into();
-        if self.buffer.remaining() < len {
+
+        // Check if the buffer contains the full message yet
+        let message_len = buf.get_u16().into();
+        if self.buffer.remaining() < message_len + std::mem::size_of::<u16>() {
             return Ok(None);
         }
 
+        // Consume the frame from the buffer and deserialize a message
+        self.buffer.advance(std::mem::size_of::<u16>());
         let message = bincode::deserialize::<Message>(&self.buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        self.buffer.advance(len);
+        self.buffer.advance(message_len);
 
         Ok(Some(message))
     }
