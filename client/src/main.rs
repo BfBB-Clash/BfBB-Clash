@@ -46,7 +46,7 @@ fn main() {
 #[tokio::main(flavor = "current_thread")]
 async fn start_network(
     mut receiver: tokio::sync::mpsc::Receiver<Message>,
-    _logic_sender: Sender<Message>,
+    mut logic_sender: Sender<Message>,
 ) {
     let mut sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(&mut sock);
@@ -54,13 +54,9 @@ async fn start_network(
     loop {
         select! {
             m = receiver.recv() => {
-                match conn.write_frame(m.unwrap()).await {
-                    Ok(a) => {
-                        info!("Sent message {a:#?}.")
-                    }
-                    Err(e) => {
-                        error!("Error sending message to server. Disconnecting. {e:#?}");
-                    }
+                debug!("Sending message {m:#?}");
+                if let Err(e) = conn.write_frame(m.unwrap()).await {
+                    error!("Error sending message to server. Disconnecting. {e:#?}");
                 };
             }
             incoming = conn.read_frame() => {
@@ -78,33 +74,22 @@ async fn start_network(
                         break;
                     }
                 };
-                process_incoming(incoming, &mut conn).await;
+                process_incoming(incoming, &mut conn, &mut logic_sender).await;
             }
         };
     }
 }
 
-async fn process_incoming<'a>(message: Message, conn: &mut Connection<'a>) {
+async fn process_incoming<'a>(
+    message: Message,
+    conn: &mut Connection<'a>,
+    logic_sender: &mut Sender<Message>,
+) {
     match message {
         Message::ConnectionAccept { auth_id } => {
             debug!("ConnectionAccept message got :)");
-            let message = Message::PlayerOptions {
-                auth_id,
-                options: PlayerOptions {
-                    name: String::from("Will"),
-                    color: 0xFFFFFFFF,
-                },
-            };
-            match conn.write_frame(message).await {
-                Ok(a) => {
-                    info!("Sent message {a:#?}.")
-                }
-                Err(e) => {
-                    error!("Error sending message to server. Disconnecting. {e:#?}");
-                }
-            };
 
-            conn.write_frame(Message::GameJoin {
+            conn.write_frame(Message::GameHost {
                 auth_id,
                 lobby_id: 0,
             })
@@ -127,10 +112,12 @@ async fn process_incoming<'a>(message: Message, conn: &mut Connection<'a>) {
             auth_id: _,
             options: _,
         } => todo!(),
-        Message::GameLobbyInfo {
+        m @ Message::GameLobbyInfo {
             auth_id: _,
             lobby: _,
-        } => todo!(),
+        } => {
+            logic_sender.send(m).unwrap();
+        }
         Message::GameBegin { auth_id: _ } => todo!(),
         Message::GameCurrentRoom {
             auth_id: _,

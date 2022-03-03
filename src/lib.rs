@@ -5,4 +5,4 @@ pub mod protocol;
 pub mod room;
 pub mod spatula;
 
-pub const MAX_PLAYERS: u32 = 6;
+pub const MAX_PLAYERS: usize = 6;
