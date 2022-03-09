@@ -27,9 +27,12 @@ pub enum Menu {
 
 pub struct Clash {
     state: Menu,
-    name: String,
-    lobby_id: String,
-    lab_door_string: String,
+    name_buf: String,
+
+    lobby_id_buf: String,
+    lobby_id: Option<u32>,
+
+    lab_door_buf: String,
     lab_door_num: Option<u8>,
     game_active: bool,
     lobby: SharedLobby,
@@ -40,9 +43,10 @@ impl Clash {
     fn new(receiver: Receiver<SharedLobby>) -> Self {
         Self {
             state: Menu::Main,
-            name: Default::default(),
+            name_buf: Default::default(),
+            lobby_id_buf: Default::default(),
             lobby_id: Default::default(),
-            lab_door_string: Default::default(),
+            lab_door_buf: Default::default(),
             lab_door_num: None,
             game_active: false,
             lobby: SharedLobby::new(0, LobbyOptions::default(), None),
@@ -59,20 +63,20 @@ impl Clash {
                 "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
             );
 
-        if ui
+        let door_cost_response = ui
             .horizontal(|ui| {
                 if self.lab_door_num.is_none() {
                     ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
                 }
                 ui.label("Lab Door Cost: ");
-                ui.text_edit_singleline(&mut self.lab_door_string)
+                ui.text_edit_singleline(&mut self.lab_door_buf)
             })
-            .inner
-            .changed()
-        {
-            // Validate input
+            .inner;
+
+        // Validate input
+        if door_cost_response.changed() {
             self.lab_door_num = self
-                .lab_door_string
+                .lab_door_buf
                 .parse::<u8>()
                 .ok()
                 .filter(|&n| n > 0 && n <= 82);
@@ -184,8 +188,8 @@ impl App for Clash {
                     ui.vertical_centered(|ui| ui.label("Host Game"));
                 });
                 TopBottomPanel::bottom("Join Panel").show(ctx, |ui| {
-                    ui.add(TextEdit::singleline(&mut self.name).hint_text("Name"));
-                    ui.add_enabled_ui(!self.name.is_empty(), |ui| {
+                    ui.add(TextEdit::singleline(&mut self.name_buf).hint_text("Name"));
+                    ui.add_enabled_ui(!self.name_buf.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
                             self.state = Menu::Game;
                         }
@@ -201,17 +205,29 @@ impl App for Clash {
                     ui.label("Join Game");
                 });
                 TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.add(TextEdit::singleline(&mut self.name).hint_text("Name"));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.add(TextEdit::singleline(&mut self.lobby_id).hint_text("Lobby ID"));
-                    });
-                    ui.add_enabled_ui(!self.name.is_empty() && !self.lobby_id.is_empty(), |ui| {
-                        if ui.button("Join Game").clicked() {
-                            self.state = Menu::Game;
-                        }
-                    });
+                    ui.add(TextEdit::singleline(&mut self.name_buf).hint_text("Name"));
+                    let lobby_response =
+                        ui.add(TextEdit::singleline(&mut self.lobby_id_buf).hint_text("Lobby ID"));
+
+                    // Validate input
+                    if lobby_response.changed() {
+                        self.lobby_id = u32::from_str_radix(self.lobby_id_buf.as_str(), 16).ok();
+                    }
+
+                    let mut join_response = ui
+                        .add_enabled_ui(self.lobby_id.is_some(), |ui| ui.button("Join Game"))
+                        .inner;
+
+                    if self.lobby_id.is_none() {
+                        join_response = join_response.on_disabled_hover_text(
+                            "Lobby ID must be an 8 digit hexadecimal number",
+                        )
+                    };
+
+                    if join_response.clicked() {
+                        self.state = Menu::Game;
+                    }
+
                     if ui.button("Back").clicked() {
                         self.state = Menu::Main;
                     }
