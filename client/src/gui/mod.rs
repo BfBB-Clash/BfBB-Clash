@@ -247,42 +247,19 @@ impl App for Clash {
                     .resizable(false)
                     .show(ctx, |ui| {
                         ui.add_space(PADDING);
-                        ui.add(PlayerUi::new(
-                            self.name.as_str(),
-                            self.lobby.game_state.spatulas.len() as u32,
-                            self.lobby.game_state.current_room,
-                            Color32::from_rgb(100, 120, 180),
-                        ));
-                        ui.add(PlayerUi::new(
-                            "Not Square",
-                            4,
-                            None,
-                            Color32::from_rgb(180, 100, 120),
-                        ));
-                        ui.add(PlayerUi::new(
-                            "Not Square",
-                            4,
-                            None,
-                            Color32::from_rgb(180, 100, 120),
-                        ));
-                        ui.add(PlayerUi::new(
-                            "Not Square",
-                            4,
-                            None,
-                            Color32::from_rgb(180, 100, 120),
-                        ));
-                        ui.add(PlayerUi::new(
-                            "Not Square",
-                            4,
-                            None,
-                            Color32::from_rgb(180, 100, 120),
-                        ));
-                        ui.add(PlayerUi::new(
-                            "Not Square",
-                            4,
-                            None,
-                            Color32::from_rgb(180, 100, 120),
-                        ));
+                        for player in self.lobby.players.iter() {
+                            ui.add(PlayerUi::new(
+                                player.options.name.as_str(),
+                                self.lobby
+                                    .game_state
+                                    .spatulas
+                                    .iter()
+                                    .filter(|&(_, &index)| index == player.lobby_index)
+                                    .count() as u32,
+                                self.lobby.game_state.current_room,
+                                Color32::from_rgb(180, 120, 100),
+                            ));
+                        }
                     });
                 CentralPanel::default().show(ctx, |ui| {
                     if self.game_active {
