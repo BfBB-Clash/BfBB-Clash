@@ -5,6 +5,8 @@ use crate::game::GameStateExt;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use clash::lobby::{LobbyOptions, SharedLobby};
+use clash::player::PlayerOptions;
+use clash::protocol::Message;
 use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
@@ -26,6 +28,9 @@ pub enum Menu {
 }
 
 pub struct Clash {
+    gui_receiver: Receiver<SharedLobby>,
+    network_sender: tokio::sync::mpsc::Sender<Message>,
+
     state: Menu,
     name_buf: String,
 
@@ -36,12 +41,16 @@ pub struct Clash {
     lab_door_num: Option<u8>,
     game_active: bool,
     lobby: SharedLobby,
-    receiver: Receiver<SharedLobby>,
 }
 
 impl Clash {
-    fn new(receiver: Receiver<SharedLobby>) -> Self {
+    fn new(
+        gui_receiver: Receiver<SharedLobby>,
+        network_sender: tokio::sync::mpsc::Sender<Message>,
+    ) -> Self {
         Self {
+            gui_receiver,
+            network_sender,
             state: Menu::Main,
             name_buf: Default::default(),
             lobby_id_buf: Default::default(),
@@ -50,7 +59,6 @@ impl Clash {
             lab_door_num: None,
             game_active: false,
             lobby: SharedLobby::new(0, LobbyOptions::default(), None),
-            receiver,
         }
     }
 
@@ -191,6 +199,19 @@ impl App for Clash {
                     ui.add(TextEdit::singleline(&mut self.name_buf).hint_text("Name"));
                     ui.add_enabled_ui(!self.name_buf.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
+                            self.network_sender
+                                .blocking_send(Message::GameHost { auth_id: 0 })
+                                .unwrap();
+                            self.network_sender
+                                .blocking_send(Message::PlayerOptions {
+                                    auth_id: 0,
+                                    options: PlayerOptions {
+                                        name: self.name_buf.clone(),
+                                        color: (0, 0, 0),
+                                    },
+                                })
+                                .unwrap();
+
                             self.state = Menu::Game;
                         }
                     });
@@ -225,6 +246,21 @@ impl App for Clash {
                     };
 
                     if join_response.clicked() {
+                        self.network_sender
+                            .blocking_send(Message::GameJoin {
+                                auth_id: 0,
+                                lobby_id: self.lobby_id.unwrap(),
+                            })
+                            .unwrap();
+                        self.network_sender
+                            .blocking_send(Message::PlayerOptions {
+                                auth_id: 0,
+                                options: PlayerOptions {
+                                    name: self.name_buf.clone(),
+                                    color: (0, 0, 0),
+                                },
+                            })
+                            .unwrap();
                         self.state = Menu::Game;
                     }
 
@@ -239,7 +275,7 @@ impl App for Clash {
                 ctx.request_repaint();
 
                 // Receive gamestate updates
-                while let Ok(new_lobby) = self.receiver.try_recv() {
+                while let Ok(new_lobby) = self.gui_receiver.try_recv() {
                     self.lobby = new_lobby;
                 }
 
@@ -248,22 +284,12 @@ impl App for Clash {
                     .show(ctx, |ui| {
                         ui.add_space(PADDING);
                         for player in self.lobby.players.iter() {
-                            ui.add(PlayerUi::new(
-                                player.options.name.as_str(),
-                                self.lobby
-                                    .game_state
-                                    .spatulas
-                                    .iter()
-                                    .filter(|&(_, &index)| index == player.lobby_index)
-                                    .count() as u32,
-                                self.lobby.game_state.current_room,
-                                Color32::from_rgb(180, 120, 100),
-                            ));
+                            ui.add(PlayerUi::new(player, self.lobby.game_state.current_room));
                         }
                     });
                 CentralPanel::default().show(ctx, |ui| {
                     if self.game_active {
-                        ui.add(GameMenu::new(&self.lobby.game_state));
+                        ui.add(GameMenu::new(&self.lobby.game_state, &self.lobby.players));
                     } else {
                         // TODO: Restrict these to the host
                         self.paint_options(ui);
@@ -278,12 +304,18 @@ impl App for Clash {
     }
 }
 
-pub fn run(gui_receiver: Receiver<SharedLobby>) {
+pub fn run(
+    gui_receiver: Receiver<SharedLobby>,
+    network_sender: tokio::sync::mpsc::Sender<Message>,
+) {
     let window_options = NativeOptions {
         initial_window_size: Some((600., 742.).into()),
         resizable: false,
         ..Default::default()
     };
 
-    run_native(Box::new(Clash::new(gui_receiver)), window_options);
+    run_native(
+        Box::new(Clash::new(gui_receiver, network_sender)),
+        window_options,
+    );
 }

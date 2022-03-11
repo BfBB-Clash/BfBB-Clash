@@ -3,6 +3,7 @@ use clash::player::{PlayerOptions, SharedPlayer};
 use clash::protocol::{Connection, Item, Message};
 use log::{debug, error, info, warn};
 use rand::{thread_rng, Rng};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::net::{TcpListener, TcpStream};
@@ -34,7 +35,7 @@ impl State {
             Player::new(
                 SharedPlayer::new(PlayerOptions {
                     name: String::new(),
-                    color: 0,
+                    color: (0, 0, 0),
                 }),
                 auth_id,
             ),
@@ -150,10 +151,7 @@ async fn process_incoming(
     lobby_recv: &mut Option<Receiver<Message>>,
 ) -> bool {
     match incoming {
-        Message::GameHost {
-            auth_id: _,
-            lobby_id: _,
-        } => {
+        Message::GameHost { auth_id: _ } => {
             let state = &mut *state.write().unwrap();
             if state.players.contains_key(&auth_id) {
                 let gen_lobby_id = state.gen_lobby_id();
@@ -228,7 +226,7 @@ async fn process_incoming(
             let state = &mut *state.write().unwrap();
 
             let lobby_id = match state.players.get_mut(&auth_id) {
-                Some(p) => p.lobby_id,
+                Some(p) => p.shared.current_lobby,
                 None => {
                     error!("Invalid player id {auth_id:#X}");
                     //TODO: Kick player?
@@ -248,12 +246,18 @@ async fn process_incoming(
                 lobby.rem_player(&mut state.players, auth_id);
             }
         }
-        Message::PlayerOptions { auth_id, options } => {
+        Message::PlayerOptions {
+            auth_id: _,
+            options,
+        } => {
             let state = &mut *state.write().unwrap();
 
             let player = match state.players.get_mut(&auth_id) {
                 Some(p) => {
-                    p.shared.options = options.clone();
+                    p.shared.options = options;
+                    // Temporarily force player to color determined by index
+                    p.shared.options.color =
+                        clash::player::COLORS[p.shared.lobby_index.unwrap_or_default()];
                     p
                 }
                 None => {
@@ -262,23 +266,25 @@ async fn process_incoming(
                     return false;
                 }
             };
-            match state.lobbies.get_mut(&player.lobby_id) {
+            let lobby = match state.lobbies.get_mut(&player.shared.current_lobby) {
                 Some(l) => {
                     if let Some(index) = player.shared.lobby_index {
                         if index < l.shared.players.len() {
                             l.shared.players[index] = player.shared.clone();
                         }
                     }
+                    l
                 }
                 None => {
-                    error!("Invalid lobby id {:#X}", player.lobby_id);
+                    error!("Invalid lobby id {:#X}", player.shared.current_lobby);
+                    return true;
                 }
-            }
+            };
 
             if let Some(lobby_send) = lobby_send.as_mut() {
-                let message = Message::PlayerOptions {
+                let message = Message::GameLobbyInfo {
                     auth_id: 0,
-                    options,
+                    lobby: lobby.shared.clone(),
                 };
                 lobby_send.send(message).unwrap();
             }
@@ -316,7 +322,7 @@ async fn process_incoming(
             let state = &mut *state.write().unwrap();
 
             let lobby_id = match state.players.get_mut(&auth_id) {
-                Some(p) => p.lobby_id,
+                Some(p) => p.shared.current_lobby,
                 None => {
                     error!("Invalid player id {auth_id:#X}");
                     return false;
@@ -344,24 +350,27 @@ async fn process_incoming(
         Message::GameItemCollected { auth_id: _, item } => {
             let state = &mut *state.write().unwrap();
 
-            let (lobby_id, index) = match state.players.get_mut(&auth_id) {
-                Some(p) => (p.lobby_id, p.shared.lobby_index),
+            let player = match state.players.get_mut(&auth_id) {
+                Some(p) => p,
                 None => {
                     error!("Invalid player id {auth_id:#X}");
                     return false;
                 }
             };
 
-            let lobby = match state.lobbies.get_mut(&lobby_id) {
+            let lobby = match state.lobbies.get_mut(&player.shared.current_lobby) {
                 Some(l) => {
                     if let Item::Spatula(spat) = item {
-                        l.shared.game_state.spatulas.insert(spat, index);
-                        info!("Player {auth_id:#X} collected {spat:?}");
+                        if let Entry::Vacant(e) = l.shared.game_state.spatulas.entry(spat) {
+                            e.insert(player.shared.lobby_index);
+                            l.shared.players[player.shared.lobby_index.unwrap()].score += 1;
+                            info!("Player {auth_id:#X} collected {spat:?}");
+                        }
                     }
                     l.shared.clone()
                 }
                 None => {
-                    error!("Invalid lobby id {lobby_id:#X}");
+                    error!("Invalid lobby id {:#X}", player.shared.current_lobby);
                     return false;
                 }
             };

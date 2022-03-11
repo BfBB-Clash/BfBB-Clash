@@ -1,9 +1,6 @@
 use std::sync::mpsc::{channel, Sender};
 
-use clash::{
-    player::PlayerOptions,
-    protocol::{Connection, Message},
-};
+use clash::protocol::{Connection, Message};
 use log::{debug, error, info};
 use tokio::{net::TcpStream, select};
 
@@ -35,12 +32,15 @@ fn main() {
 
     // Start Game Thread
     let (gui_sender, gui_receiver) = channel();
-    let _game_thread = std::thread::Builder::new()
-        .name("Logic".into())
-        .spawn(move || game::start_game(gui_sender, network_sender, logic_receiver));
+    let _game_thread = {
+        let network_sender = network_sender.clone();
+        std::thread::Builder::new()
+            .name("Logic".into())
+            .spawn(move || game::start_game(gui_sender, network_sender, logic_receiver))
+    };
 
     // Start gui on the main thread
-    gui::run(gui_receiver);
+    gui::run(gui_receiver, network_sender);
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -82,28 +82,18 @@ async fn start_network(
 
 async fn process_incoming<'a>(
     message: Message,
-    conn: &mut Connection<'a>,
+    _conn: &mut Connection<'a>,
     logic_sender: &mut Sender<Message>,
 ) {
     match message {
-        Message::ConnectionAccept { auth_id } => {
+        Message::ConnectionAccept { auth_id: _ } => {
             debug!("ConnectionAccept message got :)");
-
-            conn.write_frame(Message::GameHost {
-                auth_id,
-                lobby_id: 0,
-            })
-            .await
-            .unwrap();
         }
         Message::PlayerOptions {
             auth_id: _,
             options: _,
         } => todo!(),
-        Message::GameHost {
-            auth_id: _,
-            lobby_id: _,
-        } => todo!(),
+        Message::GameHost { auth_id: _ } => todo!(),
         Message::GameJoin {
             auth_id: _,
             lobby_id: _,

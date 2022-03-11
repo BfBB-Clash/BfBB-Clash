@@ -90,9 +90,9 @@ impl Lobby {
             if let Some(p) = players.get_mut(&auth_id) {
                 if !self.is_player_in_lobby(&auth_id) {
                     p.shared.lobby_index = Some(self.player_ids.len());
+                    p.shared.current_lobby = self.id;
                     self.shared.players.push(p.shared.clone());
                     self.player_ids.push(auth_id);
-                    p.lobby_id = self.id;
                     return Ok((self.sender.clone(), self.sender.subscribe()));
                 }
             }

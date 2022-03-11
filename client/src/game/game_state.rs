@@ -6,7 +6,6 @@ use clash::{
     spatula::Spatula,
 };
 use log::info;
-use std::sync::mpsc::{Receiver, Sender};
 use strum::IntoEnumIterator;
 
 pub trait GameStateExt {

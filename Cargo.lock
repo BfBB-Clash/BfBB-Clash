@@ -353,6 +353,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bytes",
+ "egui",
  "log",
  "serde",
  "strum",

@@ -23,7 +23,6 @@ pub enum Message {
     },
     GameHost {
         auth_id: u32,
-        lobby_id: u32,
     },
     GameJoin {
         auth_id: u32,
