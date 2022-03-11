@@ -1,4 +1,4 @@
-use clash::{game_state::GameState, spatula::Spatula};
+use clash::{game_state::GameState, player::SharedPlayer, spatula::Spatula};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
@@ -7,11 +7,12 @@ use strum::IntoEnumIterator;
 
 pub struct GameMenu<'a> {
     game: &'a GameState,
+    players: &'a [SharedPlayer],
 }
 
 impl<'a> GameMenu<'a> {
-    pub fn new(game: &'a GameState) -> Self {
-        Self { game }
+    pub fn new(game: &'a GameState, players: &'a [SharedPlayer]) -> Self {
+        Self { game, players }
     }
 }
 impl<'a> Widget for GameMenu<'a> {
@@ -28,8 +29,8 @@ impl<'a> Widget for GameMenu<'a> {
             ui.allocate_exact_size(desired_size, Sense::focusable_noninteractive());
 
         for spat in Spatula::iter() {
-            let color = if self.game.spatulas.contains_key(&spat) {
-                Color32::from_rgb(100, 120, 180)
+            let color = if let Some(Some(i)) = self.game.spatulas.get(&spat) {
+                self.players[*i].options.color()
             } else {
                 Color32::from_rgb(50, 50, 50)
             };

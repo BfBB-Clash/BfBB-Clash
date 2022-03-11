@@ -1,41 +1,32 @@
-use clash::room::Room;
-use eframe::egui::{Color32, Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
+use clash::{player::SharedPlayer, room::Room};
+use eframe::egui::{Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
 pub struct PlayerUi<'a> {
-    name: &'a str,
-    score: u32,
+    player: &'a SharedPlayer,
     location: Option<Room>,
-    color: Color32,
 }
 
 impl<'a> PlayerUi<'a> {
-    pub fn new(name: &'a str, score: u32, location: Option<Room>, color: Color32) -> Self {
-        Self {
-            name,
-            score,
-            location,
-            color,
-        }
+    pub fn new(player: &'a SharedPlayer, location: Option<Room>) -> Self {
+        Self { player, location }
     }
 }
 
 impl<'a> Widget for PlayerUi<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let PlayerUi {
-            name,
-            score,
-            location,
-            color,
-        } = self;
+        let PlayerUi { player, location } = self;
+        let color = player.options.color();
 
         // Use individual layouts instead of a single one to be able to add padding between each line
+        // TODO: Look into how to avoid these constant string allocations
+        //       Probably store these Galleys in a client-side player struct
         let name_galley = ui.painter().layout_no_wrap(
-            name.to_string(),
+            player.options.name.clone(),
             TextStyle::Body.resolve(ui.style()),
             color,
         );
         let score_galley = ui.painter().layout_no_wrap(
-            format!("Spatulas: {score}"),
+            format!("Spatulas: {}", player.score),
             TextStyle::Body.resolve(ui.style()),
             color,
         );
