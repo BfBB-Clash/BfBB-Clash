@@ -1,4 +1,6 @@
-use clash::{game_state::GameState, player::SharedPlayer, spatula::Spatula};
+use std::collections::HashMap;
+
+use clash::{game_state::GameState, player::SharedPlayer, spatula::Spatula, AuthId};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
@@ -7,11 +9,11 @@ use strum::IntoEnumIterator;
 
 pub struct GameMenu<'a> {
     game: &'a GameState,
-    players: &'a [SharedPlayer],
+    players: &'a HashMap<AuthId, SharedPlayer>,
 }
 
 impl<'a> GameMenu<'a> {
-    pub fn new(game: &'a GameState, players: &'a [SharedPlayer]) -> Self {
+    pub fn new(game: &'a GameState, players: &'a HashMap<AuthId, SharedPlayer>) -> Self {
         Self { game, players }
     }
 }
@@ -30,7 +32,10 @@ impl<'a> Widget for GameMenu<'a> {
 
         for spat in Spatula::iter() {
             let color = if let Some(Some(i)) = self.game.spatulas.get(&spat) {
-                self.players[*i].options.color()
+                self.players
+                    .get(i)
+                    .map(|p| p.options.color())
+                    .unwrap_or_default()
             } else {
                 Color32::from_rgb(50, 50, 50)
             };

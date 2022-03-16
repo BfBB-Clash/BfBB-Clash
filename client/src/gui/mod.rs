@@ -58,7 +58,7 @@ impl Clash {
             lab_door_buf: Default::default(),
             lab_door_num: None,
             game_active: false,
-            lobby: SharedLobby::new(0, LobbyOptions::default(), None),
+            lobby: SharedLobby::new(0, LobbyOptions::default(), 0),
         }
     }
 
@@ -283,7 +283,8 @@ impl App for Clash {
                     .resizable(false)
                     .show(ctx, |ui| {
                         ui.add_space(PADDING);
-                        for player in self.lobby.players.iter() {
+                        // TODO: Deterministic ordering
+                        for player in self.lobby.players.values() {
                             ui.add(PlayerUi::new(player, self.lobby.game_state.current_room));
                         }
                     });

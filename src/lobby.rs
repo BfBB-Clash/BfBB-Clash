@@ -1,4 +1,6 @@
-use crate::{game_state::GameState, player::SharedPlayer};
+use std::collections::HashMap;
+
+use crate::{game_state::GameState, player::SharedPlayer, AuthId, LobbyId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -19,23 +21,23 @@ impl Default for LobbyOptions {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SharedLobby {
     pub game_state: GameState,
-    pub lobby_id: u32,
+    pub lobby_id: LobbyId,
     pub options: LobbyOptions,
-    // TODO: Think about a player handle/id instead of duplicating SharedPlayers, or put it in an Arc
-    pub players: Vec<SharedPlayer>,
+    // TODO: Use something other than the AuthId to identify players, this leaks the AuthId to the whole lobby
+    pub players: HashMap<AuthId, SharedPlayer>,
     pub is_started: bool,
-    pub host_index: Option<usize>,
+    pub host_id: AuthId,
 }
 
 impl SharedLobby {
-    pub fn new(lobby_id: u32, options: LobbyOptions, host_index: Option<usize>) -> Self {
+    pub fn new(lobby_id: u32, options: LobbyOptions, host_id: AuthId) -> Self {
         Self {
             game_state: GameState::default(),
             lobby_id,
             options,
-            players: Vec::new(),
+            players: HashMap::new(),
             is_started: false,
-            host_index,
+            host_id,
         }
     }
 }

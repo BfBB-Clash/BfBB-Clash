@@ -9,29 +9,22 @@ pub const COLORS: [(u8, u8, u8); 6] = [
     (254, 154, 95),
 ];
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct PlayerOptions {
     pub name: String,
     pub color: (u8, u8, u8),
     // Other options?
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct SharedPlayer {
     pub options: PlayerOptions,
-    pub current_lobby: u32,
-    pub lobby_index: Option<usize>,
     pub score: u8,
 }
 
 impl SharedPlayer {
     pub fn new(options: PlayerOptions) -> Self {
-        Self {
-            options,
-            current_lobby: 0,
-            lobby_index: None,
-            score: 0,
-        }
+        Self { options, score: 0 }
     }
 }
 
