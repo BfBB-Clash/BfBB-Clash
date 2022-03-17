@@ -174,7 +174,15 @@ impl GameInterface for DolphinInterface {
         let handle = self.handle.ok_or(InterfaceError::Unhooked)?;
 
         // TODO: reduce magic numbers
-        let offset = spatula.get_offset() as usize * 4;
+        let offset = match spatula.get_offset() {
+            Some(offset) => offset * 4,
+            None => return Ok(()),
+        };
+
+        // This prevents writing to incorrect memory for KahRahTae and SmallShallRule
+        if offset == 0 {
+            return Ok(());
+        }
 
         let ptr_flags = DataMember::<u8>::new_offset(
             handle,
@@ -205,7 +213,10 @@ impl GameInterface for DolphinInterface {
         let handle = self.handle.ok_or(InterfaceError::Unhooked)?;
 
         // TODO: reduce magic numbers
-        let offset = spatula.get_offset() as usize * 4;
+        let offset = match spatula.get_offset() {
+            Some(offset) => offset * 4,
+            None => return Ok(false),
+        };
 
         let ptr = DataMember::<u32>::new_offset(
             handle,

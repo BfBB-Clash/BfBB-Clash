@@ -82,10 +82,7 @@ impl GameStateExt for SharedLobby {
             }
 
             // Detect spatula collection events
-            if spat != Spatula::TheSmallShallRuleOrNot
-                && spat != Spatula::KahRahTae
-                && game.is_spatula_being_collected(spat)?
-            {
+            if game.is_spatula_being_collected(spat)? {
                 self.game_state.spatulas.insert(spat, None);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
