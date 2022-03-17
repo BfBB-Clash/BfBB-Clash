@@ -45,7 +45,7 @@ impl Lobby {
         &mut self,
         players: &mut PlayerMap,
         auth_id: AuthId,
-    ) -> Result<(Sender<Message>, Receiver<Message>), LobbyError> {
+    ) -> Result<Receiver<Message>, LobbyError> {
         if self.shared.players.len() >= MAX_PLAYERS {
             return Err(LobbyError::LobbyFull);
         }
@@ -69,6 +69,6 @@ impl Lobby {
         player.options.color = clash::player::COLORS[self.shared.players.len()];
 
         self.shared.players.insert(auth_id, player);
-        Ok((self.sender.clone(), self.sender.subscribe()))
+        Ok(self.sender.subscribe())
     }
 }

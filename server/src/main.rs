@@ -7,7 +7,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::broadcast::Receiver;
 use tokio::{select, spawn};
 
 pub mod lobby;
@@ -101,8 +101,7 @@ async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream)
     }
     info!("New connection for player id {auth_id:#X} opened");
 
-    let (mut lobby_send, mut lobby_recv): (Option<Sender<Message>>, Option<Receiver<Message>>) =
-        (None, None);
+    let mut lobby_recv: Option<Receiver<Message>> = None;
     loop {
         select! {
             m = async { lobby_recv.as_mut().unwrap().recv().await }, if lobby_recv.is_some() => {
@@ -123,7 +122,7 @@ async fn handle_new_connection(state: Arc<RwLock<State>>, mut socket: TcpStream)
                     }
                 };
                 debug!("Received message from player id {auth_id:#X} \nMessage: {incoming:#X?}",);
-                if !process_incoming(state.clone(), auth_id, incoming, &mut lobby_send, &mut lobby_recv).await {
+                if !process_incoming(state.clone(), auth_id, incoming,  &mut lobby_recv).await {
                     info!("Disconnecting player {auth_id:#X} due to unrecoverable error.");
                     break;
                 }
@@ -140,7 +139,6 @@ async fn process_incoming(
     state: Arc<RwLock<State>>,
     auth_id: u32,
     incoming: Message,
-    lobby_send: &mut Option<Sender<Message>>,
     lobby_recv: &mut Option<Receiver<Message>>,
 ) -> bool {
     match incoming {
@@ -161,14 +159,11 @@ async fn process_incoming(
                     Some(l) => l,
                 };
 
-                let tmp = lobby.add_player(&mut state.players, auth_id).unwrap();
-                *lobby_send = Some(tmp.0);
-                *lobby_recv = Some(tmp.1);
+                *lobby_recv = Some(lobby.add_player(&mut state.players, auth_id).unwrap());
 
                 info!("Player {auth_id:#X} has hosted lobby {gen_lobby_id:#X}");
-                lobby_send
-                    .as_mut()
-                    .unwrap()
+                lobby
+                    .sender
                     .send(Message::GameLobbyInfo {
                         auth_id: 0,
                         lobby: lobby.shared.clone(),
@@ -192,14 +187,11 @@ async fn process_incoming(
                 };
 
                 // TODO: Waiting for destructuring assignment
-                let tmp = lobby.add_player(&mut state.players, auth_id).unwrap();
-                *lobby_send = Some(tmp.0);
-                *lobby_recv = Some(tmp.1);
+                *lobby_recv = Some(lobby.add_player(&mut state.players, auth_id).unwrap());
 
                 info!("Player {auth_id:#X} has joined lobby {lobby_id:#X}");
-                lobby_send
-                    .as_mut()
-                    .unwrap()
+                lobby
+                    .sender
                     .send(Message::GameLobbyInfo {
                         auth_id: 0,
                         lobby: lobby.shared.clone(),
@@ -239,9 +231,10 @@ async fn process_incoming(
 
             lobby.shared.is_started = true;
 
-            if let Some(lobby_send) = lobby_send.as_mut() {
-                lobby_send.send(Message::GameBegin { auth_id: 0 }).unwrap();
-            }
+            lobby
+                .sender
+                .send(Message::GameBegin { auth_id: 0 })
+                .unwrap();
         }
         Message::GameEnd { auth_id: _ } => todo!(),
         Message::GameLeave { auth_id: _ } => {
@@ -310,13 +303,11 @@ async fn process_incoming(
                 return false;
             }
 
-            if let Some(lobby_send) = lobby_send.as_mut() {
-                let message = Message::GameLobbyInfo {
-                    auth_id: 0,
-                    lobby: lobby.shared.clone(),
-                };
-                lobby_send.send(message).unwrap();
-            }
+            let message = Message::GameLobbyInfo {
+                auth_id: 0,
+                lobby: lobby.shared.clone(),
+            };
+            lobby.sender.send(message).unwrap();
         }
         Message::GameOptions { auth_id, options } => {
             let state = &mut *state.write().unwrap();
@@ -346,13 +337,11 @@ async fn process_incoming(
                 }
             };
 
-            if let Some(lobby_send) = lobby_send {
-                let message = Message::GameLobbyInfo {
-                    auth_id: 0,
-                    lobby: lobby.shared.clone(),
-                };
-                lobby_send.send(message).unwrap();
-            }
+            let message = Message::GameLobbyInfo {
+                auth_id: 0,
+                lobby: lobby.shared.clone(),
+            };
+            lobby.sender.send(message).unwrap();
         }
         Message::GameCurrentRoom { auth_id: _, room } => {
             let state = &mut *state.write().unwrap();
@@ -387,14 +376,13 @@ async fn process_incoming(
                 }
             };
 
-            if let Some(lobby_send) = lobby_send {
-                lobby_send
-                    .send(Message::GameLobbyInfo {
-                        auth_id: 0,
-                        lobby: lobby.shared.clone(),
-                    })
-                    .unwrap();
-            }
+            lobby
+                .sender
+                .send(Message::GameLobbyInfo {
+                    auth_id: 0,
+                    lobby: lobby.shared.clone(),
+                })
+                .unwrap();
         }
         Message::GameItemCollected { auth_id: _, item } => {
             let state = &mut *state.write().unwrap();
@@ -431,14 +419,13 @@ async fn process_incoming(
                 }
             };
 
-            if let Some(lobby_send) = lobby_send {
-                lobby_send
-                    .send(Message::GameLobbyInfo {
-                        auth_id: 0,
-                        lobby: lobby.shared.clone(),
-                    })
-                    .unwrap();
-            }
+            lobby
+                .sender
+                .send(Message::GameLobbyInfo {
+                    auth_id: 0,
+                    lobby: lobby.shared.clone(),
+                })
+                .unwrap();
         }
         m => {
             warn!("Player id {auth_id:#X} sent a server only message. \nMessage: {m:?}");
