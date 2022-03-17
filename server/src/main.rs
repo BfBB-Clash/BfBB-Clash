@@ -247,7 +247,7 @@ async fn process_incoming(
         }
         Message::PlayerOptions {
             auth_id: _,
-            options,
+            mut options,
         } => {
             let state = &mut *state.write().unwrap();
 
@@ -273,9 +273,9 @@ async fn process_incoming(
             };
 
             if let Some(player) = lobby.shared.players.get_mut(&auth_id) {
+                // TODO: Unhardcode player color
+                options.color = player.options.color;
                 player.options = options;
-                // Temporarily force player to color determined by index
-                player.options.color = clash::player::COLORS[0];
             } else {
                 error!("Lobby received from player map did not contain player {auth_id:#X}");
                 return false;
