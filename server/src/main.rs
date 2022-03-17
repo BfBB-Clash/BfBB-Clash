@@ -70,7 +70,7 @@ async fn main() {
         .filter_level(log::LevelFilter::Debug)
         .parse_env("CLASH_LOG")
         .init();
-    let listener = TcpListener::bind("127.0.0.1:42932").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:42932").await.unwrap();
     info!("Listening on port 42932");
     // We will certainly want more than one lock for the server state. Likely at least for each
     // individual lobby
