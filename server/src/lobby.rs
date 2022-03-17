@@ -64,7 +64,10 @@ impl Lobby {
         }
         players.insert(auth_id, Some(self.shared.lobby_id));
 
-        let player = SharedPlayer::default();
+        // TODO: Unhardcode player color
+        let mut player = SharedPlayer::default();
+        player.options.color = clash::player::COLORS[self.shared.players.len()];
+
         self.shared.players.insert(auth_id, player);
         Ok((self.sender.clone(), self.sender.subscribe()))
     }
