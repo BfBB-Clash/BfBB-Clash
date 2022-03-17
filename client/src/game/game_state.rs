@@ -56,6 +56,11 @@ impl GameStateExt for SharedLobby {
         for spat in Spatula::iter() {
             // Skip already collected spatulas
             if self.game_state.spatulas.contains_key(&spat) {
+                if local_player.current_room == Some(spat.get_room()) {
+                    // Sync collected spatulas
+                    game.collect_spatula(spat)?;
+                }
+                game.mark_task_complete(spat)?;
                 continue;
             }
 
