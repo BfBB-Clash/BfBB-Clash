@@ -65,7 +65,7 @@ pub fn start_game(
 }
 
 fn update_from_network<T: GameInterface>(
-    _game: &T,
+    game: &T,
     auth_id: &mut AuthId,
     lobby: &mut Option<SharedLobby>,
     logic_receiver: &mut Receiver<Message>,
@@ -89,6 +89,9 @@ fn update_from_network<T: GameInterface>(
                 auth_id: _,
                 lobby: new_lobby,
             } => {
+                // This could fail if the user is restarting dolphin, but that will desync a lot of other things as well
+                // so it's fine to just wait for a future lobby update to correct the issue
+                let _ = game.set_spatula_count(new_lobby.game_state.spatulas.len() as u32);
                 *lobby = Some(new_lobby.clone());
                 gui_sender
                     .send(new_lobby)
