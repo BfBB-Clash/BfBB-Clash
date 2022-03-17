@@ -86,8 +86,9 @@ async fn process_incoming<'a>(
     logic_sender: &mut Sender<Message>,
 ) {
     match message {
-        Message::ConnectionAccept { auth_id: _ } => {
+        m @ Message::ConnectionAccept { auth_id: _ } => {
             debug!("ConnectionAccept message got :)");
+            logic_sender.send(m).unwrap();
         }
         Message::PlayerOptions {
             auth_id: _,
