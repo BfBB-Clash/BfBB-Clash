@@ -11,7 +11,7 @@ use spin_sleep::LoopHelper;
 use std::sync::mpsc::{Receiver, Sender};
 
 pub fn start_game(
-    mut gui_sender: Sender<SharedLobby>,
+    mut gui_sender: Sender<(AuthId, SharedLobby)>,
     mut network_sender: tokio::sync::mpsc::Sender<Message>,
     mut logic_receiver: Receiver<Message>,
 ) {
@@ -69,14 +69,23 @@ fn update_from_network<T: GameInterface>(
     auth_id: &mut AuthId,
     lobby: &mut Option<SharedLobby>,
     logic_receiver: &mut Receiver<Message>,
-    gui_sender: &mut Sender<SharedLobby>,
+    gui_sender: &mut Sender<(AuthId, SharedLobby)>,
 ) -> Result<(), InterfaceError> {
     while let Ok(m) = logic_receiver.try_recv() {
         match m {
             Message::ConnectionAccept { auth_id: id } => {
                 *auth_id = id;
             }
-            Message::GameBegin { auth_id: _ } => todo!(),
+            Message::GameBegin { auth_id: _ } => {
+                let _ = game.start_new_game();
+                let lobby = lobby
+                    .as_mut()
+                    .expect("Tried to begin game without being in a lobby");
+                lobby.is_started = true;
+                gui_sender
+                    .send((*auth_id, lobby.clone()))
+                    .expect("GUI has crashed and so will we");
+            }
             Message::PlayerOptions {
                 auth_id: _,
                 options: _,
@@ -94,7 +103,7 @@ fn update_from_network<T: GameInterface>(
                 let _ = game.set_spatula_count(new_lobby.game_state.spatulas.len() as u32);
                 *lobby = Some(new_lobby.clone());
                 gui_sender
-                    .send(new_lobby)
+                    .send((*auth_id, new_lobby))
                     .expect("GUI has crashed and so will we");
             }
             Message::GameForceWarp {
