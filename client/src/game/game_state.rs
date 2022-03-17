@@ -1,5 +1,6 @@
 use crate::game::{GameInterface, InterfaceResult};
 use clash::lobby::SharedLobby;
+use clash::AuthId;
 use clash::{
     protocol::{Item, Message},
     room::Room,
@@ -8,9 +9,12 @@ use clash::{
 use log::info;
 use strum::IntoEnumIterator;
 
+use crate::game::InterfaceError;
+
 pub trait GameStateExt {
     fn update<T: GameInterface>(
         &mut self,
+        auth_id: AuthId,
         game: &T,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()>;
@@ -22,6 +26,7 @@ impl GameStateExt for SharedLobby {
     /// Process state updates from the server and report back any actions of the local player
     fn update<T: GameInterface>(
         &mut self,
+        auth_id: AuthId,
         game: &T,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()> {
@@ -29,15 +34,21 @@ impl GameStateExt for SharedLobby {
             return Ok(());
         }
 
+        // TODO: Use a better error
+        let local_player = self
+            .players
+            .get_mut(&auth_id)
+            .ok_or(InterfaceError::Other)?;
+
         // Set the cost to unlock the lab door
         let room = Some(game.get_current_level()?);
-        if self.game_state.current_room != room {
-            self.game_state.current_room = room;
+        if local_player.current_room != room {
+            local_player.current_room = room;
             network_sender
                 .blocking_send(Message::GameCurrentRoom { auth_id: 0, room })
                 .unwrap();
         }
-        if self.game_state.current_room == Some(Room::ChumBucket) {
+        if local_player.current_room == Some(Room::ChumBucket) {
             game.set_lab_door(self.options.lab_door_cost.into())?;
         }
 
@@ -61,7 +72,7 @@ impl GameStateExt for SharedLobby {
             }
 
             // Skip spatulas that aren't in the current room
-            if self.game_state.current_room != Some(spat.get_room()) {
+            if local_player.current_room != Some(spat.get_room()) {
                 continue;
             }
 
@@ -87,6 +98,11 @@ impl GameStateExt for SharedLobby {
     /// True when all connected players are on the Main Menu
     fn can_start(&self) -> bool {
         // TODO: Solve the "Demo Cutscene" issue. We can probably detect when players are on the autosave preference screen instead.
-        self.game_state.current_room == Some(Room::MainMenu)
+        for player in self.players.values() {
+            if player.current_room != Some(Room::MainMenu) {
+                return false;
+            }
+        }
+        true
     }
 }

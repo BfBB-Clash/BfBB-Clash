@@ -3,18 +3,17 @@ use eframe::egui::{Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
 pub struct PlayerUi<'a> {
     player: &'a SharedPlayer,
-    location: Option<Room>,
 }
 
 impl<'a> PlayerUi<'a> {
-    pub fn new(player: &'a SharedPlayer, location: Option<Room>) -> Self {
-        Self { player, location }
+    pub fn new(player: &'a SharedPlayer) -> Self {
+        Self { player }
     }
 }
 
 impl<'a> Widget for PlayerUi<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let PlayerUi { player, location } = self;
+        let PlayerUi { player } = self;
         let color = player.options.color();
 
         // Use individual layouts instead of a single one to be able to add padding between each line
@@ -31,7 +30,8 @@ impl<'a> Widget for PlayerUi<'a> {
             color,
         );
         let room_galley = ui.painter().layout_no_wrap(
-            location
+            player
+                .current_room
                 .map(|r| r.to_string())
                 .unwrap_or_else(|| "? ? ?".to_string()),
             TextStyle::Small.resolve(ui.style()),

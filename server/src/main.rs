@@ -342,7 +342,13 @@ async fn process_incoming(
 
             let lobby = match state.lobbies.get_mut(lobby_id) {
                 Some(l) => {
-                    l.shared.game_state.current_room = room;
+                    l.shared
+                        .players
+                        .get_mut(&auth_id)
+                        .expect(
+                            "Lobby received from player map did not contain player {auth_id:#X}",
+                        )
+                        .current_room = room;
                     info!("Player {auth_id:#X} entered {room:?}");
                     l
                 }

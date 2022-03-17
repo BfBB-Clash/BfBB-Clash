@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::room::Room;
+
 pub const COLORS: [(u8, u8, u8); 6] = [
     (195, 247, 58),
     (224, 108, 0),
@@ -19,12 +21,17 @@ pub struct PlayerOptions {
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct SharedPlayer {
     pub options: PlayerOptions,
+    pub current_room: Option<Room>,
     pub score: u8,
 }
 
 impl SharedPlayer {
     pub fn new(options: PlayerOptions) -> Self {
-        Self { options, score: 0 }
+        Self {
+            options,
+            current_room: None,
+            score: 0,
+        }
     }
 }
 

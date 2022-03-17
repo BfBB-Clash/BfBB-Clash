@@ -5,7 +5,7 @@ pub use self::game_state::GameStateExt;
 pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
 
 use crate::dolphin::DolphinInterface;
-use clash::{lobby::SharedLobby, protocol::Message};
+use clash::{lobby::SharedLobby, protocol::Message, AuthId};
 use log::error;
 use spin_sleep::LoopHelper;
 use std::sync::mpsc::{Receiver, Sender};
@@ -22,26 +22,39 @@ pub fn start_game(
     // TODO: Report hooking errors to user/stdout
     let mut game = DolphinInterface::default();
     let _ = game.hook();
+    let mut auth_id = 0;
     let mut lobby = None;
 
     loop {
         loop_helper.loop_start();
 
         // Receive network updates
-        update_from_network(&game, &mut lobby, &mut logic_receiver, &mut gui_sender).unwrap();
+        update_from_network(
+            &game,
+            &mut auth_id,
+            &mut lobby,
+            &mut logic_receiver,
+            &mut gui_sender,
+        )
+        .unwrap();
 
         if let Some(lobby) = lobby.as_mut() {
-            if let Err(InterfaceError::Unhooked) = lobby.update(&game, &mut network_sender) {
+            if let Err(InterfaceError::Unhooked) = lobby.update(auth_id, &game, &mut network_sender)
+            {
                 // We lost dolphin
-                if lobby.game_state.current_room != None {
-                    lobby.game_state.current_room = None;
-                    network_sender
-                        .blocking_send(Message::GameCurrentRoom {
-                            auth_id: 0,
-                            room: None,
-                        })
-                        .unwrap();
-                }
+                || -> Option<()> {
+                    let local_player = lobby.players.get_mut(&auth_id)?;
+                    if local_player.current_room != None {
+                        local_player.current_room = None;
+                        network_sender
+                            .blocking_send(Message::GameCurrentRoom {
+                                auth_id: 0,
+                                room: None,
+                            })
+                            .unwrap();
+                    }
+                    Some(())
+                }();
 
                 // TODO: Maybe don't re-attempt this every frame
                 let _ = game.hook();
@@ -53,12 +66,16 @@ pub fn start_game(
 
 fn update_from_network<T: GameInterface>(
     _game: &T,
+    auth_id: &mut AuthId,
     lobby: &mut Option<SharedLobby>,
     logic_receiver: &mut Receiver<Message>,
     gui_sender: &mut Sender<SharedLobby>,
 ) -> Result<(), InterfaceError> {
     while let Ok(m) = logic_receiver.try_recv() {
         match m {
+            Message::ConnectionAccept { auth_id: id } => {
+                *auth_id = id;
+            }
             Message::GameBegin { auth_id: _ } => todo!(),
             Message::PlayerOptions {
                 auth_id: _,

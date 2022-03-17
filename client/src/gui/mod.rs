@@ -285,7 +285,7 @@ impl App for Clash {
                         ui.add_space(PADDING);
                         // TODO: Deterministic ordering
                         for player in self.lobby.players.values() {
-                            ui.add(PlayerUi::new(player, self.lobby.game_state.current_room));
+                            ui.add(PlayerUi::new(player));
                         }
                     });
                 CentralPanel::default().show(ctx, |ui| {
