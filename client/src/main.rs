@@ -109,7 +109,9 @@ async fn process_incoming<'a>(
         } => {
             logic_sender.send(m).unwrap();
         }
-        Message::GameBegin { auth_id: _ } => todo!(),
+        m @ Message::GameBegin { auth_id: _ } => {
+            logic_sender.send(m).unwrap();
+        }
         Message::GameCurrentRoom {
             auth_id: _,
             room: _,

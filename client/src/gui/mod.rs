@@ -7,6 +7,7 @@ use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use clash::lobby::{LobbyOptions, SharedLobby};
 use clash::player::PlayerOptions;
 use clash::protocol::Message;
+use clash::AuthId;
 use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
@@ -28,7 +29,7 @@ pub enum Menu {
 }
 
 pub struct Clash {
-    gui_receiver: Receiver<SharedLobby>,
+    gui_receiver: Receiver<(AuthId, SharedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 
     state: Menu,
@@ -39,13 +40,14 @@ pub struct Clash {
 
     lab_door_buf: String,
     lab_door_num: Option<u8>,
-    game_active: bool,
+
+    auth_id: AuthId,
     lobby: SharedLobby,
 }
 
 impl Clash {
     fn new(
-        gui_receiver: Receiver<SharedLobby>,
+        gui_receiver: Receiver<(AuthId, SharedLobby)>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
         Self {
@@ -57,7 +59,7 @@ impl Clash {
             lobby_id: Default::default(),
             lab_door_buf: Default::default(),
             lab_door_num: None,
-            game_active: false,
+            auth_id: 0,
             lobby: SharedLobby::new(0, LobbyOptions::default(), 0),
         }
     }
@@ -65,6 +67,10 @@ impl Clash {
     fn paint_options(&mut self, ui: &mut Ui) {
         ui.heading("Lobby Options");
         ui.separator();
+
+        if self.auth_id != self.lobby.host_id {
+            return;
+        }
 
         ui.add(Checkbox::new(&mut self.lobby.options.ng_plus, "New Game+"))
             .on_hover_text(
@@ -111,7 +117,11 @@ impl Clash {
 
         if start_game_response.clicked() {
             // TODO: Send a message to the network thread to start the game.
-            self.game_active = true;
+            self.network_sender
+                .blocking_send(Message::GameBegin {
+                    auth_id: self.auth_id,
+                })
+                .unwrap();
         }
     }
 }
@@ -275,7 +285,8 @@ impl App for Clash {
                 ctx.request_repaint();
 
                 // Receive gamestate updates
-                while let Ok(new_lobby) = self.gui_receiver.try_recv() {
+                while let Ok((local_auth_id, new_lobby)) = self.gui_receiver.try_recv() {
+                    self.auth_id = local_auth_id;
                     self.lobby = new_lobby;
                 }
 
@@ -289,7 +300,7 @@ impl App for Clash {
                         }
                     });
                 CentralPanel::default().show(ctx, |ui| {
-                    if self.game_active {
+                    if self.lobby.is_started {
                         ui.add(GameMenu::new(&self.lobby.game_state, &self.lobby.players));
                     } else {
                         // TODO: Restrict these to the host
@@ -306,7 +317,7 @@ impl App for Clash {
 }
 
 pub fn run(
-    gui_receiver: Receiver<SharedLobby>,
+    gui_receiver: Receiver<(AuthId, SharedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 ) {
     let window_options = NativeOptions {

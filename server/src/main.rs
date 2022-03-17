@@ -213,7 +213,36 @@ async fn process_incoming(
             auth_id: _,
             lobby: _,
         } => todo!(),
-        Message::GameBegin { auth_id: _ } => todo!(),
+        Message::GameBegin { auth_id: _ } => {
+            let state = &mut *state.write().unwrap();
+
+            let lobby_id = match state.players.get(&auth_id) {
+                Some(Some(id)) => id,
+                Some(None) => {
+                    error!("Player id {auth_id:#X} attempted to start a game while not in a lobby");
+                    return true;
+                }
+                None => {
+                    error!("Invalid player id {auth_id:#X}");
+                    //TODO: Kick player?
+                    return false;
+                }
+            };
+
+            let lobby = match state.lobbies.get_mut(lobby_id) {
+                None => {
+                    error!("Attempted to start game in lobby with an invalid id '{lobby_id}'");
+                    return true;
+                }
+                Some(l) => l,
+            };
+
+            lobby.shared.is_started = true;
+
+            if let Some(lobby_send) = lobby_send.as_mut() {
+                lobby_send.send(Message::GameBegin { auth_id: 0 }).unwrap();
+            }
+        }
         Message::GameEnd { auth_id: _ } => todo!(),
         Message::GameLeave { auth_id: _ } => {
             let state = &mut *state.write().unwrap();
