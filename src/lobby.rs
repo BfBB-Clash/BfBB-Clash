@@ -26,18 +26,18 @@ pub struct SharedLobby {
     // TODO: Use something other than the AuthId to identify players, this leaks the AuthId to the whole lobby
     pub players: HashMap<AuthId, SharedPlayer>,
     pub is_started: bool,
-    pub host_id: AuthId,
+    pub host_id: Option<AuthId>,
 }
 
 impl SharedLobby {
-    pub fn new(lobby_id: u32, options: LobbyOptions, host_id: AuthId) -> Self {
+    pub fn new(lobby_id: u32, options: LobbyOptions) -> Self {
         Self {
             game_state: GameState::default(),
             lobby_id,
             options,
             players: HashMap::new(),
             is_started: false,
-            host_id,
+            host_id: None,
         }
     }
 }

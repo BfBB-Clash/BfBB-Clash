@@ -1,4 +1,4 @@
-use clash::{AuthId, LobbyId};
+use clash::{lobby::LobbyOptions, AuthId, LobbyId};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 
@@ -20,10 +20,19 @@ impl State {
         }
     }
 
-    pub fn add_player(&mut self) -> u32 {
+    pub fn add_player(&mut self) -> AuthId {
         let auth_id = self.gen_auth_id();
         self.players.insert(auth_id, None);
         auth_id
+    }
+
+    pub fn add_lobby(&mut self) -> LobbyId {
+        let gen_lobby_id = self.gen_lobby_id();
+        self.lobbies.insert(
+            gen_lobby_id,
+            Lobby::new(LobbyOptions::default(), gen_lobby_id),
+        );
+        gen_lobby_id
     }
 
     // TODO: dedupe this.
@@ -38,7 +47,7 @@ impl State {
         auth_id
     }
 
-    pub fn gen_lobby_id(&self) -> LobbyId {
+    fn gen_lobby_id(&self) -> LobbyId {
         let mut lobby_id;
         loop {
             lobby_id = thread_rng().gen();

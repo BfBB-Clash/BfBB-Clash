@@ -60,7 +60,7 @@ impl Clash {
             lab_door_buf: Default::default(),
             lab_door_num: None,
             auth_id: 0,
-            lobby: SharedLobby::new(0, LobbyOptions::default(), 0),
+            lobby: SharedLobby::new(0, LobbyOptions::default()),
         }
     }
 
@@ -68,7 +68,7 @@ impl Clash {
         ui.heading("Lobby Options");
         ui.separator();
 
-        if self.auth_id != self.lobby.host_id {
+        if self.lobby.host_id != Some(self.auth_id) {
             return;
         }
 
