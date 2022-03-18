@@ -6,7 +6,7 @@ use thiserror::Error;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::broadcast::{channel, Receiver};
 
-use crate::PlayerMap;
+use crate::state::PlayerMap;
 
 #[derive(Copy, Clone, Debug, Error)]
 pub enum LobbyError {
@@ -37,6 +37,7 @@ impl Lobby {
     pub fn start_game() {}
 
     pub fn rem_player(&mut self, players: &mut PlayerMap, auth_id: &AuthId) {
+        // TODO: Remove this lobby if this is the last player (might need to be handled at callsite)
         self.shared.players.remove(auth_id);
         players.remove(auth_id);
     }

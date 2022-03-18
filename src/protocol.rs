@@ -3,7 +3,7 @@ use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use thiserror::Error;
-use tokio::net::tcp::{ReadHalf, WriteHalf};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
 use crate::lobby::{LobbyOptions, SharedLobby};
@@ -73,18 +73,34 @@ pub enum Error {
     FrameIncomplete,
     #[error("Connection reset by peer")]
     ConnectionReset,
+    #[error("I/O Error: {0}")]
+    Io(std::io::Error),
+    #[error("Serialization Error: {0}")]
+    Bincode(bincode::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl From<bincode::Error> for Error {
+    fn from(e: bincode::Error) -> Self {
+        Self::Bincode(e)
+    }
 }
 
 #[derive(Debug)]
-pub struct Connection<'a> {
-    read_stream: ReadHalf<'a>,
-    write_stream: BufWriter<WriteHalf<'a>>,
+pub struct Connection {
+    read_stream: OwnedReadHalf,
+    write_stream: BufWriter<OwnedWriteHalf>,
     buffer: BytesMut,
 }
 
-impl<'a> Connection<'a> {
-    pub fn new(socket: &'a mut TcpStream) -> Self {
-        let (read_stream, write_stream) = socket.split();
+impl Connection {
+    pub fn new(socket: TcpStream) -> Self {
+        let (read_stream, write_stream) = socket.into_split();
         Self {
             read_stream,
             write_stream: BufWriter::new(write_stream),
@@ -133,10 +149,10 @@ impl<'a> Connection<'a> {
         Ok(Some(message))
     }
 
-    pub async fn write_frame(&mut self, frame: Message) -> Result<()> {
+    pub async fn write_frame(&mut self, frame: Message) -> Result<(), Error> {
         let mut bytes: Bytes = bincode::serialize(&frame)?.into();
         if bytes.len() > u16::MAX.into() {
-            return Err(Error::FrameLength.into());
+            return Err(Error::FrameLength);
         }
         let len = bytes.len() as u16;
         let len = len.to_be_bytes();

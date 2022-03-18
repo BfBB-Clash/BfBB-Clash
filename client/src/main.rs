@@ -48,8 +48,8 @@ async fn start_network(
     mut receiver: tokio::sync::mpsc::Receiver<Message>,
     mut logic_sender: Sender<Message>,
 ) {
-    let mut sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
-    let mut conn = Connection::new(&mut sock);
+    let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
+    let mut conn = Connection::new(sock);
 
     loop {
         select! {
@@ -80,9 +80,9 @@ async fn start_network(
     }
 }
 
-async fn process_incoming<'a>(
+async fn process_incoming(
     message: Message,
-    _conn: &mut Connection<'a>,
+    _conn: &mut Connection,
     logic_sender: &mut Sender<Message>,
 ) {
     match message {
