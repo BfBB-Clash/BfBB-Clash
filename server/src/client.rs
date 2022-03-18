@@ -1,6 +1,4 @@
-use crate::lobby::Lobby;
 use crate::state::State;
-use clash::lobby::LobbyOptions;
 use clash::protocol::{self, Connection, Item, Message};
 use clash::AuthId;
 use log::{debug, error, info, warn};
@@ -78,26 +76,14 @@ impl Client {
             Message::GameHost { auth_id: _ } => {
                 let state = &mut *self.state.write().unwrap();
                 if state.players.contains_key(&self.auth_id) {
-                    let gen_lobby_id = state.gen_lobby_id();
-                    state.lobbies.insert(
-                        gen_lobby_id,
-                        Lobby::new(LobbyOptions::default(), gen_lobby_id, self.auth_id),
-                    );
-
-                    let lobby = match state.lobbies.get_mut(&gen_lobby_id) {
-                        None => {
-                            error!("Attempted to join lobby with an invalid id '{gen_lobby_id}'");
-                            return true;
-                        }
-                        Some(l) => l,
-                    };
-
+                    let lobby_id = state.add_lobby();
+                    let lobby = state.lobbies.get_mut(&lobby_id).unwrap();
                     self.lobby_recv =
                         Some(lobby.add_player(&mut state.players, self.auth_id).unwrap());
 
                     info!(
-                        "Player {:#X} has hosted lobby {gen_lobby_id:#X}",
-                        self.auth_id
+                        "Player {:#X} has hosted lobby {:#X}",
+                        self.auth_id, lobby.shared.lobby_id
                     );
                     lobby
                         .sender
@@ -169,44 +155,13 @@ impl Client {
                     Some(l) => l,
                 };
 
-                lobby.shared.is_started = true;
-
-                lobby
-                    .sender
-                    .send(Message::GameBegin { auth_id: 0 })
-                    .unwrap();
+                lobby.start_game();
             }
             Message::GameEnd { auth_id: _ } => todo!(),
             Message::GameLeave { auth_id: _ } => {
-                let state = &mut *self.state.write().unwrap();
-
-                let lobby_id = match state.players.get(&self.auth_id) {
-                    Some(Some(id)) => id,
-                    Some(None) => {
-                        error!(
-                            "Player id {:#X} attempted to leave a lobby while not in a lobby",
-                            self.auth_id
-                        );
-                        return true;
-                    }
-                    None => {
-                        error!("Invalid player id {:#X}", self.auth_id);
-                        //TODO: Kick player?
-                        return false;
-                    }
-                };
-
-                let lobby = match state.lobbies.get_mut(lobby_id) {
-                    None => {
-                        error!("Attempted to leave lobby with an invalid id '{lobby_id}'");
-                        return true;
-                    }
-                    Some(l) => l,
-                };
-
-                if lobby.is_player_in_lobby(&self.auth_id) {
-                    lobby.rem_player(&mut state.players, &self.auth_id);
-                }
+                // Disconnect player
+                info!("Player {:#X} disconnecting.", self.auth_id);
+                return false;
             }
             Message::PlayerOptions {
                 auth_id: _,
@@ -273,7 +228,7 @@ impl Client {
 
                 let lobby = match state.lobbies.get_mut(lobby_id) {
                     Some(l) => {
-                        if l.shared.host_id == self.auth_id {
+                        if l.shared.host_id == Some(self.auth_id) {
                             l.shared.options = options;
                         }
                         l
@@ -400,7 +355,7 @@ impl Drop for Client {
             };
 
             if let Some(lobby) = state.lobbies.get_mut(&lobby_id) {
-                lobby.rem_player(&mut state.players, &self.auth_id);
+                lobby.rem_player(self.auth_id);
             }
         }
     }
