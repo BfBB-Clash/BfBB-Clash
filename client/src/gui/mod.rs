@@ -68,59 +68,75 @@ impl Clash {
         ui.heading("Lobby Options");
         ui.separator();
 
-        if self.lobby.host_id != Some(self.player_id) {
-            return;
-        }
+        ui.add_enabled_ui(self.lobby.host_id == Some(self.player_id), |ui| {
+            let ng_plus_response = ui
+                .add(Checkbox::new(&mut self.lobby.options.ng_plus, "New Game+"))
+                .on_hover_text(
+                    "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
+                );
 
-        ui.add(Checkbox::new(&mut self.lobby.options.ng_plus, "New Game+"))
-            .on_hover_text(
-                "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
-            );
+            let door_cost_response = ui
+                .horizontal(|ui| {
+                    if self.lab_door_num.is_none() {
+                        ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
+                    }
+                    ui.label("Lab Door Cost: ");
+                    ui.text_edit_singleline(&mut self.lab_door_buf)
+                })
+                .inner;
 
-        let door_cost_response = ui
-            .horizontal(|ui| {
-                if self.lab_door_num.is_none() {
-                    ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
+            if !ui.is_enabled() {
+                return;
+            }
+
+            // Validate input
+            let mut door_cost_change_valid = false;
+            if door_cost_response.changed() {
+                self.lab_door_num = self
+                    .lab_door_buf
+                    .parse::<u8>()
+                    .ok()
+                    .filter(|&n| n > 0 && n <= 82);
+                if let Some(n) = self.lab_door_num {
+                    self.lobby.options.lab_door_cost = n;
+                    door_cost_change_valid = true;
                 }
-                ui.label("Lab Door Cost: ");
-                ui.text_edit_singleline(&mut self.lab_door_buf)
-            })
-            .inner;
+            }
 
-        // Validate input
-        if door_cost_response.changed() {
-            self.lab_door_num = self
-                .lab_door_buf
-                .parse::<u8>()
-                .ok()
-                .filter(|&n| n > 0 && n <= 82);
-        }
+            if door_cost_change_valid || ng_plus_response.changed() {
+                self.network_sender
+                    .blocking_send(Message::GameOptions {
+                        options: self.lobby.options.clone(),
+                    })
+                    .unwrap();
+            }
 
-        let mut start_game_response = ui
-            .add_enabled(
-                self.lobby.can_start() && self.lab_door_num.is_some(),
-                Button::new("Start Game"),
-            )
-            .on_hover_text("Starts a new game for all connected players.");
+            let mut start_game_response = ui
+                .add_enabled(
+                    self.lobby.can_start() && self.lab_door_num.is_some(),
+                    Button::new("Start Game"),
+                )
+                .on_hover_text("Starts a new game for all connected players.");
 
-        // We unfortunately have to check these conditions twice since we need the Response to add the
-        // tooltips but need to enable/disable the button before we can get the response
-        if !self.lobby.can_start() {
-            start_game_response =
-                start_game_response.on_disabled_hover_text("All players must be on the Main Menu.")
-        }
+            // We unfortunately have to check these conditions twice since we need the Response to add the
+            // tooltips but need to enable/disable the button before we can get the response
+            if !self.lobby.can_start() {
+                start_game_response = start_game_response
+                    .on_disabled_hover_text("All players must be on the Main Menu.")
+            }
 
-        if self.lab_door_num.is_none() {
-            start_game_response = start_game_response
-                .on_disabled_hover_text("'Lab Door Cost' must be a number from 1-82");
-        }
+            if self.lab_door_num.is_none() {
+                start_game_response = start_game_response
+                    .on_disabled_hover_text("'Lab Door Cost' must be a number from 1-82");
+            }
 
-        if start_game_response.clicked() {
-            // TODO: Send a message to the network thread to start the game.
-            self.network_sender
-                .blocking_send(Message::GameBegin {})
-                .unwrap();
-        }
+            if start_game_response.clicked() {
+                // TODO: Send a message to the network thread to start the game.
+                self.network_sender
+                    .blocking_send(Message::GameBegin {})
+                    .unwrap();
+            }
+        });
     }
 }
 
@@ -282,6 +298,8 @@ impl App for Clash {
                 // Receive gamestate updates
                 while let Ok((local_player_id, new_lobby)) = self.gui_receiver.try_recv() {
                     self.player_id = local_player_id;
+                    self.lab_door_buf = new_lobby.options.lab_door_cost.to_string();
+                    self.lab_door_num = Some(new_lobby.options.lab_door_cost);
                     self.lobby = new_lobby;
                 }
 
