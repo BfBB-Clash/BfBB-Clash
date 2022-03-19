@@ -27,6 +27,8 @@ pub fn start_game(
 
     loop {
         loop_helper.loop_start();
+        // You have to call this to avoid overflowing an integer within the loop helper
+        let _ = loop_helper.report_rate();
 
         // Receive network updates
         update_from_network(
