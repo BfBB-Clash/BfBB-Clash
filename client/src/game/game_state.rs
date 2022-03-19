@@ -1,6 +1,6 @@
 use crate::game::{GameInterface, InterfaceResult};
 use clash::lobby::SharedLobby;
-use clash::AuthId;
+use clash::PlayerId;
 use clash::{
     protocol::{Item, Message},
     room::Room,
@@ -14,7 +14,7 @@ use crate::game::InterfaceError;
 pub trait GameStateExt {
     fn update<T: GameInterface>(
         &mut self,
-        auth_id: AuthId,
+        player_id: PlayerId,
         game: &T,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()>;
@@ -26,7 +26,7 @@ impl GameStateExt for SharedLobby {
     /// Process state updates from the server and report back any actions of the local player
     fn update<T: GameInterface>(
         &mut self,
-        auth_id: AuthId,
+        player_id: PlayerId,
         game: &T,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()> {
@@ -37,7 +37,7 @@ impl GameStateExt for SharedLobby {
         // TODO: Use a better error
         let local_player = self
             .players
-            .get_mut(&auth_id)
+            .get_mut(&player_id)
             .ok_or(InterfaceError::Other)?;
 
         // Set the cost to unlock the lab door
@@ -45,7 +45,7 @@ impl GameStateExt for SharedLobby {
         if local_player.current_room != room {
             local_player.current_room = room;
             network_sender
-                .blocking_send(Message::GameCurrentRoom { auth_id: 0, room })
+                .blocking_send(Message::GameCurrentRoom { room })
                 .unwrap();
         }
         if local_player.current_room == Some(Room::ChumBucket) {
@@ -69,7 +69,6 @@ impl GameStateExt for SharedLobby {
                 self.game_state.spatulas.insert(spat, None);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
-                        auth_id: 0,
                         item: Item::Spatula(spat),
                     })
                     .unwrap();
@@ -86,7 +85,6 @@ impl GameStateExt for SharedLobby {
                 self.game_state.spatulas.insert(spat, None);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
-                        auth_id: 0,
                         item: Item::Spatula(spat),
                     })
                     .unwrap();

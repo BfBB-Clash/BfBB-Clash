@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use clash::{game_state::GameState, player::SharedPlayer, spatula::Spatula, AuthId};
+use clash::{game_state::GameState, player::SharedPlayer, spatula::Spatula, PlayerId};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
@@ -9,11 +9,11 @@ use strum::IntoEnumIterator;
 
 pub struct GameMenu<'a> {
     game: &'a GameState,
-    players: &'a HashMap<AuthId, SharedPlayer>,
+    players: &'a HashMap<PlayerId, SharedPlayer>,
 }
 
 impl<'a> GameMenu<'a> {
-    pub fn new(game: &'a GameState, players: &'a HashMap<AuthId, SharedPlayer>) -> Self {
+    pub fn new(game: &'a GameState, players: &'a HashMap<PlayerId, SharedPlayer>) -> Self {
         Self { game, players }
     }
 }

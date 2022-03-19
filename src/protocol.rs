@@ -14,49 +14,18 @@ use crate::spatula::Spatula;
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Message {
-    ConnectionAccept {
-        auth_id: u32,
-    },
-    PlayerOptions {
-        auth_id: u32,
-        options: PlayerOptions,
-    },
-    GameHost {
-        auth_id: u32,
-    },
-    GameJoin {
-        auth_id: u32,
-        lobby_id: u32,
-    },
-    GameOptions {
-        auth_id: u32,
-        options: LobbyOptions,
-    },
-    GameLobbyInfo {
-        auth_id: u32,
-        lobby: SharedLobby,
-    },
-    GameBegin {
-        auth_id: u32,
-    },
-    GameCurrentRoom {
-        auth_id: u32,
-        room: Option<Room>,
-    },
-    GameForceWarp {
-        auth_id: u32,
-        room: Room,
-    },
-    GameItemCollected {
-        auth_id: u32,
-        item: Item,
-    },
-    GameEnd {
-        auth_id: u32,
-    },
-    GameLeave {
-        auth_id: u32,
-    },
+    ConnectionAccept { player_id: u32 },
+    PlayerOptions { options: PlayerOptions },
+    GameHost,
+    GameJoin { lobby_id: u32 },
+    GameOptions { options: LobbyOptions },
+    GameLobbyInfo { lobby: SharedLobby },
+    GameBegin,
+    GameCurrentRoom { room: Option<Room> },
+    GameForceWarp { room: Room },
+    GameItemCollected { item: Item },
+    GameEnd,
+    GameLeave,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

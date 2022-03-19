@@ -1,10 +1,10 @@
-use clash::{lobby::LobbyOptions, AuthId, LobbyId};
+use clash::{lobby::LobbyOptions, LobbyId, PlayerId};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 
 use crate::lobby::Lobby;
 
-pub type PlayerMap = HashMap<AuthId, Option<LobbyId>>;
+pub type PlayerMap = HashMap<PlayerId, Option<LobbyId>>;
 pub type LobbyMap = HashMap<LobbyId, Lobby>;
 
 pub struct State {
@@ -20,10 +20,10 @@ impl State {
         }
     }
 
-    pub fn add_player(&mut self) -> AuthId {
-        let auth_id = self.gen_auth_id();
-        self.players.insert(auth_id, None);
-        auth_id
+    pub fn add_player(&mut self) -> PlayerId {
+        let player_id = self.gen_player_id();
+        self.players.insert(player_id, None);
+        player_id
     }
 
     pub fn add_lobby(&mut self) -> LobbyId {
@@ -36,15 +36,15 @@ impl State {
     }
 
     // TODO: dedupe this.
-    fn gen_auth_id(&self) -> AuthId {
-        let mut auth_id;
+    fn gen_player_id(&self) -> PlayerId {
+        let mut player_id;
         loop {
-            auth_id = thread_rng().gen();
-            if !self.players.contains_key(&auth_id) {
+            player_id = thread_rng().gen();
+            if !self.players.contains_key(&player_id) {
                 break;
             };
         }
-        auth_id
+        player_id
     }
 
     fn gen_lobby_id(&self) -> LobbyId {

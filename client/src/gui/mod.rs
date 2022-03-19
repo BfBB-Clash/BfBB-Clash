@@ -7,7 +7,7 @@ use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use clash::lobby::{LobbyOptions, SharedLobby};
 use clash::player::PlayerOptions;
 use clash::protocol::Message;
-use clash::AuthId;
+use clash::PlayerId;
 use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
@@ -29,7 +29,7 @@ pub enum Menu {
 }
 
 pub struct Clash {
-    gui_receiver: Receiver<(AuthId, SharedLobby)>,
+    gui_receiver: Receiver<(PlayerId, SharedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 
     state: Menu,
@@ -41,13 +41,13 @@ pub struct Clash {
     lab_door_buf: String,
     lab_door_num: Option<u8>,
 
-    auth_id: AuthId,
+    player_id: PlayerId,
     lobby: SharedLobby,
 }
 
 impl Clash {
     fn new(
-        gui_receiver: Receiver<(AuthId, SharedLobby)>,
+        gui_receiver: Receiver<(PlayerId, SharedLobby)>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
         Self {
@@ -59,7 +59,7 @@ impl Clash {
             lobby_id: Default::default(),
             lab_door_buf: Default::default(),
             lab_door_num: None,
-            auth_id: 0,
+            player_id: 0,
             lobby: SharedLobby::new(0, LobbyOptions::default()),
         }
     }
@@ -68,7 +68,7 @@ impl Clash {
         ui.heading("Lobby Options");
         ui.separator();
 
-        if self.lobby.host_id != Some(self.auth_id) {
+        if self.lobby.host_id != Some(self.player_id) {
             return;
         }
 
@@ -118,9 +118,7 @@ impl Clash {
         if start_game_response.clicked() {
             // TODO: Send a message to the network thread to start the game.
             self.network_sender
-                .blocking_send(Message::GameBegin {
-                    auth_id: self.auth_id,
-                })
+                .blocking_send(Message::GameBegin {})
                 .unwrap();
         }
     }
@@ -210,11 +208,10 @@ impl App for Clash {
                     ui.add_enabled_ui(!self.name_buf.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
                             self.network_sender
-                                .blocking_send(Message::GameHost { auth_id: 0 })
+                                .blocking_send(Message::GameHost)
                                 .unwrap();
                             self.network_sender
                                 .blocking_send(Message::PlayerOptions {
-                                    auth_id: 0,
                                     options: PlayerOptions {
                                         name: self.name_buf.clone(),
                                         color: (0, 0, 0),
@@ -258,13 +255,11 @@ impl App for Clash {
                     if join_response.clicked() {
                         self.network_sender
                             .blocking_send(Message::GameJoin {
-                                auth_id: 0,
                                 lobby_id: self.lobby_id.unwrap(),
                             })
                             .unwrap();
                         self.network_sender
                             .blocking_send(Message::PlayerOptions {
-                                auth_id: 0,
                                 options: PlayerOptions {
                                     name: self.name_buf.clone(),
                                     color: (0, 0, 0),
@@ -285,8 +280,8 @@ impl App for Clash {
                 ctx.request_repaint();
 
                 // Receive gamestate updates
-                while let Ok((local_auth_id, new_lobby)) = self.gui_receiver.try_recv() {
-                    self.auth_id = local_auth_id;
+                while let Ok((local_player_id, new_lobby)) = self.gui_receiver.try_recv() {
+                    self.player_id = local_player_id;
                     self.lobby = new_lobby;
                 }
 
@@ -317,7 +312,7 @@ impl App for Clash {
 }
 
 pub fn run(
-    gui_receiver: Receiver<(AuthId, SharedLobby)>,
+    gui_receiver: Receiver<(PlayerId, SharedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 ) {
     let window_options = NativeOptions {

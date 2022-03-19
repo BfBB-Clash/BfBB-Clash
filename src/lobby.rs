@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{game_state::GameState, player::SharedPlayer, AuthId, LobbyId};
+use crate::{game_state::GameState, player::SharedPlayer, LobbyId, PlayerId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -23,10 +23,9 @@ pub struct SharedLobby {
     pub game_state: GameState,
     pub lobby_id: LobbyId,
     pub options: LobbyOptions,
-    // TODO: Use something other than the AuthId to identify players, this leaks the AuthId to the whole lobby
-    pub players: HashMap<AuthId, SharedPlayer>,
+    pub players: HashMap<PlayerId, SharedPlayer>,
     pub is_started: bool,
-    pub host_id: Option<AuthId>,
+    pub host_id: Option<PlayerId>,
 }
 
 impl SharedLobby {
