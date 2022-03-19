@@ -1,6 +1,6 @@
 use crate::state::State;
 use clash::protocol::{self, Connection, Item, Message};
-use clash::AuthId;
+use clash::PlayerId;
 use log::{debug, error, info, warn};
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
@@ -11,7 +11,7 @@ use tokio::sync::broadcast::Receiver;
 pub struct Client {
     state: Arc<RwLock<State>>,
     connection: Connection,
-    auth_id: AuthId,
+    player_id: PlayerId,
     lobby_recv: Option<Receiver<Message>>,
 }
 
@@ -21,22 +21,22 @@ impl Client {
         socket: TcpStream,
     ) -> Result<Self, protocol::Error> {
         // Add new player
-        let auth_id = {
+        let player_id = {
             let mut state = state.write().expect("Failed to lock State");
             state.add_player()
         };
         let mut connection = Connection::new(socket);
 
-        // Inform player of their auth_id
+        // Inform player of their PlayerId
         connection
-            .write_frame(Message::ConnectionAccept { auth_id })
+            .write_frame(Message::ConnectionAccept { player_id })
             .await?;
-        info!("New connection for player id {auth_id:#X} opened");
+        info!("New connection for player id {player_id:#X} opened");
 
         Ok(Self {
             state,
             connection,
-            auth_id,
+            player_id,
             lobby_recv: None,
         })
     }
@@ -51,19 +51,19 @@ impl Client {
                     let incoming = match incoming {
                         Ok(Some(x)) => x,
                         Ok(None) => {
-                            info!("Player id {:#X} disconnected", self.auth_id);
+                            info!("Player id {:#X} disconnected", self.player_id);
                             break;
                         }
                         Err(e) => {
                             error!(
-                                "Error reading message from player id {:#X}. Closing connection\n{e:?}", self.auth_id
+                                "Error reading message from player id {:#X}. Closing connection\n{e:?}", self.player_id
                             );
                             break;
                         }
                     };
-                    debug!("Received message from player id {:#X} \nMessage: {incoming:#X?}", self.auth_id,);
+                    debug!("Received message from player id {:#X} \nMessage: {incoming:#X?}", self.player_id,);
                     if !self.process_incoming(incoming).await {
-                        info!("Disconnecting player {:#X} due to unrecoverable error.", self.auth_id);
+                        info!("Disconnecting player {:#X} due to unrecoverable error.", self.player_id);
                         break;
                     }
                 }
@@ -73,34 +73,33 @@ impl Client {
 
     async fn process_incoming(&mut self, incoming: Message) -> bool {
         match incoming {
-            Message::GameHost { auth_id: _ } => {
+            Message::GameHost => {
                 let state = &mut *self.state.write().unwrap();
-                if state.players.contains_key(&self.auth_id) {
+                if state.players.contains_key(&self.player_id) {
                     let lobby_id = state.add_lobby();
                     let lobby = state.lobbies.get_mut(&lobby_id).unwrap();
-                    self.lobby_recv =
-                        Some(lobby.add_player(&mut state.players, self.auth_id).unwrap());
+                    self.lobby_recv = Some(
+                        lobby
+                            .add_player(&mut state.players, self.player_id)
+                            .unwrap(),
+                    );
 
                     info!(
                         "Player {:#X} has hosted lobby {:#X}",
-                        self.auth_id, lobby.shared.lobby_id
+                        self.player_id, lobby.shared.lobby_id
                     );
                     lobby
                         .sender
                         .send(Message::GameLobbyInfo {
-                            auth_id: 0,
                             lobby: lobby.shared.clone(),
                         })
                         .unwrap();
                 }
             }
-            Message::GameJoin {
-                auth_id: _,
-                lobby_id,
-            } => {
+            Message::GameJoin { lobby_id } => {
                 let state = &mut *self.state.write().unwrap();
 
-                if state.players.contains_key(&self.auth_id) {
+                if state.players.contains_key(&self.player_id) {
                     let lobby = match state.lobbies.get_mut(&lobby_id) {
                         None => {
                             error!("Attempted to join lobby with an invalid id '{lobby_id}'");
@@ -109,39 +108,41 @@ impl Client {
                         Some(l) => l,
                     };
 
-                    self.lobby_recv =
-                        Some(lobby.add_player(&mut state.players, self.auth_id).unwrap());
+                    self.lobby_recv = Some(
+                        lobby
+                            .add_player(&mut state.players, self.player_id)
+                            .unwrap(),
+                    );
 
-                    info!("Player {:#X} has joined lobby {lobby_id:#X}", self.auth_id);
+                    info!(
+                        "Player {:#X} has joined lobby {lobby_id:#X}",
+                        self.player_id
+                    );
                     lobby
                         .sender
                         .send(Message::GameLobbyInfo {
-                            auth_id: 0,
                             lobby: lobby.shared.clone(),
                         })
                         .unwrap();
                 } else {
-                    error!("Player {:#X} not in the playerlist", self.auth_id);
+                    error!("Player {:#X} not in the playerlist", self.player_id);
                 }
             }
-            Message::GameLobbyInfo {
-                auth_id: _,
-                lobby: _,
-            } => todo!(),
-            Message::GameBegin { auth_id: _ } => {
+            Message::GameLobbyInfo { lobby: _ } => todo!(),
+            Message::GameBegin => {
                 let state = &mut *self.state.write().unwrap();
 
-                let lobby_id = match state.players.get(&self.auth_id) {
+                let lobby_id = match state.players.get(&self.player_id) {
                     Some(Some(id)) => id,
                     Some(None) => {
                         error!(
                             "Player id {:#X} attempted to start a game while not in a lobby",
-                            self.auth_id
+                            self.player_id
                         );
                         return true;
                     }
                     None => {
-                        error!("Invalid player id {:#X}", self.auth_id);
+                        error!("Invalid player id {:#X}", self.player_id);
                         //TODO: Kick player?
                         return false;
                     }
@@ -157,26 +158,23 @@ impl Client {
 
                 lobby.start_game();
             }
-            Message::GameEnd { auth_id: _ } => todo!(),
-            Message::GameLeave { auth_id: _ } => {
+            Message::GameEnd => todo!(),
+            Message::GameLeave => {
                 // Disconnect player
-                info!("Player {:#X} disconnecting.", self.auth_id);
+                info!("Player {:#X} disconnecting.", self.player_id);
                 return false;
             }
-            Message::PlayerOptions {
-                auth_id: _,
-                mut options,
-            } => {
+            Message::PlayerOptions { mut options } => {
                 let state = &mut *self.state.write().unwrap();
 
-                let lobby_id = match state.players.get(&self.auth_id) {
+                let lobby_id = match state.players.get(&self.player_id) {
                     Some(Some(id)) => id,
                     Some(None) => {
-                        error!("Player id {:#X} not currently in a lobby", self.auth_id);
+                        error!("Player id {:#X} not currently in a lobby", self.player_id);
                         return true;
                     }
                     None => {
-                        error!("Invalid player id {:#X}", self.auth_id);
+                        error!("Invalid player id {:#X}", self.player_id);
                         //TODO: Kick player?
                         return false;
                     }
@@ -190,37 +188,33 @@ impl Client {
                     }
                 };
 
-                if let Some(player) = lobby.shared.players.get_mut(&self.auth_id) {
+                if let Some(player) = lobby.shared.players.get_mut(&self.player_id) {
                     // TODO: Unhardcode player color
                     options.color = player.options.color;
                     player.options = options;
                 } else {
                     error!(
                         "Lobby received from player map did not contain player {:#X}",
-                        self.auth_id
+                        self.player_id
                     );
                     return false;
                 }
 
                 let message = Message::GameLobbyInfo {
-                    auth_id: 0,
                     lobby: lobby.shared.clone(),
                 };
                 lobby.sender.send(message).unwrap();
             }
-            Message::GameOptions {
-                auth_id: _,
-                options,
-            } => {
+            Message::GameOptions { options } => {
                 let state = &mut *self.state.write().unwrap();
-                let lobby_id = match state.players.get(&self.auth_id) {
+                let lobby_id = match state.players.get(&self.player_id) {
                     Some(Some(id)) => id,
                     Some(None) => {
-                        error!("Player id {:#X} not currently in a lobby", self.auth_id);
+                        error!("Player id {:#X} not currently in a lobby", self.player_id);
                         return true;
                     }
                     None => {
-                        error!("Invalid player id {:#X}", self.auth_id);
+                        error!("Invalid player id {:#X}", self.player_id);
                         //TODO: Ditto
                         return false;
                     }
@@ -228,7 +222,7 @@ impl Client {
 
                 let lobby = match state.lobbies.get_mut(lobby_id) {
                     Some(l) => {
-                        if l.shared.host_id == Some(self.auth_id) {
+                        if l.shared.host_id == Some(self.player_id) {
                             l.shared.options = options;
                         }
                         l
@@ -240,22 +234,21 @@ impl Client {
                 };
 
                 let message = Message::GameLobbyInfo {
-                    auth_id: 0,
                     lobby: lobby.shared.clone(),
                 };
                 lobby.sender.send(message).unwrap();
             }
-            Message::GameCurrentRoom { auth_id: _, room } => {
+            Message::GameCurrentRoom { room } => {
                 let state = &mut *self.state.write().unwrap();
 
-                let lobby_id = match state.players.get_mut(&self.auth_id) {
+                let lobby_id = match state.players.get_mut(&self.player_id) {
                     Some(Some(id)) => id,
                     Some(None) => {
-                        error!("Player id {:#X} not currently in a lobby", self.auth_id);
+                        error!("Player id {:#X} not currently in a lobby", self.player_id);
                         return true;
                     }
                     None => {
-                        error!("Invalid player id {:#X}", self.auth_id);
+                        error!("Invalid player id {:#X}", self.player_id);
                         return false;
                     }
                 };
@@ -264,15 +257,15 @@ impl Client {
                     Some(l) => {
                         l.shared
                             .players
-                            .get_mut(&self.auth_id)
+                            .get_mut(&self.player_id)
                             .unwrap_or_else(|| {
                                 panic!(
                                     "Lobby received from player map did not contain player {:#X}",
-                                    self.auth_id,
+                                    self.player_id,
                                 )
                             })
                             .current_room = room;
-                        info!("Player {:#X} entered {room:?}", self.auth_id);
+                        info!("Player {:#X} entered {room:?}", self.player_id);
                         l
                     }
                     None => {
@@ -284,22 +277,21 @@ impl Client {
                 lobby
                     .sender
                     .send(Message::GameLobbyInfo {
-                        auth_id: 0,
                         lobby: lobby.shared.clone(),
                     })
                     .unwrap();
             }
-            Message::GameItemCollected { auth_id: _, item } => {
+            Message::GameItemCollected { item } => {
                 let state = &mut *self.state.write().unwrap();
 
-                let lobby_id = match state.players.get_mut(&self.auth_id) {
+                let lobby_id = match state.players.get_mut(&self.player_id) {
                     Some(Some(id)) => id,
                     Some(None) => {
-                        error!("Player id {:#X} not currently in a lobby", self.auth_id);
+                        error!("Player id {:#X} not currently in a lobby", self.player_id);
                         return true;
                     }
                     None => {
-                        error!("Invalid player id {:#X}", self.auth_id);
+                        error!("Invalid player id {:#X}", self.player_id);
                         return false;
                     }
                 };
@@ -308,12 +300,12 @@ impl Client {
                     Some(l) => {
                         if let Item::Spatula(spat) = item {
                             if let Entry::Vacant(e) = l.shared.game_state.spatulas.entry(spat) {
-                                e.insert(Some(self.auth_id));
+                                e.insert(Some(self.player_id));
                                 l.shared.players
-                                .get_mut(&self.auth_id)
-                                .unwrap_or_else(|| panic!("Lobby received from player map did not contain player {:#X}", self.auth_id))
+                                .get_mut(&self.player_id)
+                                .unwrap_or_else(|| panic!("Lobby received from player map did not contain player {:#X}", self.player_id))
                                 .score += 1;
-                                info!("Player {:#X} collected {spat:?}", self.auth_id);
+                                info!("Player {:#X} collected {spat:?}", self.player_id);
                             }
                         }
                         l
@@ -327,7 +319,6 @@ impl Client {
                 lobby
                     .sender
                     .send(Message::GameLobbyInfo {
-                        auth_id: 0,
                         lobby: lobby.shared.clone(),
                     })
                     .unwrap();
@@ -335,7 +326,7 @@ impl Client {
             m => {
                 warn!(
                     "Player id {:#X} sent a server only message. \nMessage: {m:?}",
-                    self.auth_id
+                    self.player_id
                 );
             }
         }
@@ -348,14 +339,14 @@ impl Drop for Client {
         // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
         // and that's fine for now.
         let state = &mut *self.state.write().unwrap();
-        if let Entry::Occupied(e) = state.players.entry(self.auth_id) {
+        if let Entry::Occupied(e) = state.players.entry(self.player_id) {
             let lobby_id = match e.remove() {
                 Some(it) => it,
                 None => return,
             };
 
             if let Some(lobby) = state.lobbies.get_mut(&lobby_id) {
-                lobby.rem_player(self.auth_id);
+                lobby.rem_player(self.player_id);
             }
         }
     }

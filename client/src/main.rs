@@ -86,45 +86,24 @@ async fn process_incoming(
     logic_sender: &mut Sender<Message>,
 ) {
     match message {
-        m @ Message::ConnectionAccept { auth_id: _ } => {
+        m @ Message::ConnectionAccept { player_id: _ } => {
             debug!("ConnectionAccept message got :)");
             logic_sender.send(m).unwrap();
         }
-        Message::PlayerOptions {
-            auth_id: _,
-            options: _,
-        } => todo!(),
-        Message::GameHost { auth_id: _ } => todo!(),
-        Message::GameJoin {
-            auth_id: _,
-            lobby_id: _,
-        } => todo!(),
-        Message::GameOptions {
-            auth_id: _,
-            options: _,
-        } => todo!(),
-        m @ Message::GameLobbyInfo {
-            auth_id: _,
-            lobby: _,
-        } => {
+        Message::PlayerOptions { options: _ } => todo!(),
+        Message::GameHost => todo!(),
+        Message::GameJoin { lobby_id: _ } => todo!(),
+        Message::GameOptions { options: _ } => todo!(),
+        m @ Message::GameLobbyInfo { lobby: _ } => {
             logic_sender.send(m).unwrap();
         }
-        m @ Message::GameBegin { auth_id: _ } => {
+        m @ Message::GameBegin => {
             logic_sender.send(m).unwrap();
         }
-        Message::GameCurrentRoom {
-            auth_id: _,
-            room: _,
-        } => todo!(),
-        Message::GameForceWarp {
-            auth_id: _,
-            room: _,
-        } => todo!(),
-        Message::GameItemCollected {
-            auth_id: _,
-            item: _,
-        } => todo!(),
-        Message::GameEnd { auth_id: _ } => todo!(),
-        Message::GameLeave { auth_id: _ } => todo!(),
+        Message::GameCurrentRoom { room: _ } => todo!(),
+        Message::GameForceWarp { room: _ } => todo!(),
+        Message::GameItemCollected { item: _ } => todo!(),
+        Message::GameEnd => todo!(),
+        Message::GameLeave => todo!(),
     }
 }
