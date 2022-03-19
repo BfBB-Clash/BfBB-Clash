@@ -35,12 +35,13 @@ impl GameStateExt for SharedLobby {
         }
 
         // TODO: Use a better error
+        // Find the local player within the lobby
         let local_player = self
             .players
             .get_mut(&player_id)
             .ok_or(InterfaceError::Other)?;
 
-        // Set the cost to unlock the lab door
+        // Detect level changes
         let room = Some(game.get_current_level()?);
         if local_player.current_room != room {
             local_player.current_room = room;
@@ -48,6 +49,13 @@ impl GameStateExt for SharedLobby {
                 .blocking_send(Message::GameCurrentRoom { room })
                 .unwrap();
         }
+
+        // Don't proceed if the lobby has not yet started
+        if !self.is_started {
+            return Ok(());
+        }
+
+        // Set the cost to unlock the lab door
         if local_player.current_room == Some(Room::ChumBucket) {
             game.set_lab_door(self.options.lab_door_cost.into())?;
         }
