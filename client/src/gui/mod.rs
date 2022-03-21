@@ -319,8 +319,10 @@ impl App for Clash {
                     if self.lobby.is_started {
                         ui.add(GameMenu::new(&self.lobby.game_state, &self.lobby.players));
                     } else {
-                        // TODO: Restrict these to the host
                         self.paint_options(ui);
+                        if ui.button("Copy Lobby ID").clicked() {
+                            ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                        }
                     }
                 });
             }
