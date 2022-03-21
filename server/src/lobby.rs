@@ -79,8 +79,8 @@ impl Lobby {
         Ok(self.sender.subscribe())
     }
 
-    pub fn rem_player(&mut self, player_id: PlayerId) {
-        // TODO: Remove this lobby if this is the last player (might need to be handled at callsite)
+    // Removes a player from the lobby, if it exists, returning the number of player's remaining
+    pub fn rem_player(&mut self, player_id: PlayerId) -> usize {
         self.shared.players.remove(&player_id);
         if self.shared.host_id == Some(player_id) {
             // Pass host to first remaining player in list (effectively random with a HashMap)
@@ -92,5 +92,6 @@ impl Lobby {
         let _ = self.sender.send(Message::GameLobbyInfo {
             lobby: self.shared.clone(),
         });
+        self.shared.players.len()
     }
 }
