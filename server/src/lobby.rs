@@ -1,5 +1,5 @@
 use clash::lobby::{LobbyOptions, SharedLobby};
-use clash::player::SharedPlayer;
+use clash::player::{PlayerOptions, SharedPlayer};
 use clash::protocol::Message;
 use clash::{LobbyId, PlayerId, MAX_PLAYERS};
 use thiserror::Error;
@@ -19,6 +19,7 @@ pub enum LobbyError {
 pub struct Lobby {
     pub shared: SharedLobby,
     pub sender: Sender<Message>,
+    pub next_menu_order: u8,
 }
 
 impl Lobby {
@@ -27,6 +28,7 @@ impl Lobby {
         Self {
             shared: SharedLobby::new(lobby_id, new_options),
             sender,
+            next_menu_order: 0,
         }
     }
 
@@ -59,6 +61,7 @@ impl Lobby {
         }
 
         // Make sure the player isn't already in a different lobby
+        // TODO: The lobby probably shouldn't be responsible for this
         if players
             .get(&player_id)
             .ok_or(LobbyError::PlayerInvalid)?
@@ -67,9 +70,11 @@ impl Lobby {
             return Err(LobbyError::PlayerInvalid);
         }
         players.insert(player_id, Some(self.shared.lobby_id));
+
         // TODO: Unhardcode player color
-        let mut player = SharedPlayer::default();
+        let mut player = SharedPlayer::new(PlayerOptions::default(), self.next_menu_order);
         player.options.color = clash::player::COLORS[self.shared.players.len()];
+        self.next_menu_order += 1;
 
         self.shared.players.insert(player_id, player);
         if self.shared.host_id == None {
