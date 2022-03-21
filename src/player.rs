@@ -18,19 +18,21 @@ pub struct PlayerOptions {
     // Other options?
 }
 
-#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SharedPlayer {
     pub options: PlayerOptions,
     pub current_room: Option<Room>,
     pub score: u8,
+    pub menu_order: u8,
 }
 
 impl SharedPlayer {
-    pub fn new(options: PlayerOptions) -> Self {
+    pub fn new(options: PlayerOptions, menu_order: u8) -> Self {
         Self {
             options,
             current_room: None,
             score: 0,
+            menu_order,
         }
     }
 }

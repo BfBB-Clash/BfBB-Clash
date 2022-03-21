@@ -310,8 +310,10 @@ impl App for Clash {
                     .resizable(false)
                     .show(ctx, |ui| {
                         ui.add_space(PADDING);
-                        // TODO: Deterministic ordering
-                        for player in self.lobby.players.values() {
+                        // TODO: Cache this
+                        let mut values = self.lobby.players.values().collect::<Vec<_>>();
+                        values.sort_by(|&a, &b| a.menu_order.cmp(&b.menu_order));
+                        for player in values {
                             ui.add(PlayerUi::new(player));
                         }
                     });
