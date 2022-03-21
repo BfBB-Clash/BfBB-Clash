@@ -250,8 +250,11 @@ impl App for Clash {
                 });
                 TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
                     ui.add(TextEdit::singleline(&mut self.name_buf).hint_text("Name"));
-                    let lobby_response =
-                        ui.add(TextEdit::singleline(&mut self.lobby_id_buf).hint_text("Lobby ID"));
+                    let lobby_response = ui.add(
+                        TextEdit::singleline(&mut self.lobby_id_buf)
+                            .hint_text("Lobby ID")
+                            .password(true),
+                    );
 
                     // Validate input
                     if lobby_response.changed() {
