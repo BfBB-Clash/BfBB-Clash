@@ -345,8 +345,12 @@ impl Drop for Client {
                 None => return,
             };
 
-            if let Some(lobby) = state.lobbies.get_mut(&lobby_id) {
-                lobby.rem_player(self.player_id);
+            if let Entry::Occupied(mut lobby) = state.lobbies.entry(lobby_id) {
+                if lobby.get_mut().rem_player(self.player_id) == 0 {
+                    // Remove this lobby from the server
+                    info!("Closing lobby {:#X}", lobby.key());
+                    lobby.remove();
+                }
             }
         }
     }
