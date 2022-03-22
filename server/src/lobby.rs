@@ -34,7 +34,7 @@ impl Lobby {
 
     pub fn start_game(&mut self) {
         self.shared.is_started = true;
-        if self.sender.send(Message::GameBegin {}).is_err() {
+        if self.sender.send(Message::GameBegin).is_err() {
             log::warn!(
                 "Lobby {:#X} started with no players in lobby.",
                 self.shared.lobby_id
@@ -81,7 +81,14 @@ impl Lobby {
             self.shared.host_id = Some(player_id);
         }
 
-        Ok(self.sender.subscribe())
+        // Subscribe early so that this player will receive the lobby update that adds them
+        let recv = self.sender.subscribe();
+
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
+
+        Ok(recv)
     }
 
     // Removes a player from the lobby, if it exists, returning the number of player's remaining
