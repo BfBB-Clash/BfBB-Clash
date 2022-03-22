@@ -88,12 +88,6 @@ impl Client {
                         "Player {:#X} has hosted lobby {:#X}",
                         self.player_id, lobby.shared.lobby_id
                     );
-                    lobby
-                        .sender
-                        .send(Message::GameLobbyInfo {
-                            lobby: lobby.shared.clone(),
-                        })
-                        .unwrap();
                 }
             }
             Message::GameJoin { lobby_id } => {
@@ -118,12 +112,6 @@ impl Client {
                         "Player {:#X} has joined lobby {lobby_id:#X}",
                         self.player_id
                     );
-                    lobby
-                        .sender
-                        .send(Message::GameLobbyInfo {
-                            lobby: lobby.shared.clone(),
-                        })
-                        .unwrap();
                 } else {
                     error!("Player {:#X} not in the playerlist", self.player_id);
                 }
