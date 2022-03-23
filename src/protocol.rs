@@ -31,7 +31,6 @@ pub enum Message {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Item {
     Spatula(Spatula),
-    Fuse,
 }
 
 #[derive(Debug, Error)]

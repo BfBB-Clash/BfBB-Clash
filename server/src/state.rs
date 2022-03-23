@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clash::{lobby::LobbyOptions, LobbyId, PlayerId};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -33,6 +34,21 @@ impl State {
             Lobby::new(LobbyOptions::default(), gen_lobby_id),
         );
         gen_lobby_id
+    }
+
+    pub fn get_lobby(&mut self, player_id: PlayerId) -> anyhow::Result<&mut Lobby> {
+        use crate::client::Error;
+        let lobby_id = self
+            .players
+            .get(&player_id)
+            .ok_or(Error::InvalidPlayerId(player_id))?
+            .ok_or(Error::InvalidMessage)
+            .context("Player not currently in a lobby")?;
+
+        self.lobbies
+            .get_mut(&lobby_id)
+            .ok_or(Error::InvalidLobbyId(lobby_id))
+            .context("Lobby specified by player list not found")
     }
 
     // TODO: dedupe this.
