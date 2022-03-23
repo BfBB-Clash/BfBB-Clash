@@ -1,6 +1,8 @@
 use crate::state::State;
 use anyhow::Context;
+use clash::lobby::GamePhase;
 use clash::protocol::{self, Connection, Item, Message};
+use clash::spatula::Spatula;
 use clash::{LobbyId, PlayerId};
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
@@ -220,6 +222,10 @@ impl Client {
                                 .ok_or(Error::InvalidPlayerId(self.player_id))?
                                 .score += 1;
                             log::info!("Player {:#X} collected {spat:?}", self.player_id);
+
+                            if spat == Spatula::TheSmallShallRuleOrNot {
+                                lobby.shared.game_phase = GamePhase::Finished;
+                            }
 
                             let message = Message::GameLobbyInfo {
                                 lobby: lobby.shared.clone(),

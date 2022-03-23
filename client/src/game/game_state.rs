@@ -1,5 +1,5 @@
 use crate::game::{GameInterface, InterfaceResult};
-use clash::lobby::SharedLobby;
+use clash::lobby::{GamePhase, SharedLobby};
 use clash::PlayerId;
 use clash::{
     protocol::{Item, Message},
@@ -50,8 +50,8 @@ impl GameStateExt for SharedLobby {
                 .unwrap();
         }
 
-        // Don't proceed if the lobby has not yet started
-        if !self.is_started {
+        // Don't proceed if the game is not active
+        if self.game_phase != GamePhase::Playing {
             return Ok(());
         }
 
