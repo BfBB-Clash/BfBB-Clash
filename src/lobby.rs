@@ -18,13 +18,20 @@ impl Default for LobbyOptions {
     }
 }
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum GamePhase {
+    Setup,
+    Playing,
+    Finished,
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SharedLobby {
     pub game_state: GameState,
     pub lobby_id: LobbyId,
     pub options: LobbyOptions,
     pub players: HashMap<PlayerId, SharedPlayer>,
-    pub is_started: bool,
+    pub game_phase: GamePhase,
     pub host_id: Option<PlayerId>,
 }
 
@@ -35,7 +42,7 @@ impl SharedLobby {
             lobby_id,
             options,
             players: HashMap::new(),
-            is_started: false,
+            game_phase: GamePhase::Setup,
             host_id: None,
         }
     }

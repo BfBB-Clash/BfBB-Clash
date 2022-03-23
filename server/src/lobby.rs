@@ -1,4 +1,4 @@
-use clash::lobby::{LobbyOptions, SharedLobby};
+use clash::lobby::{GamePhase, LobbyOptions, SharedLobby};
 use clash::player::{PlayerOptions, SharedPlayer};
 use clash::protocol::Message;
 use clash::{LobbyId, PlayerId, MAX_PLAYERS};
@@ -33,7 +33,7 @@ impl Lobby {
     }
 
     pub fn start_game(&mut self) {
-        self.shared.is_started = true;
+        self.shared.game_phase = GamePhase::Playing;
         if self.sender.send(Message::GameBegin).is_err() {
             log::warn!(
                 "Lobby {:#X} started with no players in lobby.",

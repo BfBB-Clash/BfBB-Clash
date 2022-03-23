@@ -5,7 +5,11 @@ pub use self::game_state::GameStateExt;
 pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
 
 use crate::dolphin::DolphinInterface;
-use clash::{lobby::SharedLobby, protocol::Message, PlayerId};
+use clash::{
+    lobby::{GamePhase, SharedLobby},
+    protocol::Message,
+    PlayerId,
+};
 use log::error;
 use spin_sleep::LoopHelper;
 use std::sync::mpsc::{Receiver, Sender};
@@ -81,7 +85,7 @@ fn update_from_network<T: GameInterface>(
                 let lobby = lobby
                     .as_mut()
                     .expect("Tried to begin game without being in a lobby");
-                lobby.is_started = true;
+                lobby.game_phase = GamePhase::Playing;
                 gui_sender
                     .send((*player_id, lobby.clone()))
                     .expect("GUI has crashed and so will we");

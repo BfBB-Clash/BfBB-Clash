@@ -4,7 +4,7 @@ mod player_widget;
 use crate::game::GameStateExt;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
-use clash::lobby::{LobbyOptions, SharedLobby};
+use clash::lobby::{GamePhase, LobbyOptions, SharedLobby};
 use clash::player::PlayerOptions;
 use clash::protocol::Message;
 use clash::PlayerId;
@@ -318,13 +318,13 @@ impl App for Clash {
                         }
                     });
                 CentralPanel::default().show(ctx, |ui| {
-                    if self.lobby.is_started {
-                        ui.add(GameMenu::new(&self.lobby.game_state, &self.lobby.players));
-                    } else {
+                    if self.lobby.game_phase == GamePhase::Setup {
                         self.paint_options(ui);
                         if ui.button("Copy Lobby ID").clicked() {
                             ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
                         }
+                    } else {
+                        ui.add(GameMenu::new(&self.lobby.game_state, &self.lobby.players));
                     }
                 });
             }
