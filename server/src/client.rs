@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::broadcast::Receiver;
 
-#[derive(Error, Copy, Clone, Debug)]
+#[derive(Error, Clone, Debug)]
 pub enum Error {
     #[error("Invalid Player ID {0:#X}")]
     InvalidPlayerId(PlayerId),
@@ -22,6 +22,11 @@ pub enum Error {
     // TODO: This probably shouldn't be an error
     #[error("Player disconnected")]
     Disconnected,
+    #[error(
+        "Client version '{0}' does not match server version '{}'",
+        crate::VERSION
+    )]
+    VersionMismatch(String),
 }
 
 pub struct Client {
@@ -38,20 +43,13 @@ impl Client {
     ) -> Result<Self, protocol::Error> {
         // Add new player
         let player_id = {
-            let mut state = state.write().expect("Failed to lock State");
+            let mut state = state.write().unwrap();
             state.add_player()
         };
-        let mut connection = Connection::new(socket);
-
-        // Inform player of their PlayerId
-        connection
-            .write_frame(Message::ConnectionAccept { player_id })
-            .await?;
-        log::info!("New connection for player id {player_id:#X} opened");
 
         Ok(Self {
             state,
-            connection,
+            connection: Connection::new(socket),
             player_id,
             lobby_recv: None,
         })
@@ -111,6 +109,25 @@ impl Client {
 
     async fn process_incoming(&mut self, incoming: Message) -> anyhow::Result<()> {
         match incoming {
+            Message::Version { version } => {
+                if version != crate::VERSION {
+                    // Tell the client what the correct version is and disconnect
+                    self.connection
+                        .write_frame(Message::Version {
+                            version: crate::VERSION.to_owned(),
+                        })
+                        .await?;
+                    return Err(Error::VersionMismatch(version).into());
+                }
+
+                // Inform player of their PlayerId
+                self.connection
+                    .write_frame(Message::ConnectionAccept {
+                        player_id: self.player_id,
+                    })
+                    .await?;
+                log::info!("New connection for player id {:#X} opened", self.player_id);
+            }
             Message::GameHost => {
                 let state = &mut *self.state.write().unwrap();
                 if state.players.contains_key(&self.player_id) {
