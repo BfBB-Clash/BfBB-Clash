@@ -14,6 +14,7 @@ use crate::spatula::Spatula;
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Message {
+    Version { version: String },
     ConnectionAccept { player_id: u32 },
     PlayerOptions { options: PlayerOptions },
     GameHost,
