@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(target_os = "windows", not(feature = "console")),
+    windows_subsystem = "windows"
+)]
+
 use std::sync::mpsc::{channel, Sender};
 
 use clash::protocol::{Connection, Message};
