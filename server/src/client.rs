@@ -1,33 +1,14 @@
 use crate::state::State;
 use anyhow::Context;
 use clash::lobby::GamePhase;
-use clash::protocol::{self, Connection, Item, Message};
+use clash::protocol::{self, Connection, Item, Message, ProtocolError};
 use clash::spatula::Spatula;
-use clash::{LobbyId, PlayerId};
+use clash::PlayerId;
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
-use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::broadcast::Receiver;
-
-#[derive(Error, Clone, Debug)]
-pub enum Error {
-    #[error("Invalid Player ID {0:#X}")]
-    InvalidPlayerId(PlayerId),
-    #[error("Invalid Lobby ID {0:#X}")]
-    InvalidLobbyId(LobbyId),
-    #[error("Invalid Message")]
-    InvalidMessage,
-    // TODO: This probably shouldn't be an error
-    #[error("Player disconnected")]
-    Disconnected,
-    #[error(
-        "Client version '{0}' does not match server version '{}'",
-        crate::VERSION
-    )]
-    VersionMismatch(String),
-}
 
 pub struct Client {
     state: Arc<RwLock<State>>,
@@ -40,7 +21,7 @@ impl Client {
     pub async fn new(
         state: Arc<RwLock<State>>,
         socket: TcpStream,
-    ) -> Result<Self, protocol::Error> {
+    ) -> Result<Self, protocol::FrameError> {
         // Add new player
         let player_id = {
             let mut state = state.write().unwrap();
@@ -78,17 +59,18 @@ impl Client {
 
                     log::debug!("Received message from player id {:#X} \nMessage: {incoming:#X?}", self.player_id,);
                     if let Err(e) = self.process_incoming(incoming).await {
-                        match e.downcast_ref::<Error>() {
-                            Some(Error::InvalidLobbyId(_)) => {
-                                // Usually this is the result of the client joining an invalid lobby id
-                                // TODO: Inform client of failure
+                        match e.downcast_ref::<ProtocolError>() {
+                            Some(m @ ProtocolError::InvalidLobbyId(_)) |
+                            Some(m @ ProtocolError::InvalidMessage) => {
                                 log::error!("{e:?}");
-                            }
-                            Some(Error::InvalidMessage) => {
-                                // TODO: Tell the client their message was invalid?
-                                log::error!("{e:?}");
+                                let _ = self.connection.write_frame(Message::Error {error: m.clone() }).await;
                             },
-                            Some(Error::Disconnected) => {
+                            Some(m @ ProtocolError::VersionMismatch(_,_)) => {
+                                log::error!("{e:?}");
+                                let _ = self.connection.write_frame(Message::Error {error: m.clone() }).await;
+                                break;
+                            }
+                            Some(ProtocolError::Disconnected) => {
                                 // Close the connection without error
                                 log::info!("Player id {:#X} disconnected", self.player_id);
                                 break;
@@ -96,8 +78,7 @@ impl Client {
                             _ => {
                                 // This error means there is a problem with our internal state
                                 // TODO: Figure out how to properly resolve this error
-                                log::error!("Disconnecting player {:#X} due to unrecoverable error.", self.player_id);
-                                log::error!("{e:?}");
+                                log::error!("Disconnecting player {:#X} due to unrecoverable error:\n{e:?}", self.player_id);
                                 break;
                             }
                         }
@@ -111,13 +92,9 @@ impl Client {
         match incoming {
             Message::Version { version } => {
                 if version != crate::VERSION {
-                    // Tell the client what the correct version is and disconnect
-                    self.connection
-                        .write_frame(Message::Version {
-                            version: crate::VERSION.to_owned(),
-                        })
-                        .await?;
-                    return Err(Error::VersionMismatch(version).into());
+                    return Err(
+                        ProtocolError::VersionMismatch(version, crate::VERSION.to_owned()).into(),
+                    );
                 }
 
                 // Inform player of their PlayerId
@@ -135,7 +112,7 @@ impl Client {
                     let lobby = state
                         .lobbies
                         .get_mut(&lobby_id)
-                        .ok_or(Error::InvalidLobbyId(lobby_id))?;
+                        .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
 
                     self.lobby_recv = Some(lobby.add_player(&mut state.players, self.player_id)?);
 
@@ -151,7 +128,7 @@ impl Client {
                 let lobby = state
                     .lobbies
                     .get_mut(&lobby_id)
-                    .ok_or(Error::InvalidLobbyId(lobby_id))?;
+                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
 
                 self.lobby_recv = Some(lobby.add_player(&mut state.players, self.player_id)?);
 
@@ -168,7 +145,7 @@ impl Client {
             Message::GameLeave => {
                 // Disconnect player
                 log::info!("Player {:#X} disconnecting.", self.player_id);
-                return Err(Error::Disconnected.into());
+                return Err(ProtocolError::Disconnected.into());
             }
             Message::PlayerOptions { mut options } => {
                 let state = &mut *self.state.write().unwrap();
@@ -178,7 +155,7 @@ impl Client {
                     .shared
                     .players
                     .get_mut(&self.player_id)
-                    .ok_or(Error::InvalidPlayerId(self.player_id))
+                    .ok_or(ProtocolError::InvalidPlayerId(self.player_id))
                     .context("Player not found in lobby specified by the playerlist")?;
 
                 // TODO: Unhardcode player color
@@ -195,7 +172,7 @@ impl Client {
                 let lobby = state.get_lobby(self.player_id)?;
 
                 if lobby.shared.host_id != Some(self.player_id) {
-                    return Err(Error::InvalidMessage)
+                    return Err(ProtocolError::InvalidMessage)
                         .context("Only the host can change Lobby Options");
                 }
                 lobby.shared.options = options;
@@ -213,7 +190,7 @@ impl Client {
                     .shared
                     .players
                     .get_mut(&self.player_id)
-                    .ok_or(Error::InvalidPlayerId(self.player_id))
+                    .ok_or(ProtocolError::InvalidPlayerId(self.player_id))
                     .context("Player not found in lobby specified by the playerlist")?;
 
                 player.current_room = room;
@@ -236,7 +213,7 @@ impl Client {
                                 .shared
                                 .players
                                 .get_mut(&self.player_id)
-                                .ok_or(Error::InvalidPlayerId(self.player_id))?
+                                .ok_or(ProtocolError::InvalidPlayerId(self.player_id))?
                                 .score += 1;
                             log::info!("Player {:#X} collected {spat:?}", self.player_id);
 
@@ -252,7 +229,10 @@ impl Client {
                     }
                 }
             }
-            _ => return Err(Error::InvalidMessage).context("Client sent a server-only message."),
+            _ => {
+                return Err(ProtocolError::InvalidMessage)
+                    .context("Client sent a server-only message.")
+            }
         }
         Ok(())
     }

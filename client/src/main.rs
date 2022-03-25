@@ -5,9 +5,8 @@
 
 use std::sync::mpsc::{channel, Sender};
 
-use clash::protocol::{Connection, Message};
+use clash::protocol::{Connection, Message, ProtocolError};
 use log::{debug, error, info};
-use thiserror::Error;
 use tokio::{net::TcpStream, select};
 
 mod dolphin;
@@ -51,12 +50,6 @@ fn main() {
     gui::run(gui_receiver, network_sender);
 }
 
-#[derive(Error, Clone, Debug)]
-enum Error {
-    #[error("Client version '{VERSION}' does not match server version '{0}'")]
-    VersionMismatch(String),
-}
-
 #[tokio::main(flavor = "current_thread")]
 async fn start_network(
     mut receiver: tokio::sync::mpsc::Receiver<Message>,
@@ -65,7 +58,7 @@ async fn start_network(
     let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(sock);
     conn.write_frame(Message::Version {
-        version: env!("CARGO_PKG_VERSION").to_owned(),
+        version: VERSION.to_owned(),
     })
     .await
     .unwrap();
@@ -95,8 +88,7 @@ async fn start_network(
                 };
 
                 if let Err(e) = process_incoming(incoming, &mut conn, &mut logic_sender).await {
-                    log::error!("{e}");
-                    break;
+                    log::error!("Error from server:\n{e}");
                 }
             }
         };
@@ -107,11 +99,13 @@ async fn process_incoming(
     message: Message,
     _conn: &mut Connection,
     logic_sender: &mut Sender<Message>,
-) -> Result<(), Error> {
+) -> Result<(), ProtocolError> {
     match message {
-        Message::Version { version } => {
-            // We are outdated
-            return Err(Error::VersionMismatch(version));
+        Message::Version { version: _ } => {
+            todo!()
+        }
+        Message::Error { error } => {
+            return Err(error);
         }
         m @ Message::ConnectionAccept { player_id: _ } => {
             debug!("ConnectionAccept message got :)");
