@@ -3,7 +3,10 @@
     windows_subsystem = "windows"
 )]
 
-use std::sync::mpsc::{channel, Sender};
+use std::{
+    error::Error,
+    sync::mpsc::{channel, Sender},
+};
 
 use clash::protocol::{Connection, Message, ProtocolError};
 use log::{debug, error, info};
@@ -28,6 +31,7 @@ fn main() {
 
     let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<Message>(100);
     let (logic_sender, logic_receiver) = channel::<Message>();
+    let (error_sender, error_receiver) = channel::<Box<dyn Error + Send>>();
     // Create a new thread and start a tokio runtime on it for talking to the server
     // TODO: Tokio may not be the best tool for the client. It might be better to
     //       simply use std's blocking networking in a new thread, since we should only ever
@@ -35,7 +39,7 @@ fn main() {
     //       library is async.
     let _network_thread = std::thread::Builder::new()
         .name("Network".into())
-        .spawn(move || start_network(network_receiver, logic_sender));
+        .spawn(move || start_network(network_receiver, logic_sender, error_sender));
 
     // Start Game Thread
     let (gui_sender, gui_receiver) = channel();
@@ -47,13 +51,14 @@ fn main() {
     };
 
     // Start gui on the main thread
-    gui::run(gui_receiver, network_sender);
+    gui::run(gui_receiver, error_receiver, network_sender);
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn start_network(
     mut receiver: tokio::sync::mpsc::Receiver<Message>,
-    mut logic_sender: Sender<Message>,
+    logic_sender: Sender<Message>,
+    error_sender: Sender<Box<dyn Error + Send>>,
 ) {
     let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
     let mut conn = Connection::new(sock);
@@ -69,6 +74,7 @@ async fn start_network(
                 debug!("Sending message {m:#?}");
                 if let Err(e) = conn.write_frame(m.unwrap()).await {
                     error!("Error sending message to server. Disconnecting. {e:#?}");
+                    error_sender.send(Box::new(e)).expect("GUI has crashed and so will we.");
                 };
             }
             incoming = conn.read_frame() => {
@@ -83,12 +89,14 @@ async fn start_network(
                     }
                     Err(e) => {
                         error!("Error reading message from server. Disconnecting.\n{e}");
+                        error_sender.send(e.into()).expect("GUI has crashed and so will we.");
                         break;
                     }
                 };
 
-                if let Err(e) = process_incoming(incoming, &mut conn, &mut logic_sender).await {
+                if let Err(e) = process_incoming(incoming, &mut conn, &logic_sender).await {
                     log::error!("Error from server:\n{e}");
+                    error_sender.send(Box::new(e)).expect("GUI has crashed and so will we.");
                 }
             }
         };
@@ -98,7 +106,7 @@ async fn start_network(
 async fn process_incoming(
     message: Message,
     _conn: &mut Connection,
-    logic_sender: &mut Sender<Message>,
+    logic_sender: &Sender<Message>,
 ) -> Result<(), ProtocolError> {
     match message {
         Message::Version { version: _ } => {

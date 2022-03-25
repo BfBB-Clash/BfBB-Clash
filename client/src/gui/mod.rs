@@ -8,6 +8,7 @@ use clash::lobby::{GamePhase, LobbyOptions, SharedLobby};
 use clash::player::PlayerOptions;
 use clash::protocol::Message;
 use clash::PlayerId;
+use std::error::Error;
 use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
@@ -31,6 +32,7 @@ pub enum Menu {
 pub struct Clash {
     gui_receiver: Receiver<(PlayerId, SharedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
+    error_receiver: Receiver<Box<dyn Error + Send>>,
 
     state: Menu,
     name_buf: String,
@@ -43,16 +45,20 @@ pub struct Clash {
 
     player_id: PlayerId,
     lobby: SharedLobby,
+
+    error_queue: Vec<Box<dyn Error>>,
 }
 
 impl Clash {
     fn new(
         gui_receiver: Receiver<(PlayerId, SharedLobby)>,
+        error_receiver: Receiver<Box<dyn Error + Send>>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
         Self {
             gui_receiver,
             network_sender,
+            error_receiver,
             state: Menu::Main,
             name_buf: Default::default(),
             lobby_id_buf: Default::default(),
@@ -61,6 +67,7 @@ impl Clash {
             lab_door_num: None,
             player_id: 0,
             lobby: SharedLobby::new(0, LobbyOptions::default()),
+            error_queue: Vec::new(),
         }
     }
 
@@ -198,6 +205,18 @@ impl App for Clash {
         let version_ui = Area::new("Version")
             // TODO: Find how to not hardcode this
             .fixed_pos(Pos2::new(560., ctx.available_rect().height() - height));
+
+        while let Ok(e) = self.error_receiver.try_recv() {
+            self.error_queue.push(e);
+        }
+        TopBottomPanel::bottom("errors").show(ctx, |ui| {
+            if let Some(e) = self.error_queue.get(0) {
+                ui.label(format!("Error!: {e}"));
+                if ui.button("OK").clicked() {
+                    self.error_queue.remove(0);
+                }
+            }
+        });
 
         match self.state {
             Menu::Main => {
@@ -350,6 +369,7 @@ impl App for Clash {
 
 pub fn run(
     gui_receiver: Receiver<(PlayerId, SharedLobby)>,
+    error_receiver: Receiver<Box<dyn Error + Send>>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 ) {
     let window_options = NativeOptions {
@@ -359,7 +379,7 @@ pub fn run(
     };
 
     run_native(
-        Box::new(Clash::new(gui_receiver, network_sender)),
+        Box::new(Clash::new(gui_receiver, error_receiver, network_sender)),
         window_options,
     );
 }
