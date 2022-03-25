@@ -11,10 +11,10 @@ use clash::PlayerId;
 use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
-    Align, Button, CentralPanel, Checkbox, Color32, Context, FontData, FontDefinitions, FontFamily,
-    Layout, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
+    Align, Area, Button, CentralPanel, Checkbox, Color32, Context, FontData, FontDefinitions,
+    FontFamily, Layout, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
 };
-use eframe::epaint::FontId;
+use eframe::epaint::{FontId, Pos2};
 use eframe::epi::{App, Frame, Storage};
 use eframe::{run_native, NativeOptions};
 
@@ -191,6 +191,14 @@ impl App for Clash {
     }
 
     fn update(&mut self, ctx: &Context, frame: &Frame) {
+        let style = ctx.style();
+        let height = ctx.fonts().row_height(&TextStyle::Small.resolve(&style));
+
+        // Paint this at the end so it stays on top
+        let version_ui = Area::new("Version")
+            // TODO: Find how to not hardcode this
+            .fixed_pos(Pos2::new(560., ctx.available_rect().height() - height));
+
         match self.state {
             Menu::Main => {
                 CentralPanel::default().show(ctx, |ui| {
@@ -329,6 +337,10 @@ impl App for Clash {
                 });
             }
         }
+
+        version_ui.show(ctx, |ui| {
+            ui.small(crate::VERSION);
+        });
     }
 
     fn name(&self) -> &str {
