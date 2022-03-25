@@ -10,11 +10,28 @@ use crate::lobby::{LobbyOptions, SharedLobby};
 use crate::player::PlayerOptions;
 use crate::room::Room;
 use crate::spatula::Spatula;
+use crate::{LobbyId, PlayerId};
+
+#[derive(Error, Clone, Debug, Serialize, Deserialize)]
+pub enum ProtocolError {
+    #[error("Invalid Player ID {0:#X}")]
+    InvalidPlayerId(PlayerId),
+    #[error("Invalid Lobby ID {0:#X}")]
+    InvalidLobbyId(LobbyId),
+    #[error("Invalid Message")]
+    InvalidMessage,
+    // TODO: This probably shouldn't be an error
+    #[error("Player disconnected")]
+    Disconnected,
+    #[error("Client version '{0}' does not match server version '{1}'")]
+    VersionMismatch(String, String),
+}
 
 // TODO: Take more advantage of the type system (e.g. Client/Server messages)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Message {
     Version { version: String },
+    Error { error: ProtocolError },
     ConnectionAccept { player_id: u32 },
     PlayerOptions { options: PlayerOptions },
     GameHost,
@@ -35,7 +52,7 @@ pub enum Item {
 }
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum FrameError {
     #[error("Frame exceeded max length")]
     FrameLength,
     #[error("Full frame is not available yet.")]
@@ -48,13 +65,13 @@ pub enum Error {
     Bincode(bincode::Error),
 }
 
-impl From<std::io::Error> for Error {
+impl From<std::io::Error> for FrameError {
     fn from(e: std::io::Error) -> Self {
         Self::Io(e)
     }
 }
 
-impl From<bincode::Error> for Error {
+impl From<bincode::Error> for FrameError {
     fn from(e: bincode::Error) -> Self {
         Self::Bincode(e)
     }
@@ -89,7 +106,7 @@ impl Connection {
                     return Ok(None);
                 } else {
                     // Connection closed while still sending data
-                    return Err(Error::ConnectionReset.into());
+                    return Err(FrameError::ConnectionReset.into());
                 }
             }
         }
@@ -118,10 +135,10 @@ impl Connection {
         Ok(Some(message))
     }
 
-    pub async fn write_frame(&mut self, frame: Message) -> Result<(), Error> {
+    pub async fn write_frame(&mut self, frame: Message) -> Result<(), FrameError> {
         let mut bytes: Bytes = bincode::serialize(&frame)?.into();
         if bytes.len() > u16::MAX.into() {
-            return Err(Error::FrameLength);
+            return Err(FrameError::FrameLength);
         }
         let len = bytes.len() as u16;
         let len = len.to_be_bytes();
