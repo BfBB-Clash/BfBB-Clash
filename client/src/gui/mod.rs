@@ -13,7 +13,7 @@ use std::sync::mpsc::Receiver;
 
 use eframe::egui::{
     Align, Area, Button, CentralPanel, Checkbox, Color32, Context, FontData, FontDefinitions,
-    FontFamily, Layout, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
+    FontFamily, Label, Layout, RichText, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
 };
 use eframe::epaint::{FontId, Pos2};
 use eframe::epi::{App, Frame, Storage};
@@ -211,7 +211,9 @@ impl App for Clash {
         }
         TopBottomPanel::bottom("errors").show(ctx, |ui| {
             if let Some(e) = self.error_queue.get(0) {
-                ui.label(format!("Error!: {e}"));
+                ui.add(Label::new(
+                    RichText::new(format!("Error!: {e}")).color(Color32::DARK_RED),
+                ));
                 if ui.button("OK").clicked() {
                     self.error_queue.remove(0);
                 }
