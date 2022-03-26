@@ -54,13 +54,28 @@ fn main() {
     gui::run(gui_receiver, error_receiver, network_sender);
 }
 
+fn load_ip_address() -> String {
+    if let Ok(mut exe_path) = std::env::current_exe() {
+        exe_path.pop();
+        exe_path.push("ipaddress");
+        if let Ok(ip) = std::fs::read_to_string(exe_path) {
+            return ip;
+        }
+    }
+
+    "127.0.0.1:42932".into()
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn start_network(
     mut receiver: tokio::sync::mpsc::Receiver<Message>,
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
 ) {
-    let sock = TcpStream::connect("127.0.0.1:42932").await.unwrap();
+    let ip = load_ip_address();
+    info!("Connecting to server at '{ip}'");
+
+    let sock = TcpStream::connect(&ip).await.unwrap();
     let mut conn = Connection::new(sock);
     conn.write_frame(Message::Version {
         version: VERSION.to_owned(),
