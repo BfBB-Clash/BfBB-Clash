@@ -29,6 +29,9 @@ pub trait GameInterface {
     /// Will start a new game when called. Only works when the player is on the main menu and not in the demo cutscene.
     fn start_new_game(&self) -> InterfaceResult<()>;
 
+    /// Unlock the Bubble Bowl and Cruise Bubble
+    fn unlock_powers(&self) -> InterfaceResult<()>;
+
     /// Get the level that the player is currently in
     fn get_current_level(&self) -> InterfaceResult<Room>;
 

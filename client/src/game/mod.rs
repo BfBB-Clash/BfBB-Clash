@@ -85,6 +85,10 @@ fn update_from_network<T: GameInterface>(
                 let lobby = lobby
                     .as_mut()
                     .expect("Tried to begin game without being in a lobby");
+
+                if lobby.options.ng_plus {
+                    let _ = game.unlock_powers();
+                }
                 lobby.game_phase = GamePhase::Playing;
                 gui_sender
                     .send((*player_id, lobby.clone()))
