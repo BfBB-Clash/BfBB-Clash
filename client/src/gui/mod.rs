@@ -16,7 +16,7 @@ use eframe::egui::{
     FontFamily, Label, Layout, RichText, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
 };
 use eframe::epaint::{FontId, Pos2};
-use eframe::epi::{App, Frame, Storage};
+use eframe::epi::{App, Frame, IconData, Storage};
 use eframe::{run_native, NativeOptions};
 
 const BORDER: f32 = 32.;
@@ -374,9 +374,18 @@ pub fn run(
     error_receiver: Receiver<Box<dyn Error + Send>>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 ) {
+    let icon_bytes = include_bytes!("../../res/icon.ico");
+    let icon = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
+    let (width, height) = icon.dimensions();
+
     let window_options = NativeOptions {
         initial_window_size: Some((600., 742.).into()),
         resizable: false,
+        icon_data: Some(IconData {
+            rgba: icon.into_raw(),
+            width,
+            height,
+        }),
         ..Default::default()
     };
 

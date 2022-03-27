@@ -11,6 +11,7 @@ console = []
 [dependencies]
 clash = { path = ".." }
 eframe = "0.17"
+image = "0.24"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
 strum = "0.23"
 spin_sleep = "1"
@@ -28,3 +29,6 @@ sysinfo = "0.23" # For getting PID by name
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
