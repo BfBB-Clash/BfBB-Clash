@@ -62,14 +62,10 @@ impl Lobby {
 
         // Make sure the player isn't already in a different lobby
         // TODO: The lobby probably shouldn't be responsible for this
-        if players
-            .get(&player_id)
-            .ok_or(LobbyError::PlayerInvalid)?
-            .is_some()
-        {
+        if players.get(&player_id).is_some() {
             return Err(LobbyError::PlayerInvalid);
         }
-        players.insert(player_id, Some(self.shared.lobby_id));
+        players.insert(player_id, self.shared.lobby_id);
 
         // TODO: Unhardcode player color
         let mut player = SharedPlayer::new(PlayerOptions::default(), self.next_menu_order);

@@ -361,6 +361,12 @@ impl App for Clash {
                     } else {
                         ui.add(GameMenu::new(&self.lobby.game_state, &self.lobby.players));
                     }
+                    ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
+                        if ui.button("Leave").clicked() {
+                            let _ = self.network_sender.blocking_send(Message::GameLeave);
+                            self.state = Menu::Main;
+                        }
+                    })
                 });
             }
         }

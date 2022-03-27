@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::lobby::Lobby;
 
-pub type PlayerMap = HashMap<PlayerId, Option<LobbyId>>;
+pub type PlayerMap = HashMap<PlayerId, LobbyId>;
 pub type LobbyMap = HashMap<LobbyId, Lobby>;
 
 pub struct State {
@@ -23,7 +23,6 @@ impl State {
 
     pub fn add_player(&mut self) -> PlayerId {
         let player_id = self.gen_player_id();
-        self.players.insert(player_id, None);
         player_id
     }
 
@@ -37,11 +36,10 @@ impl State {
     }
 
     pub fn get_lobby(&mut self, player_id: PlayerId) -> anyhow::Result<&mut Lobby> {
-        let lobby_id = self
+        let lobby_id = *self
             .players
             .get(&player_id)
-            .ok_or(ProtocolError::InvalidPlayerId(player_id))?
-            .ok_or(ProtocolError::InvalidMessage)
+            .ok_or(ProtocolError::InvalidPlayerId(player_id))
             .context("Player not currently in a lobby")?;
 
         self.lobbies
