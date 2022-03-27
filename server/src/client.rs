@@ -40,7 +40,9 @@ impl Client {
         loop {
             select! {
                 m = async { self.lobby_recv.as_mut().unwrap().recv().await }, if self.lobby_recv.is_some() => {
-                    self.connection.write_frame(m.unwrap()).await.unwrap();
+                    if let Ok(m) = m {
+                        self.connection.write_frame(m).await.unwrap();
+                    }
                 }
                 incoming = self.connection.read_frame() => {
                     let incoming = match incoming {
@@ -108,23 +110,29 @@ impl Client {
             Message::GameHost => {
                 let state = &mut *self.state.write().unwrap();
                 if state.players.contains_key(&self.player_id) {
-                    let lobby_id = state.add_lobby();
-                    let lobby = state
-                        .lobbies
-                        .get_mut(&lobby_id)
-                        .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
-
-                    self.lobby_recv = Some(lobby.add_player(&mut state.players, self.player_id)?);
-
-                    log::info!(
-                        "Player {:#X} has hosted lobby {:#X}",
-                        self.player_id,
-                        lobby.shared.lobby_id
-                    );
+                    return Err(ProtocolError::InvalidMessage.into());
                 }
+
+                let lobby_id = state.add_lobby();
+                let lobby = state
+                    .lobbies
+                    .get_mut(&lobby_id)
+                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
+
+                self.lobby_recv = Some(lobby.add_player(&mut state.players, self.player_id)?);
+
+                log::info!(
+                    "Player {:#X} has hosted lobby {:#X}",
+                    self.player_id,
+                    lobby.shared.lobby_id
+                );
             }
             Message::GameJoin { lobby_id } => {
                 let state = &mut *self.state.write().unwrap();
+                if state.players.contains_key(&self.player_id) {
+                    return Err(ProtocolError::InvalidMessage.into());
+                }
+
                 let lobby = state
                     .lobbies
                     .get_mut(&lobby_id)
@@ -143,9 +151,10 @@ impl Client {
                 lobby.start_game();
             }
             Message::GameLeave => {
-                // Disconnect player
-                log::info!("Player {:#X} disconnecting.", self.player_id);
-                return Err(ProtocolError::Disconnected.into());
+                // Remove player from their lobby
+                let state = &mut *self.state.write().unwrap();
+
+                self.leave_lobby(state);
             }
             Message::PlayerOptions { mut options } => {
                 let state = &mut *self.state.write().unwrap();
@@ -236,18 +245,10 @@ impl Client {
         }
         Ok(())
     }
-}
 
-impl Drop for Client {
-    fn drop(&mut self) {
-        // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
-        // and that's fine for now.
-        let state = &mut *self.state.write().unwrap();
+    fn leave_lobby(&self, state: &mut State) {
         if let Entry::Occupied(e) = state.players.entry(self.player_id) {
-            let lobby_id = match e.remove() {
-                Some(it) => it,
-                None => return,
-            };
+            let lobby_id = e.remove();
 
             if let Entry::Occupied(mut lobby) = state.lobbies.entry(lobby_id) {
                 if lobby.get_mut().rem_player(self.player_id) == 0 {
@@ -257,5 +258,14 @@ impl Drop for Client {
                 }
             }
         }
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
+        // and that's fine for now.
+        let state = &mut *self.state.write().unwrap();
+        self.leave_lobby(state);
     }
 }
