@@ -70,12 +70,12 @@ impl DolphinInterface {
 
 const LOADING_ADDRESS: usize = 0x803CB7B0;
 const WHEREAMI_ADDRESS: usize = 0x803CB8A8;
+const POWERS_ADDRESS: usize = 0x803C0F17;
 const SCENE_PTR_ADDRESS: usize = 0x803C2518;
 const SPATULA_COUNT_ADDRESS: usize = 0x803C205C;
 const SWORLD_BASE: usize = 0x802F63C8;
 const LAB_DOOR_ADDRESS: usize = 0x804F6CB8;
 
-// TODO: Don't panic when dolphin isn't hooked
 // TODO: Cache DataMembers; they contain a Vec so it isn't the best idea to be making new ones
 //       every time we interact with the game.
 impl GameInterface for DolphinInterface {
@@ -95,6 +95,16 @@ impl GameInterface for DolphinInterface {
             vec![WHEREAMI_ADDRESS],
         );
         ptr.write(&12u32.to_be())?;
+        Ok(())
+    }
+
+    fn unlock_powers(&self) -> InterfaceResult<()> {
+        let ptr = DataMember::<[u8; 2]>::new_offset(
+            self.handle.ok_or(InterfaceError::Unhooked)?,
+            self.base_address.ok_or(InterfaceError::Unhooked)?,
+            vec![POWERS_ADDRESS],
+        );
+        ptr.write(&[1, 1])?;
         Ok(())
     }
 
