@@ -15,7 +15,7 @@ use eframe::egui::{
     Align, Area, Button, CentralPanel, Checkbox, Color32, Context, FontData, FontDefinitions,
     FontFamily, Label, Layout, RichText, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
 };
-use eframe::epaint::{FontId, Pos2};
+use eframe::epaint::{ColorImage, FontId, Pos2, TextureHandle};
 use eframe::epi::{App, Frame, IconData, Storage};
 use eframe::{run_native, NativeOptions};
 
@@ -36,6 +36,8 @@ pub struct Clash {
 
     state: Menu,
     name_buf: String,
+
+    logo: Option<TextureHandle>,
 
     lobby_id_buf: String,
     lobby_id: Option<u32>,
@@ -59,6 +61,7 @@ impl Clash {
             gui_receiver,
             network_sender,
             error_receiver,
+            logo: None,
             state: Menu::Main,
             name_buf: Default::default(),
             lobby_id_buf: Default::default(),
@@ -224,11 +227,14 @@ impl App for Clash {
             Menu::Main => {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                        ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                            ui.add_space(BORDER);
-                            ui.label("Battle for Bikini Bottom");
-                            ui.heading("CLASH!");
+                        let texture: &TextureHandle = self.logo.get_or_insert_with(|| {
+                            ctx.load_texture(
+                                "logo",
+                                load_image_from_memory(include_bytes!("../../res/logo.png"))
+                                    .unwrap(),
+                            )
                         });
+                        ui.image(texture, texture.size_vec2() / 3.);
                     });
                     ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
                         ui.add_space(BORDER);
@@ -393,4 +399,12 @@ pub fn run(
         Box::new(Clash::new(gui_receiver, error_receiver, network_sender)),
         window_options,
     );
+}
+
+fn load_image_from_memory(image_data: &[u8]) -> Result<ColorImage, image::ImageError> {
+    let image = image::load_from_memory(image_data)?;
+    let size = [image.width() as _, image.height() as _];
+    let image_buffer = image.to_rgba8();
+    let pixels = image_buffer.as_flat_samples();
+    Ok(ColorImage::from_rgba_unmultiplied(size, pixels.as_slice()))
 }
