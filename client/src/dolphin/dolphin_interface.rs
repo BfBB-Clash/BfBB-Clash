@@ -1,6 +1,6 @@
 use clash::{room::Room, spatula::Spatula};
 use log::{debug, error, trace};
-use process_memory::{Memory, ProcessHandle, TryIntoProcessHandle};
+use process_memory::{Memory, ProcessHandle, TryIntoProcessHandle, Architecture};
 use sysinfo::{PidExt, ProcessExt, System, SystemExt};
 use thiserror::Error;
 
@@ -12,7 +12,7 @@ const REGION_SIZE: usize = 0x2000000;
 
 // This is a little odd because processes_by_name is case-sensitive
 #[cfg(unix)]
-const PROCESS_NAME: &str = "dolphin";
+const PROCESS_NAME: &str = "dolphin-emu";
 #[cfg(windows)]
 const PROCESS_NAME: &str = "Dolphin";
 
@@ -60,7 +60,15 @@ impl DolphinInterface {
         if let Some(addr) = addr {
             debug!("Found emulated memory region at {addr:#X}");
             self.base_address = Some(addr);
-            self.handle = Some(pid.try_into_process_handle()?);
+            #[cfg(target_os = "windows")]
+            {
+                self.handle = Some(pid.try_into_process_handle()?);
+            }
+            #[cfg(target_os = "linux")]
+            {
+                //TODO: Detect architecture.
+                self.handle = Some((pid as i32, Architecture::from_native()));
+            }
             return Ok(());
         }
 
@@ -109,10 +117,9 @@ impl GameInterface for DolphinInterface {
     }
 
     fn get_current_level(&self) -> InterfaceResult<Room> {
-        let base = self.base_address.ok_or(InterfaceError::Unhooked)?;
         let ptr = DataMember::<[u8; 4]>::new_offset(
             self.handle.ok_or(InterfaceError::Unhooked)?,
-            base,
+            self.base_address.ok_or(InterfaceError::Unhooked)?,
             vec![SCENE_PTR_ADDRESS, 0],
         );
 
@@ -262,7 +269,7 @@ fn get_emulated_base_address(pid: u32) -> Option<usize> {
         Ok(maps) => maps,
     };
 
-    let map = maps.iter().find(|m| {
+    let map = maps.iter().rev().find(|m| {
         m.size() == REGION_SIZE
             && m.filename()
                 .and_then(|f| Some(f.to_string_lossy().contains("dolphin-emu")))

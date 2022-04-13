@@ -155,8 +155,7 @@ impl App for Clash {
         let mut font_def = FontDefinitions::default();
         font_def.font_data.insert(
             "spongebob".into(),
-            // TODO: include_bytes is platform specific, this will not compile on linux.
-            FontData::from_static(include_bytes!("..\\..\\fonts\\Some.Time.Later.otf")),
+            FontData::from_static(include_bytes!("../../fonts/Some.Time.Later.otf")),
         );
         font_def
             .families
