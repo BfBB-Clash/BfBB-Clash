@@ -1,3 +1,4 @@
+#[cfg(windows)]
 use winres::WindowsResource;
 
 fn main() -> std::io::Result<()> {
