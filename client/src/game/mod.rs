@@ -4,11 +4,7 @@ mod game_state;
 use bfbb::game_interface::{
     dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult,
 };
-use clash::{
-    lobby::{GamePhase, NetworkedLobby},
-    net::Message,
-    PlayerId,
-};
+use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
 use log::error;
 use spin_sleep::LoopHelper;
 use std::sync::mpsc::{Receiver, Sender};
@@ -89,7 +85,6 @@ fn update_from_network<T: GameInterface>(
                 if lobby.options.ng_plus {
                     let _ = game.unlock_powers();
                 }
-                lobby.game_phase = GamePhase::Playing;
                 gui_sender
                     .send((*player_id, lobby.clone()))
                     .expect("GUI has crashed and so will we");

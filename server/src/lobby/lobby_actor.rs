@@ -118,6 +118,13 @@ impl LobbyActor {
         log::info!("Closing lobby {:#X}", self.shared.lobby_id);
     }
 
+    fn reset_game(&mut self) {
+        self.shared.game_state.reset_state();
+        for (_, player) in self.shared.players.iter_mut() {
+            player.score = 0;
+        }
+    }
+
     fn start_game(&mut self, player_id: PlayerId) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
@@ -132,7 +139,11 @@ impl LobbyActor {
             return Ok(());
         }
 
+        self.reset_game();
         self.shared.game_phase = GamePhase::Playing;
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
         if self.sender.send(Message::GameBegin).is_err() {
             log::warn!(
                 "Lobby {:#X} started with no players in lobby.",
@@ -141,6 +152,19 @@ impl LobbyActor {
         }
 
         Ok(())
+    }
+
+    fn stop_game(&mut self) {
+        self.shared.game_phase = GamePhase::Setup;
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
+        if self.sender.send(Message::GameEnd).is_err() {
+            log::warn!(
+                "Lobby {:#X} started with no players in lobby.",
+                self.shared.lobby_id
+            )
+        }
     }
 
     /// Adds a new player to this lobby. If there is currently no host, they will become it.
@@ -261,7 +285,7 @@ impl LobbyActor {
                     log::info!("Player {:#X} collected {spat:?}", player_id);
 
                     if spat == Spatula::TheSmallShallRuleOrNot {
-                        self.shared.game_phase = GamePhase::Finished;
+                        self.stop_game();
                     }
 
                     let message = Message::GameLobbyInfo {

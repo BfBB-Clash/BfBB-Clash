@@ -73,13 +73,17 @@ impl App for Game {
                 }
             });
         CentralPanel::default().show(ctx, |ui| {
-            if self.lobby.game_phase == GamePhase::Setup {
-                self.paint_options(ui);
-                if ui.button("Copy Lobby ID").clicked() {
-                    ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+            match self.lobby.game_phase {
+                GamePhase::Setup => {
+                    self.paint_options(ui);
+                    if ui.button("Copy Lobby ID").clicked() {
+                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                    }
                 }
-            } else {
-                ui.add(Tracker::new(&self.lobby.game_state, &self.lobby.players));
+                GamePhase::Playing => {
+                    ui.add(Tracker::new(&self.lobby.game_state, &self.lobby.players));
+                }
+                GamePhase::Finished => todo!(),
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {
