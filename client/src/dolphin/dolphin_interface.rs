@@ -1,7 +1,7 @@
 use clash::{room::Room, spatula::Spatula};
 use log::{debug, error, trace};
-use process_memory::{Memory, ProcessHandle, TryIntoProcessHandle, Architecture};
-use sysinfo::{PidExt, ProcessExt, System, SystemExt};
+use process_memory::{Memory, ProcessHandle, TryIntoProcessHandle};
+use sysinfo::{ProcessExt, System, SystemExt};
 use thiserror::Error;
 
 use crate::game::{GameInterface, InterfaceError, InterfaceResult};
@@ -10,7 +10,6 @@ use super::DataMember;
 
 const REGION_SIZE: usize = 0x2000000;
 
-// This is a little odd because processes_by_name is case-sensitive
 #[cfg(unix)]
 const PROCESS_NAME: &str = "dolphin-emu";
 #[cfg(windows)]
@@ -47,28 +46,27 @@ impl DolphinInterface {
         self.system.refresh_processes();
 
         let procs = self.system.processes_by_name(PROCESS_NAME);
-        let (pid, addr) = procs
+        if let Some((pid, addr)) = procs
             .into_iter()
             .map(|p| {
-                let pid = p.pid().as_u32();
+                let pid = p.pid();
                 trace!("{} found with pid {pid}", p.name());
                 (pid, get_emulated_base_address(pid))
             })
-            .find(|(_, addr)| addr.is_some())
-            .unwrap_or((0, None));
-
-        if let Some(addr) = addr {
+            .find_map(|(pid, addr)| addr.map(|addr| (pid, addr)))
+        {
             debug!("Found emulated memory region at {addr:#X}");
             self.base_address = Some(addr);
+
+            // Convert sysinfo Pid (wrapper type) to process_memory Pid (platform specific alias)
             #[cfg(target_os = "windows")]
-            {
-                self.handle = Some(pid.try_into_process_handle()?);
-            }
-            #[cfg(target_os = "linux")]
-            {
-                //TODO: Detect architecture.
-                self.handle = Some((pid as i32, Architecture::from_native()));
-            }
+            // Work around for sysinfo crate using usize on windows for Pids
+            let pid = <sysinfo::Pid as Into<usize>>::into(pid) as u32;
+
+            #[allow(clippy::useless_conversion)]
+            // This isn't uselss on *nix
+            let pid: process_memory::Pid = pid.into();
+            self.handle = Some(pid.try_into_process_handle()?);
             return Ok(());
         }
 
@@ -259,9 +257,9 @@ impl GameInterface for DolphinInterface {
 }
 
 #[cfg(target_os = "linux")]
-fn get_emulated_base_address(pid: u32) -> Option<usize> {
+fn get_emulated_base_address(pid: sysinfo::Pid) -> Option<usize> {
     use proc_maps::get_process_maps;
-    let maps = match get_process_maps(pid as proc_maps::Pid) {
+    let maps = match get_process_maps(pid.into()) {
         Err(e) => {
             error!("Could not get dolphin process maps\n{e:?}");
             return None;
@@ -269,6 +267,8 @@ fn get_emulated_base_address(pid: u32) -> Option<usize> {
         Ok(maps) => maps,
     };
 
+    // Multiple maps exist that fit our criteria who only differ by address.
+    // Perhaps by chance, the last match appears to always have the correct address.
     let map = maps.iter().rev().find(|m| {
         m.size() == REGION_SIZE
             && m.filename()
@@ -279,7 +279,7 @@ fn get_emulated_base_address(pid: u32) -> Option<usize> {
 }
 
 #[cfg(target_os = "windows")]
-fn get_emulated_base_address(pid: u32) -> Option<usize> {
+fn get_emulated_base_address(pid: sysinfo::Pid) -> Option<usize> {
     use winapi::um::handleapi::CloseHandle;
     use winapi::um::memoryapi::VirtualQueryEx;
     use winapi::um::processthreadsapi::OpenProcess;
@@ -293,7 +293,7 @@ fn get_emulated_base_address(pid: u32) -> Option<usize> {
         let handle = OpenProcess(
             PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE,
             0,
-            pid,
+            <sysinfo::Pid as Into<usize>>::into(pid) as u32,
         );
         if handle.is_null() {
             // TODO use GetLastError for error feedback
