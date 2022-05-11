@@ -40,7 +40,7 @@ pub trait GameInterface {
 
     /// Sets the player's total spatula count to `value`
     fn set_spatula_count(&self, value: u32) -> InterfaceResult<()>;
-    
+
     /// Marks a spatula as "completed" in the pause menu. This has the effect of giving the player access to the task warp.
     fn mark_task_complete(&self, spatula: Spatula) -> InterfaceResult<()>;
 
