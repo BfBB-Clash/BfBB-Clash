@@ -3,13 +3,17 @@ name = "client"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.release]
+consolidate-commits = true
+publish = false
+shared-version = true
+tag = false
+
 [features]
 console = []
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-clash = { path = ".." }
+clash = { path = "../clash" }
 eframe = "0.17"
 image = "0.24"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
