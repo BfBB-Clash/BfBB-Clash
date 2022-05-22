@@ -32,3 +32,4 @@ jobs:
           files: |
             target/release/client*
             target/release/server*
+          prerelease: startsWith(github.ref_name, 'v0')
