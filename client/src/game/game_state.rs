@@ -60,7 +60,6 @@ impl GameMode for ClashGame {
         // Check for newly collected spatulas
         for spat in Spatula::iter() {
             // Skip already collected spatulas
-
             if local_spat_state.contains(&spat) {
                 interface.mark_task_complete(spat)?;
                 interface.collect_spatula(spat, local_player.current_level)?;
@@ -72,30 +71,12 @@ impl GameMode for ClashGame {
                     interface.mark_task_complete(spat)?;
                 }
                 if spat_ref.tier == SpatulaTier::None {
-                    if local_player.current_level == Some(spat.get_level()) {
-                        // Sync collected spatulas
-                        interface.collect_spatula(spat, local_player.current_level)?;
-                    }
+                    // Sync collected spatulas
+                    interface.collect_spatula(spat, local_player.current_level)?;
                     continue;
                 }
             }
-            /*
-            // Check menu for any potentially missed collection events
-            if game.is_task_complete(spat)? && !hack {
-                local_spat_state.insert(spat);
-                network_sender
-                    .blocking_send(Message::GameItemCollected {
-                        item: Item::Spatula(spat),
-                    })
-                    .unwrap();
-                info!("Collected (from menu) {spat:?}");
-            }
-            */
-
-            // Skip spatulas that aren't in the current room
-            if local_player.current_level != Some(spat.get_level()) {
-                continue;
-            }
+            // TODO: Is there a way to detect missed collections now?
 
             // Detect spatula collection events
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {
