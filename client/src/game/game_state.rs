@@ -60,8 +60,13 @@ impl GameMode for ClashGame {
         // Check for newly collected spatulas
         for spat in Spatula::iter() {
             // Skip already collected spatulas
+
+            if local_spat_state.contains(&spat) {
+                continue;
+            }
+
             if let Some(spat_ref) = lobby.game_state.spatulas.get_mut(&spat) {
-                if (spat_ref.tier == SpatulaTier::None) || local_spat_state.contains(&spat) {
+                if spat_ref.tier == SpatulaTier::None {
                     if local_player.current_level == Some(spat.get_level()) {
                         // Sync collected spatulas
                         interface.collect_spatula(spat, local_player.current_level)?;
