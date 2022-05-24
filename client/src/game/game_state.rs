@@ -62,11 +62,14 @@ impl GameMode for ClashGame {
             // Skip already collected spatulas
 
             if local_spat_state.contains(&spat) {
-                interface.collect_spatula(spat)?;
+                interface.collect_spatula(spat, local_player.current_level)?;
                 continue;
             }
 
             if let Some(spat_ref) = lobby.game_state.spatulas.get_mut(&spat) {
+                if spat_ref.tier != SpatulaTier::Golden {
+                    interface.mark_task_complete(spat)?;
+                }
                 if spat_ref.tier == SpatulaTier::None {
                     if local_player.current_level == Some(spat.get_level()) {
                         // Sync collected spatulas
@@ -74,13 +77,10 @@ impl GameMode for ClashGame {
                     }
                     continue;
                 }
-                if spat_ref.tier != SpatulaTier::Golden {
-                    interface.mark_task_complete(spat)?;
-                }
             }
-
+            /*
             // Check menu for any potentially missed collection events
-            if interface.is_task_complete(spat)? {
+            if game.is_task_complete(spat)? && !hack {
                 local_spat_state.insert(spat);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
@@ -88,6 +88,12 @@ impl GameMode for ClashGame {
                     })
                     .unwrap();
                 info!("Collected (from menu) {spat:?}");
+            }
+            */
+
+            // Skip spatulas that aren't in the current room
+            if local_player.current_level != Some(spat.get_level()) {
+                continue;
             }
 
             // Detect spatula collection events
