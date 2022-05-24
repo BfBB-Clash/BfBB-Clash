@@ -62,19 +62,20 @@ impl GameMode for ClashGame {
             // Skip already collected spatulas
 
             if local_spat_state.contains(&spat) {
+                interface.collect_spatula(spat)?;
                 continue;
             }
 
             if let Some(spat_ref) = lobby.game_state.spatulas.get_mut(&spat) {
-                if spat_ref.tier == SpatulaTier::None
-                    && local_player.current_level == Some(spat.get_level())
-                {
-                    // Sync collected spatulas
-                    interface.collect_spatula(spat, local_player.current_level)?;
+                if spat_ref.tier == SpatulaTier::None {
+                    if local_player.current_level == Some(spat.get_level()) {
+                        // Sync collected spatulas
+                        interface.collect_spatula(spat, local_player.current_level)?;
+                    }
+                    continue;
                 }
                 if spat_ref.tier != SpatulaTier::Golden {
                     interface.mark_task_complete(spat)?;
-                    continue;
                 }
             }
 
