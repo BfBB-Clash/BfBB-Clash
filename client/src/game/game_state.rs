@@ -62,6 +62,7 @@ impl GameMode for ClashGame {
             // Skip already collected spatulas
 
             if local_spat_state.contains(&spat) {
+                interface.mark_task_complete(spat)?;
                 interface.collect_spatula(spat, local_player.current_level)?;
                 continue;
             }
