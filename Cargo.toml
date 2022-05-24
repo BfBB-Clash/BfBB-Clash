@@ -34,3 +34,5 @@ thiserror = "1"
 anyhow = "1"
 
 log = "0.4"
+strum = "0.24.1"
+strum_macros = "0.24.1"

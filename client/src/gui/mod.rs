@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ops::Index;
 use std::sync::mpsc::Receiver;
 
 use ::clash::lobby::NetworkedLobby;

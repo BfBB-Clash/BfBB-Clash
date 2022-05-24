@@ -1,13 +1,17 @@
 mod game_mode;
 mod game_state;
 
-use bfbb::game_interface::{
-    dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult,
+use bfbb::{
+    game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult},
+    EnumCount, Spatula,
 };
 use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
 use log::error;
 use spin_sleep::LoopHelper;
-use std::sync::mpsc::{Receiver, Sender};
+use std::{
+    collections::HashSet,
+    sync::mpsc::{Receiver, Sender},
+};
 
 use self::{game_mode::GameMode, game_state::ClashGame};
 
@@ -26,6 +30,10 @@ pub fn start_game(
     let mut game = ClashGame;
     let mut player_id = 0;
     let mut lobby = None;
+    // Not sure if this is the best approach, the idea is that it would be faster
+    // to store a local state of what we as a client have collected rather
+    // than searching to see if we've collected it.
+    let mut local_spat_state = HashSet::<Spatula>::with_capacity(Spatula::COUNT);
 
     loop {
         loop_helper.loop_start();
@@ -43,9 +51,13 @@ pub fn start_game(
         .unwrap();
 
         if let Some(lobby) = lobby.as_mut() {
-            if let Err(InterfaceError::Unhooked) =
-                game.update(&interface, lobby, player_id, &mut network_sender)
-            {
+            if let Err(InterfaceError::Unhooked) = game.update(
+                &interface,
+                lobby,
+                player_id,
+                &mut network_sender,
+                &mut local_spat_state,
+            ) {
                 // We lost dolphin
                 if let Some(local_player) = lobby.players.get_mut(&player_id) {
                     if local_player.current_level != None {
