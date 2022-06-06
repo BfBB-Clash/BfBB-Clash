@@ -1,8 +1,8 @@
 use crate::state::State;
 use anyhow::Context;
+use bfbb::Spatula;
 use clash::lobby::GamePhase;
 use clash::protocol::{self, Connection, Item, Message, ProtocolError};
-use clash::spatula::Spatula;
 use clash::PlayerId;
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
@@ -191,7 +191,7 @@ impl Client {
                 };
                 let _ = lobby.sender.send(message);
             }
-            Message::GameCurrentRoom { room } => {
+            Message::GameCurrentLevel { level } => {
                 let state = &mut *self.state.write().unwrap();
                 let lobby = state.get_lobby(self.player_id)?;
 
@@ -202,8 +202,8 @@ impl Client {
                     .ok_or(ProtocolError::InvalidPlayerId(self.player_id))
                     .context("Player not found in lobby specified by the playerlist")?;
 
-                player.current_room = room;
-                log::info!("Player {:#X} entered {room:?}", self.player_id);
+                player.current_level = level;
+                log::info!("Player {:#X} entered {level:?}", self.player_id);
 
                 let message = Message::GameLobbyInfo {
                     lobby: lobby.shared.clone(),

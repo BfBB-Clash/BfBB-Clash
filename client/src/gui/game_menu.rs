@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use clash::{game_state::GameState, player::SharedPlayer, spatula::Spatula, PlayerId};
+use bfbb::{IntoEnumIterator, Spatula};
+use clash::{game_state::GameState, player::SharedPlayer, PlayerId};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
 };
-use strum::IntoEnumIterator;
 
 pub struct GameMenu<'a> {
     game: &'a GameState,

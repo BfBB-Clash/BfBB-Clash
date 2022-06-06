@@ -8,9 +8,8 @@ use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
 use crate::lobby::{LobbyOptions, SharedLobby};
 use crate::player::PlayerOptions;
-use crate::room::Room;
-use crate::spatula::Spatula;
 use crate::{LobbyId, PlayerId};
+use bfbb::{Level, Spatula};
 
 #[derive(Error, Clone, Debug, Serialize, Deserialize)]
 pub enum ProtocolError {
@@ -39,8 +38,8 @@ pub enum Message {
     GameOptions { options: LobbyOptions },
     GameLobbyInfo { lobby: SharedLobby },
     GameBegin,
-    GameCurrentRoom { room: Option<Room> },
-    GameForceWarp { room: Room },
+    GameCurrentLevel { level: Option<Level> },
+    GameForceWarp { level: Level },
     GameItemCollected { item: Item },
     GameEnd,
     GameLeave,

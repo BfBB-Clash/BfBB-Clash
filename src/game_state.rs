@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use strum::EnumCount;
 
-use crate::{spatula::Spatula, PlayerId};
+use crate::PlayerId;
+use bfbb::{EnumCount, Spatula};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {

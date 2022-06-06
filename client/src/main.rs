@@ -12,7 +12,6 @@ use clash::protocol::{Connection, Message, ProtocolError};
 use log::{debug, error, info};
 use tokio::{net::TcpStream, select};
 
-mod dolphin;
 mod game;
 mod gui;
 
@@ -144,8 +143,8 @@ async fn process_incoming(
         m @ Message::GameBegin => {
             logic_sender.send(m).unwrap();
         }
-        Message::GameCurrentRoom { room: _ } => todo!(),
-        Message::GameForceWarp { room: _ } => todo!(),
+        Message::GameCurrentLevel { level: _ } => todo!(),
+        Message::GameForceWarp { level: _ } => todo!(),
         Message::GameItemCollected { item: _ } => todo!(),
         Message::GameEnd => todo!(),
         Message::GameLeave => todo!(),

@@ -9,11 +9,11 @@ console = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bfbb = { git = "https://github.com/BfBBModdingTools/bfbb", branch = "main", features = ["game-interface"]}
 clash = { path = ".." }
 eframe = "0.17"
 image = "0.24"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
-strum = "0.23"
 spin_sleep = "1"
 
 thiserror = "1"

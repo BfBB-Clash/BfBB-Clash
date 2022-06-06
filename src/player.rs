@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::room::Room;
+use bfbb::Level;
 
 pub const COLORS: [(u8, u8, u8); 6] = [
     (195, 247, 58),
@@ -21,7 +21,7 @@ pub struct PlayerOptions {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SharedPlayer {
     pub options: PlayerOptions,
-    pub current_room: Option<Room>,
+    pub current_level: Option<Level>,
     pub score: u8,
     pub menu_order: u8,
 }
@@ -30,7 +30,7 @@ impl SharedPlayer {
     pub fn new(options: PlayerOptions, menu_order: u8) -> Self {
         Self {
             options,
-            current_room: None,
+            current_level: None,
             score: 0,
             menu_order,
         }
