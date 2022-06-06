@@ -1,10 +1,10 @@
-mod game_interface;
 mod game_state;
 
 pub use self::game_state::GameStateExt;
-pub use game_interface::{GameInterface, InterfaceError, InterfaceResult};
 
-use crate::dolphin::DolphinInterface;
+use bfbb::game_interface::{
+    dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult,
+};
 use clash::{
     lobby::{GamePhase, SharedLobby},
     protocol::Message,
@@ -51,10 +51,10 @@ pub fn start_game(
                 // We lost dolphin
                 || -> Option<()> {
                     let local_player = lobby.players.get_mut(&player_id)?;
-                    if local_player.current_room != None {
-                        local_player.current_room = None;
+                    if local_player.current_level != None {
+                        local_player.current_level = None;
                         network_sender
-                            .blocking_send(Message::GameCurrentRoom { room: None })
+                            .blocking_send(Message::GameCurrentLevel { level: None })
                             .unwrap();
                     }
                     Some(())
@@ -105,7 +105,7 @@ fn update_from_network<T: GameInterface>(
                     .send((*player_id, new_lobby))
                     .expect("GUI has crashed and so will we");
             }
-            Message::GameForceWarp { room: _ } => todo!(),
+            Message::GameForceWarp { level: _ } => todo!(),
             Message::GameEnd => todo!(),
             Message::GameLeave => todo!(),
 

@@ -1,4 +1,5 @@
-use clash::{player::SharedPlayer, room::Room};
+use bfbb::Level;
+use clash::player::SharedPlayer;
 use eframe::egui::{Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
 pub struct PlayerUi<'a> {
@@ -31,7 +32,7 @@ impl<'a> Widget for PlayerUi<'a> {
         );
         let room_galley = ui.painter().layout_no_wrap(
             player
-                .current_room
+                .current_level
                 .map(|r| r.to_string())
                 .unwrap_or_else(|| "? ? ?".to_string()),
             TextStyle::Small.resolve(ui.style()),
@@ -45,7 +46,7 @@ impl<'a> Widget for PlayerUi<'a> {
         let longest_width = ui
             .painter()
             .layout_no_wrap(
-                Room::MermalairVillianContainment.to_string(),
+                Level::MermalairVillianContainment.to_string(),
                 TextStyle::Small.resolve(ui.style()),
                 color,
             )
