@@ -195,7 +195,8 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "bfbb"
 version = "0.1.0"
-source = "git+https://github.com/BfBBModdingTools/bfbb?branch=main#403278797f9749b511a71f814d65fcdf75878c04"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd04b668b99a87b818c3e147a7f70d17639e78473e213c1ce708f0e0e0ac3531"
 dependencies = [
  "log",
  "proc-maps",
