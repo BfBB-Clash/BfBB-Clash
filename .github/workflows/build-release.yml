@@ -1,9 +1,12 @@
 on:
   push:
-    branches:
-      - cargo-release
+    branch:
+      - main
     tags:
-      - 'v*.*.*'
+      - v*.*.*
+
+name: Create Release
+
 jobs:
   release-matrix:
     strategy:
@@ -12,6 +15,7 @@ jobs:
 
     name: Build - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    if: ${{ github.ref_type == 'tag' && github.event.base_ref=='refs/heads/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
