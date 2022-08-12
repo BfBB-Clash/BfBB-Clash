@@ -141,7 +141,7 @@ impl Connection {
         }
         let len = bytes.len() as u16;
         let len = len.to_be_bytes();
-        self.write_stream.write(&len).await?;
+        self.write_stream.write_all(&len).await?;
         self.write_stream.write_buf(&mut bytes).await?;
         self.write_stream.flush().await?;
         Ok(())
