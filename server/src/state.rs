@@ -22,8 +22,7 @@ impl State {
     }
 
     pub fn add_player(&mut self) -> PlayerId {
-        let player_id = self.gen_player_id();
-        player_id
+        self.gen_player_id()
     }
 
     pub fn add_lobby(&mut self) -> LobbyId {
