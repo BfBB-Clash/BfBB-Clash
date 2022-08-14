@@ -9,18 +9,19 @@ console = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bfbb = { version = "0.1.0", features = ["game-interface"]}
 clash = { path = ".." }
-eframe = "0.17"
-image = "0.24"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
-spin_sleep = "1"
+bfbb = { version = "0.1", features = ["game-interface"]}
 
 thiserror = "1"
 anyhow = "1"
 
 log = "0.4"
 env_logger = "0.9"
+
+eframe = "0.17"
+image = "0.24"
+spin_sleep = "1"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
 
 #Memory Shenanigans
 process-memory = "0.4" # For reading external process memory
