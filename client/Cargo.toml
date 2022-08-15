@@ -18,7 +18,7 @@ anyhow = "1"
 log = "0.4"
 env_logger = "0.9"
 
-eframe = "0.17"
+eframe = "0.18"
 image = "0.24"
 spin_sleep = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
