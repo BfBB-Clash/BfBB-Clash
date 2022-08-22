@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{game_state::GameState, player::SharedPlayer, LobbyId, PlayerId};
+use crate::{game_state::GameState, player::NetworkedPlayer, LobbyId, PlayerId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -26,16 +26,16 @@ pub enum GamePhase {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct SharedLobby {
+pub struct NetworkedLobby {
     pub game_state: GameState,
     pub lobby_id: LobbyId,
     pub options: LobbyOptions,
-    pub players: HashMap<PlayerId, SharedPlayer>,
+    pub players: HashMap<PlayerId, NetworkedPlayer>,
     pub game_phase: GamePhase,
     pub host_id: Option<PlayerId>,
 }
 
-impl SharedLobby {
+impl NetworkedLobby {
     pub fn new(lobby_id: u32, options: LobbyOptions) -> Self {
         Self {
             game_state: GameState::default(),

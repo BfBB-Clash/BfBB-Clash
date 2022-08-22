@@ -4,7 +4,7 @@ mod player_widget;
 use crate::game::GameStateExt;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
-use clash::lobby::{GamePhase, LobbyOptions, SharedLobby};
+use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash::player::PlayerOptions;
 use clash::protocol::Message;
 use clash::PlayerId;
@@ -30,7 +30,7 @@ pub enum Menu {
 }
 
 pub struct Clash {
-    gui_receiver: Receiver<(PlayerId, SharedLobby)>,
+    gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
     error_receiver: Receiver<Box<dyn Error + Send>>,
 
@@ -46,14 +46,14 @@ pub struct Clash {
     lab_door_num: Option<u8>,
 
     player_id: PlayerId,
-    lobby: SharedLobby,
+    lobby: NetworkedLobby,
 
     error_queue: Vec<Box<dyn Error>>,
 }
 
 impl Clash {
     fn new(
-        gui_receiver: Receiver<(PlayerId, SharedLobby)>,
+        gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
         error_receiver: Receiver<Box<dyn Error + Send>>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
@@ -69,7 +69,7 @@ impl Clash {
             lab_door_buf: Default::default(),
             lab_door_num: None,
             player_id: 0,
-            lobby: SharedLobby::new(0, LobbyOptions::default()),
+            lobby: NetworkedLobby::new(0, LobbyOptions::default()),
             error_queue: Vec::new(),
         }
     }
@@ -381,7 +381,7 @@ impl App for Clash {
 }
 
 pub fn run(
-    gui_receiver: Receiver<(PlayerId, SharedLobby)>,
+    gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
     error_receiver: Receiver<Box<dyn Error + Send>>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
 ) {

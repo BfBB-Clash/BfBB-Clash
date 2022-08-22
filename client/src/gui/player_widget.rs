@@ -1,13 +1,13 @@
 use bfbb::Level;
-use clash::player::SharedPlayer;
+use clash::player::NetworkedPlayer;
 use eframe::egui::{Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
 pub struct PlayerUi<'a> {
-    player: &'a SharedPlayer,
+    player: &'a NetworkedPlayer,
 }
 
 impl<'a> PlayerUi<'a> {
-    pub fn new(player: &'a SharedPlayer) -> Self {
+    pub fn new(player: &'a NetworkedPlayer) -> Self {
         Self { player }
     }
 }

@@ -6,7 +6,7 @@ use thiserror::Error;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
-use crate::lobby::{LobbyOptions, SharedLobby};
+use crate::lobby::{LobbyOptions, NetworkedLobby};
 use crate::player::PlayerOptions;
 use crate::{LobbyId, PlayerId};
 use bfbb::{Level, Spatula};
@@ -36,7 +36,7 @@ pub enum Message {
     GameHost,
     GameJoin { lobby_id: u32 },
     GameOptions { options: LobbyOptions },
-    GameLobbyInfo { lobby: SharedLobby },
+    GameLobbyInfo { lobby: NetworkedLobby },
     GameBegin,
     GameCurrentLevel { level: Option<Level> },
     GameForceWarp { level: Level },

@@ -6,7 +6,7 @@ use bfbb::game_interface::{
     dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult,
 };
 use clash::{
-    lobby::{GamePhase, SharedLobby},
+    lobby::{GamePhase, NetworkedLobby},
     protocol::Message,
     PlayerId,
 };
@@ -15,7 +15,7 @@ use spin_sleep::LoopHelper;
 use std::sync::mpsc::{Receiver, Sender};
 
 pub fn start_game(
-    mut gui_sender: Sender<(PlayerId, SharedLobby)>,
+    mut gui_sender: Sender<(PlayerId, NetworkedLobby)>,
     mut network_sender: tokio::sync::mpsc::Sender<Message>,
     mut logic_receiver: Receiver<Message>,
 ) {
@@ -71,9 +71,9 @@ pub fn start_game(
 fn update_from_network<T: GameInterface>(
     game: &T,
     player_id: &mut PlayerId,
-    lobby: &mut Option<SharedLobby>,
+    lobby: &mut Option<NetworkedLobby>,
     logic_receiver: &mut Receiver<Message>,
-    gui_sender: &mut Sender<(PlayerId, SharedLobby)>,
+    gui_sender: &mut Sender<(PlayerId, NetworkedLobby)>,
 ) -> Result<(), InterfaceError> {
     while let Ok(m) = logic_receiver.try_recv() {
         match m {

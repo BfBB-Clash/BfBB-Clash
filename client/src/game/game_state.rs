@@ -1,6 +1,6 @@
 use crate::game::{GameInterface, InterfaceResult};
 use bfbb::{IntoEnumIterator, Level, Spatula};
-use clash::lobby::{GamePhase, SharedLobby};
+use clash::lobby::{GamePhase, NetworkedLobby};
 use clash::protocol::{Item, Message};
 use clash::PlayerId;
 use log::info;
@@ -18,7 +18,7 @@ pub trait GameStateExt {
     fn can_start(&self) -> bool;
 }
 
-impl GameStateExt for SharedLobby {
+impl GameStateExt for NetworkedLobby {
     /// Process state updates from the server and report back any actions of the local player
     fn update<T: GameInterface>(
         &mut self,
