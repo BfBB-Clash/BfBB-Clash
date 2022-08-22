@@ -19,14 +19,14 @@ pub struct PlayerOptions {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct SharedPlayer {
+pub struct NetworkedPlayer {
     pub options: PlayerOptions,
     pub current_level: Option<Level>,
     pub score: u8,
     pub menu_order: u8,
 }
 
-impl SharedPlayer {
+impl NetworkedPlayer {
     pub fn new(options: PlayerOptions, menu_order: u8) -> Self {
         Self {
             options,

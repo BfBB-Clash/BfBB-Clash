@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bfbb::{IntoEnumIterator, Spatula};
-use clash::{game_state::GameState, player::SharedPlayer, PlayerId};
+use clash::{game_state::GameState, player::NetworkedPlayer, PlayerId};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
@@ -9,11 +9,11 @@ use eframe::{
 
 pub struct GameMenu<'a> {
     game: &'a GameState,
-    players: &'a HashMap<PlayerId, SharedPlayer>,
+    players: &'a HashMap<PlayerId, NetworkedPlayer>,
 }
 
 impl<'a> GameMenu<'a> {
-    pub fn new(game: &'a GameState, players: &'a HashMap<PlayerId, SharedPlayer>) -> Self {
+    pub fn new(game: &'a GameState, players: &'a HashMap<PlayerId, NetworkedPlayer>) -> Self {
         Self { game, players }
     }
 }

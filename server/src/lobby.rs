@@ -1,5 +1,5 @@
-use clash::lobby::{GamePhase, LobbyOptions, SharedLobby};
-use clash::player::{PlayerOptions, SharedPlayer};
+use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
+use clash::player::{NetworkedPlayer, PlayerOptions};
 use clash::protocol::Message;
 use clash::{LobbyId, PlayerId, MAX_PLAYERS};
 use thiserror::Error;
@@ -17,7 +17,7 @@ pub enum LobbyError {
 }
 
 pub struct Lobby {
-    pub shared: SharedLobby,
+    pub shared: NetworkedLobby,
     pub sender: Sender<Message>,
     pub next_menu_order: u8,
 }
@@ -26,7 +26,7 @@ impl Lobby {
     pub fn new(new_options: LobbyOptions, lobby_id: LobbyId) -> Self {
         let (sender, _) = channel(100);
         Self {
-            shared: SharedLobby::new(lobby_id, new_options),
+            shared: NetworkedLobby::new(lobby_id, new_options),
             sender,
             next_menu_order: 0,
         }
@@ -68,7 +68,7 @@ impl Lobby {
         players.insert(player_id, self.shared.lobby_id);
 
         // TODO: Unhardcode player color
-        let mut player = SharedPlayer::new(PlayerOptions::default(), self.next_menu_order);
+        let mut player = NetworkedPlayer::new(PlayerOptions::default(), self.next_menu_order);
         player.options.color = clash::player::COLORS[self.shared.players.len()];
         self.next_menu_order += 1;
 
