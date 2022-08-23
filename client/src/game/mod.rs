@@ -49,16 +49,14 @@ pub fn start_game(
                 lobby.update(player_id, &game, &mut network_sender)
             {
                 // We lost dolphin
-                || -> Option<()> {
-                    let local_player = lobby.players.get_mut(&player_id)?;
+                if let Some(local_player) = lobby.players.get_mut(&player_id) {
                     if local_player.current_level != None {
                         local_player.current_level = None;
                         network_sender
                             .blocking_send(Message::GameCurrentLevel { level: None })
                             .unwrap();
                     }
-                    Some(())
-                }();
+                }
 
                 // TODO: Maybe don't re-attempt this every frame
                 let _ = game.hook();
