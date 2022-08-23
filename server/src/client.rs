@@ -145,7 +145,14 @@ impl Client {
             Message::GameBegin => {
                 let state = &mut *self.state.write().unwrap();
                 let lobby = state.get_lobby(self.player_id)?;
-                lobby.start_game();
+                if lobby.shared.can_start() {
+                    lobby.start_game();
+                } else {
+                    log::warn!(
+                        "Lobby {:#X} attempted to start when some players aren't on the Main Menu",
+                        lobby.shared.lobby_id
+                    )
+                }
             }
             Message::GameLeave => {
                 // Remove player from their lobby
