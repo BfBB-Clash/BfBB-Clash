@@ -1,7 +1,7 @@
 pub mod game_state;
 pub mod lobby;
+pub mod net;
 pub mod player;
-pub mod protocol;
 
 pub const MAX_PLAYERS: usize = 6;
 

@@ -1,7 +1,7 @@
 use crate::game::{GameInterface, InterfaceResult};
 use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash::lobby::{GamePhase, NetworkedLobby};
-use clash::protocol::{Item, Message};
+use clash::net::{Item, Message};
 use clash::PlayerId;
 use log::info;
 

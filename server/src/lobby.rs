@@ -1,6 +1,6 @@
 use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
+use clash::net::Message;
 use clash::player::{NetworkedPlayer, PlayerOptions};
-use clash::protocol::Message;
 use clash::{LobbyId, PlayerId, MAX_PLAYERS};
 use thiserror::Error;
 use tokio::sync::broadcast::Sender;

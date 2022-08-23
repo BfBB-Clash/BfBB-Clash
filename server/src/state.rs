@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clash::{lobby::LobbyOptions, protocol::ProtocolError, LobbyId, PlayerId};
+use clash::{lobby::LobbyOptions, net::ProtocolError, LobbyId, PlayerId};
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 

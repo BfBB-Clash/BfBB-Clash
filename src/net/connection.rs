@@ -1,80 +1,10 @@
 use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
-use serde::{Deserialize, Serialize};
 use std::io::Cursor;
-use thiserror::Error;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
-use crate::lobby::{LobbyOptions, NetworkedLobby};
-use crate::player::PlayerOptions;
-use crate::{LobbyId, PlayerId};
-use bfbb::{Level, Spatula};
-
-#[derive(Error, Clone, Debug, Serialize, Deserialize)]
-pub enum ProtocolError {
-    #[error("Invalid Player ID {0:#X}")]
-    InvalidPlayerId(PlayerId),
-    #[error("Invalid Lobby ID {0:#X}")]
-    InvalidLobbyId(LobbyId),
-    #[error("Invalid Message")]
-    InvalidMessage,
-    // TODO: This probably shouldn't be an error
-    #[error("Player disconnected")]
-    Disconnected,
-    #[error("Client version '{0}' does not match server version '{1}'")]
-    VersionMismatch(String, String),
-}
-
-// TODO: Take more advantage of the type system (e.g. Client/Server messages)
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub enum Message {
-    Version { version: String },
-    Error { error: ProtocolError },
-    ConnectionAccept { player_id: u32 },
-    PlayerOptions { options: PlayerOptions },
-    GameHost,
-    GameJoin { lobby_id: u32 },
-    GameOptions { options: LobbyOptions },
-    GameLobbyInfo { lobby: NetworkedLobby },
-    GameBegin,
-    GameCurrentLevel { level: Option<Level> },
-    GameForceWarp { level: Level },
-    GameItemCollected { item: Item },
-    GameEnd,
-    GameLeave,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub enum Item {
-    Spatula(Spatula),
-}
-
-#[derive(Debug, Error)]
-pub enum FrameError {
-    #[error("Frame exceeded max length")]
-    FrameLength,
-    #[error("Full frame is not available yet.")]
-    FrameIncomplete,
-    #[error("Connection reset by peer")]
-    ConnectionReset,
-    #[error("I/O Error: {0}")]
-    Io(std::io::Error),
-    #[error("Serialization Error: {0}")]
-    Bincode(bincode::Error),
-}
-
-impl From<std::io::Error> for FrameError {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<bincode::Error> for FrameError {
-    fn from(e: bincode::Error) -> Self {
-        Self::Bincode(e)
-    }
-}
+use super::{FrameError, Message};
 
 #[derive(Debug)]
 pub struct Connection {

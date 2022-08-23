@@ -8,7 +8,7 @@ use std::{
     sync::mpsc::{channel, Sender},
 };
 
-use clash::protocol::{Connection, Message, ProtocolError};
+use clash::net::{Connection, Message, ProtocolError};
 use log::{debug, error, info};
 use tokio::{net::TcpStream, select};
 
