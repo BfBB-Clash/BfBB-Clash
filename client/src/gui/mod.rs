@@ -5,8 +5,8 @@ use crate::game::GameStateExt;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
+use clash::net::Message;
 use clash::player::PlayerOptions;
-use clash::protocol::Message;
 use clash::PlayerId;
 use std::error::Error;
 use std::sync::mpsc::Receiver;

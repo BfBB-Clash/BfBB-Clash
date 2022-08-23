@@ -2,7 +2,7 @@ use crate::state::State;
 use anyhow::Context;
 use bfbb::Spatula;
 use clash::lobby::GamePhase;
-use clash::protocol::{self, Connection, Item, Message, ProtocolError};
+use clash::net::{Connection, FrameError, Item, Message, ProtocolError};
 use clash::PlayerId;
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
@@ -18,10 +18,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new(
-        state: Arc<RwLock<State>>,
-        socket: TcpStream,
-    ) -> Result<Self, protocol::FrameError> {
+    pub async fn new(state: Arc<RwLock<State>>, socket: TcpStream) -> Result<Self, FrameError> {
         // Add new player
         let player_id = {
             let mut state = state.write().unwrap();

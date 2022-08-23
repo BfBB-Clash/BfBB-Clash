@@ -7,7 +7,7 @@ use bfbb::game_interface::{
 };
 use clash::{
     lobby::{GamePhase, NetworkedLobby},
-    protocol::Message,
+    net::Message,
     PlayerId,
 };
 use log::error;
