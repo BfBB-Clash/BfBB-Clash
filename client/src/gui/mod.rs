@@ -34,7 +34,7 @@ pub struct Clash {
     state: Menu,
     name_buf: String,
 
-    logo: Option<TextureHandle>,
+    logo: TextureHandle,
 
     lobby_id_buf: String,
     lobby_id: Option<u32>,
@@ -56,11 +56,17 @@ impl Clash {
         network_sender: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
         Self::setup(&cc.egui_ctx);
+
+        let logo = cc.egui_ctx.load_texture(
+            "logo",
+            load_image_from_memory(include_bytes!("../../res/logo.png")).unwrap(),
+            eframe::egui::TextureFilter::Linear,
+        );
         Self {
             gui_receiver,
             network_sender,
             error_receiver,
-            logo: None,
+            logo,
             state: Menu::Main,
             name_buf: Default::default(),
             lobby_id_buf: Default::default(),
@@ -224,15 +230,7 @@ impl App for Clash {
             Menu::Main => {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                        let texture: &TextureHandle = self.logo.get_or_insert_with(|| {
-                            ctx.load_texture(
-                                "logo",
-                                load_image_from_memory(include_bytes!("../../res/logo.png"))
-                                    .unwrap(),
-                                eframe::egui::TextureFilter::Linear,
-                            )
-                        });
-                        ui.image(texture, texture.size_vec2() / 3.);
+                        ui.image(&self.logo, self.logo.size_vec2() / 3.);
                     });
                     ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
                         ui.add_space(BORDER);
