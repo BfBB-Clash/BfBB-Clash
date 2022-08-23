@@ -10,7 +10,7 @@ members = ["client", "server"]
 [dependencies]
 bfbb = { version = "0.1", features = ["serde"]}
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros"] }
-egui = "0.17"
+epaint = "0.17"
 
 bincode = "1"
 bytes = "1"

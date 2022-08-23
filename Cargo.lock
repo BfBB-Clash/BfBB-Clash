@@ -389,7 +389,7 @@ dependencies = [
  "bfbb",
  "bincode",
  "bytes",
- "egui",
+ "epaint",
  "log",
  "serde",
  "thiserror",
@@ -911,6 +911,7 @@ dependencies = [
  "bytemuck",
  "emath",
  "nohash-hasher",
+ "parking_lot 0.12.1",
 ]
 
 [[package]]
