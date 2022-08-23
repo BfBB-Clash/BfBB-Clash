@@ -14,8 +14,7 @@ use eframe::egui::{
     FontFamily, Label, Layout, RichText, SidePanel, Style, TextEdit, TextStyle, TopBottomPanel, Ui,
 };
 use eframe::epaint::{ColorImage, FontId, Pos2, TextureHandle};
-use eframe::epi::{App, Frame, IconData, Storage};
-use eframe::{run_native, NativeOptions};
+use eframe::{run_native, App, CreationContext, Frame, IconData, NativeOptions};
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
@@ -51,10 +50,12 @@ pub struct Clash {
 
 impl Clash {
     fn new(
+        cc: &CreationContext<'_>,
         gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
         error_receiver: Receiver<Box<dyn Error + Send>>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
     ) -> Self {
+        Self::setup(&cc.egui_ctx);
         Self {
             gui_receiver,
             network_sender,
@@ -70,6 +71,53 @@ impl Clash {
             lobby: NetworkedLobby::new(0),
             error_queue: Vec::new(),
         }
+    }
+
+    fn setup(ctx: &Context) {
+        let mut font_def = FontDefinitions::default();
+        font_def.font_data.insert(
+            "spongebob".into(),
+            FontData::from_static(include_bytes!("../../fonts/Some.Time.Later.otf")),
+        );
+        font_def
+            .families
+            .insert(FontFamily::Proportional, vec!["spongebob".into()]);
+
+        ctx.set_fonts(font_def);
+
+        let mut style = Style::default();
+        style.spacing.button_padding = (PADDING, PADDING).into();
+        style.spacing.item_spacing = (PADDING, PADDING).into();
+        style.text_styles.insert(
+            TextStyle::Heading,
+            FontId {
+                size: 42.,
+                family: FontFamily::Proportional,
+            },
+        );
+        style.text_styles.insert(
+            TextStyle::Body,
+            FontId {
+                size: 32.,
+                family: FontFamily::Proportional,
+            },
+        );
+        style.text_styles.insert(
+            TextStyle::Small,
+            FontId {
+                size: 18.,
+                family: FontFamily::Proportional,
+            },
+        );
+        style.text_styles.insert(
+            TextStyle::Button,
+            FontId {
+                size: 40.,
+                family: FontFamily::Proportional,
+            },
+        );
+
+        ctx.set_style(style);
     }
 
     fn paint_options(&mut self, ui: &mut Ui) {
@@ -149,55 +197,7 @@ impl Clash {
 }
 
 impl App for Clash {
-    fn setup(&mut self, ctx: &Context, _frame: &Frame, _storage: Option<&dyn Storage>) {
-        let mut font_def = FontDefinitions::default();
-        font_def.font_data.insert(
-            "spongebob".into(),
-            FontData::from_static(include_bytes!("../../fonts/Some.Time.Later.otf")),
-        );
-        font_def
-            .families
-            .insert(FontFamily::Proportional, vec!["spongebob".into()]);
-
-        ctx.set_fonts(font_def);
-
-        //
-        let mut style = Style::default();
-        style.spacing.button_padding = (PADDING, PADDING).into();
-        style.spacing.item_spacing = (PADDING, PADDING).into();
-        style.text_styles.insert(
-            TextStyle::Heading,
-            FontId {
-                size: 42.,
-                family: FontFamily::Proportional,
-            },
-        );
-        style.text_styles.insert(
-            TextStyle::Body,
-            FontId {
-                size: 32.,
-                family: FontFamily::Proportional,
-            },
-        );
-        style.text_styles.insert(
-            TextStyle::Small,
-            FontId {
-                size: 18.,
-                family: FontFamily::Proportional,
-            },
-        );
-        style.text_styles.insert(
-            TextStyle::Button,
-            FontId {
-                size: 40.,
-                family: FontFamily::Proportional,
-            },
-        );
-
-        ctx.set_style(style);
-    }
-
-    fn update(&mut self, ctx: &Context, frame: &Frame) {
+    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         let style = ctx.style();
         let height = ctx.fonts().row_height(&TextStyle::Small.resolve(&style));
 
@@ -229,6 +229,7 @@ impl App for Clash {
                                 "logo",
                                 load_image_from_memory(include_bytes!("../../res/logo.png"))
                                     .unwrap(),
+                                eframe::egui::TextureFilter::Linear,
                             )
                         });
                         ui.image(texture, texture.size_vec2() / 3.);
@@ -236,7 +237,7 @@ impl App for Clash {
                     ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
                         ui.add_space(BORDER);
                         if ui.button("Quit").clicked() {
-                            frame.quit();
+                            frame.close();
                         }
                         if ui.button("Join Game").clicked() {
                             self.state = Menu::Join;
@@ -372,10 +373,6 @@ impl App for Clash {
             ui.small(crate::VERSION);
         });
     }
-
-    fn name(&self) -> &str {
-        "BfBB Clash"
-    }
 }
 
 pub fn run(
@@ -399,8 +396,9 @@ pub fn run(
     };
 
     run_native(
-        Box::new(Clash::new(gui_receiver, error_receiver, network_sender)),
+        "BfBB Clash",
         window_options,
+        Box::new(|cc| Box::new(Clash::new(cc, gui_receiver, error_receiver, network_sender))),
     );
 }
 
