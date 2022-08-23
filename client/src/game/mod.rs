@@ -1,6 +1,5 @@
+mod game_mode;
 mod game_state;
-
-pub use self::game_state::GameStateExt;
 
 use bfbb::game_interface::{
     dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult,
@@ -14,6 +13,8 @@ use log::error;
 use spin_sleep::LoopHelper;
 use std::sync::mpsc::{Receiver, Sender};
 
+use self::{game_mode::GameMode, game_state::ClashGame};
+
 pub fn start_game(
     mut gui_sender: Sender<(PlayerId, NetworkedLobby)>,
     mut network_sender: tokio::sync::mpsc::Sender<Message>,
@@ -24,8 +25,9 @@ pub fn start_game(
         .build_with_target_rate(126);
 
     // TODO: Report hooking errors to user/stdout
-    let mut game = DolphinInterface::default();
-    let _ = game.hook();
+    let mut interface = DolphinInterface::default();
+    let _ = interface.hook();
+    let mut game = ClashGame;
     let mut player_id = 0;
     let mut lobby = None;
 
@@ -36,7 +38,7 @@ pub fn start_game(
 
         // Receive network updates
         update_from_network(
-            &game,
+            &interface,
             &mut player_id,
             &mut lobby,
             &mut logic_receiver,
@@ -46,7 +48,7 @@ pub fn start_game(
 
         if let Some(lobby) = lobby.as_mut() {
             if let Err(InterfaceError::Unhooked) =
-                lobby.update(player_id, &game, &mut network_sender)
+                game.update(&interface, lobby, player_id, &mut network_sender)
             {
                 // We lost dolphin
                 if let Some(local_player) = lobby.players.get_mut(&player_id) {
@@ -59,7 +61,7 @@ pub fn start_game(
                 }
 
                 // TODO: Maybe don't re-attempt this every frame
-                let _ = game.hook();
+                let _ = interface.hook();
             }
         }
         loop_helper.loop_start_s();

@@ -7,36 +7,34 @@ use log::info;
 
 use crate::game::InterfaceError;
 
-pub trait GameStateExt {
-    fn update<T: GameInterface>(
-        &mut self,
-        player_id: PlayerId,
-        game: &T,
-        network_sender: &mut tokio::sync::mpsc::Sender<Message>,
-    ) -> InterfaceResult<()>;
-}
+use super::game_mode::GameMode;
 
-impl GameStateExt for NetworkedLobby {
+pub struct ClashGame;
+
+impl GameMode for ClashGame {
     /// Process state updates from the server and report back any actions of the local player
-    fn update<T: GameInterface>(
+    type Result = InterfaceResult<()>;
+
+    fn update<G: GameInterface>(
         &mut self,
-        player_id: PlayerId,
-        game: &T,
+        interface: &G,
+        lobby: &mut NetworkedLobby,
+        local_player: PlayerId,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
-    ) -> InterfaceResult<()> {
-        if game.is_loading()? {
+    ) -> Self::Result {
+        if interface.is_loading()? {
             return Ok(());
         }
 
         // TODO: Use a better error
         // Find the local player within the lobby
-        let local_player = self
+        let local_player = lobby
             .players
-            .get_mut(&player_id)
+            .get_mut(&local_player)
             .ok_or(InterfaceError::Other)?;
 
         // Detect level changes
-        let level = Some(game.get_current_level()?);
+        let level = Some(interface.get_current_level()?);
         if local_player.current_level != level {
             local_player.current_level = level;
             network_sender
@@ -45,29 +43,29 @@ impl GameStateExt for NetworkedLobby {
         }
 
         // Don't proceed if the game is not active
-        if self.game_phase != GamePhase::Playing {
+        if lobby.game_phase != GamePhase::Playing {
             return Ok(());
         }
 
         // Set the cost to unlock the lab door
-        game.set_lab_door(
-            self.options.lab_door_cost.into(),
+        interface.set_lab_door(
+            lobby.options.lab_door_cost.into(),
             local_player.current_level,
         )?;
 
         // Check for newly collected spatulas
         for spat in Spatula::iter() {
             // Skip already collected spatulas
-            if self.game_state.spatulas.contains_key(&spat) {
+            if lobby.game_state.spatulas.contains_key(&spat) {
                 // Sync collected spatulas
-                game.collect_spatula(spat, local_player.current_level)?;
-                game.mark_task_complete(spat)?;
+                interface.collect_spatula(spat, local_player.current_level)?;
+                interface.mark_task_complete(spat)?;
                 continue;
             }
 
             // Check menu for any potentially missed collection events
-            if game.is_task_complete(spat)? {
-                self.game_state.spatulas.insert(spat, None);
+            if interface.is_task_complete(spat)? {
+                lobby.game_state.spatulas.insert(spat, None);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
@@ -77,8 +75,8 @@ impl GameStateExt for NetworkedLobby {
             }
 
             // Detect spatula collection events
-            if game.is_spatula_being_collected(spat, local_player.current_level)? {
-                self.game_state.spatulas.insert(spat, None);
+            if interface.is_spatula_being_collected(spat, local_player.current_level)? {
+                lobby.game_state.spatulas.insert(spat, None);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
