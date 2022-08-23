@@ -1,5 +1,5 @@
 use crate::game::{GameInterface, InterfaceResult};
-use bfbb::{IntoEnumIterator, Level, Spatula};
+use bfbb::{IntoEnumIterator, Spatula};
 use clash::lobby::{GamePhase, NetworkedLobby};
 use clash::net::{Item, Message};
 use clash::PlayerId;
@@ -14,8 +14,6 @@ pub trait GameStateExt {
         game: &T,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
     ) -> InterfaceResult<()>;
-
-    fn can_start(&self) -> bool;
 }
 
 impl GameStateExt for NetworkedLobby {
@@ -91,16 +89,5 @@ impl GameStateExt for NetworkedLobby {
         }
 
         Ok(())
-    }
-
-    /// True when all connected players are on the Main Menu
-    fn can_start(&self) -> bool {
-        // TODO: Solve the "Demo Cutscene" issue. We can probably detect when players are on the autosave preference screen instead.
-        for player in self.players.values() {
-            if player.current_level != Some(Level::MainMenu) {
-                return false;
-            }
-        }
-        true
     }
 }

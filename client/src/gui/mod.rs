@@ -1,8 +1,6 @@
 mod game_menu;
 mod player_widget;
 
-use crate::game::GameStateExt;
-
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
 use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash::net::Message;
