@@ -12,7 +12,8 @@
                 "args": [
                     "build",
                     "--bin=client",
-                    "--package=client"
+                    "--package=client",
+                    "--features=console"
                 ],
                 "filter": {
                     "name": "client",
