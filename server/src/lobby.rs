@@ -42,7 +42,7 @@ impl Lobby {
         }
     }
 
-    pub fn is_player_in_lobby(&mut self, player_id: &u32) -> bool {
+    pub fn is_player_in_lobby(&self, player_id: &u32) -> bool {
         self.shared.players.contains_key(player_id)
     }
 
