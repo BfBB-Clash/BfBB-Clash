@@ -15,7 +15,6 @@ pub const COLORS: [(u8, u8, u8); 6] = [
 pub struct PlayerOptions {
     pub name: String,
     pub color: (u8, u8, u8),
-    // Other options?
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -38,7 +37,7 @@ impl NetworkedPlayer {
 }
 
 impl PlayerOptions {
-    pub fn color(&self) -> egui::Color32 {
-        egui::Color32::from_rgb(self.color.0, self.color.1, self.color.2)
+    pub fn color(&self) -> epaint::Color32 {
+        epaint::Color32::from_rgb(self.color.0, self.color.1, self.color.2)
     }
 }
