@@ -1,8 +1,4 @@
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+on: pull_request
 
 name: Continuous Integration
 
@@ -15,6 +11,11 @@ jobs:
     name: Continuous Integration - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Install C build-dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt update -qq
+          sudo apt install -y libxcb-shape0-dev libxcb-xfixes0-dev
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -23,15 +24,23 @@ jobs:
           override: true
       - run: rustup component add rustfmt
       - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
+      - name: Verify formatting
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-      - uses: actions-rs/cargo@v1
+      - name: Verify build
+        uses: actions-rs/cargo@v1
         with:
           command: check
           args: --all
-      - uses: actions-rs/cargo@v1
+      - name: Deny Clippy warnings
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: --all -- -D warnings
+      - name: Run Tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
