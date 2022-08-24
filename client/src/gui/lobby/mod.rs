@@ -1,0 +1,169 @@
+use std::{rc::Rc, sync::mpsc::Receiver};
+
+use clash::{
+    lobby::{GamePhase, NetworkedLobby},
+    net::Message,
+    PlayerId,
+};
+use eframe::{
+    egui::{Align, Button, CentralPanel, Checkbox, Layout, SidePanel, Ui},
+    epaint::Color32,
+    App,
+};
+
+use crate::gui::state::{Screen, State};
+use crate::gui::PADDING;
+use player_ui::PlayerUi;
+use tracker::Tracker;
+
+mod player_ui;
+mod tracker;
+
+pub struct Game {
+    state: Rc<State>,
+    gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
+    network_sender: tokio::sync::mpsc::Sender<Message>,
+    lobby: NetworkedLobby,
+    local_player_id: PlayerId,
+
+    lab_door_buf: String,
+    lab_door_num: Option<u8>,
+}
+
+impl Game {
+    pub fn new(
+        state: Rc<State>,
+        gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
+        network_sender: tokio::sync::mpsc::Sender<Message>,
+    ) -> Self {
+        Self {
+            state,
+            gui_receiver,
+            network_sender,
+            lobby: NetworkedLobby::new(0),
+            local_player_id: 0,
+            lab_door_buf: Default::default(),
+            lab_door_num: None,
+        }
+    }
+}
+
+impl App for Game {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        // Continuously repaint
+        ctx.request_repaint();
+
+        // Receive gamestate updates
+        while let Ok((local_player_id, new_lobby)) = self.gui_receiver.try_recv() {
+            self.local_player_id = local_player_id;
+            self.lab_door_buf = new_lobby.options.lab_door_cost.to_string();
+            self.lab_door_num = Some(new_lobby.options.lab_door_cost);
+            self.lobby = new_lobby;
+        }
+
+        SidePanel::left("Player List")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.add_space(PADDING);
+                // TODO: Cache this
+                let mut values = self.lobby.players.values().collect::<Vec<_>>();
+                values.sort_by(|&a, &b| a.menu_order.cmp(&b.menu_order));
+                for player in values {
+                    ui.add(PlayerUi::new(player));
+                }
+            });
+        CentralPanel::default().show(ctx, |ui| {
+            if self.lobby.game_phase == GamePhase::Setup {
+                self.paint_options(ui);
+                if ui.button("Copy Lobby ID").clicked() {
+                    ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                }
+            } else {
+                ui.add(Tracker::new(&self.lobby.game_state, &self.lobby.players));
+            }
+            ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
+                if ui.button("Leave").clicked() {
+                    let _ = self.network_sender.blocking_send(Message::GameLeave);
+                    self.state.screen.set(Screen::MainMenu);
+                }
+            })
+        });
+    }
+}
+
+impl Game {
+    fn paint_options(&mut self, ui: &mut Ui) {
+        ui.heading("Lobby Options");
+        ui.separator();
+
+        ui.add_enabled_ui(self.lobby.host_id == Some(self.local_player_id), |ui| {
+            let ng_plus_response = ui
+                .add(Checkbox::new(&mut self.lobby.options.ng_plus, "New Game+"))
+                .on_hover_text(
+                    "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
+                );
+
+            let door_cost_response = ui
+                .horizontal(|ui| {
+                    if self.lab_door_num.is_none() {
+                        ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
+                    }
+                    ui.label("Lab Door Cost: ");
+                    ui.text_edit_singleline(&mut self.lab_door_buf)
+                })
+                .inner;
+
+            if !ui.is_enabled() {
+                return;
+            }
+
+            // Validate input
+            let mut door_cost_change_valid = false;
+            if door_cost_response.changed() {
+                self.lab_door_num = self
+                    .lab_door_buf
+                    .parse::<u8>()
+                    .ok()
+                    .filter(|&n| n > 0 && n <= 82);
+                if let Some(n) = self.lab_door_num {
+                    self.lobby.options.lab_door_cost = n;
+                    door_cost_change_valid = true;
+                }
+            }
+
+            if door_cost_change_valid || ng_plus_response.changed() {
+                self.network_sender
+                    .blocking_send(Message::GameOptions {
+                        options: self.lobby.options.clone(),
+                    })
+                    .unwrap();
+            }
+
+            let mut start_game_response = ui
+                .add_enabled(
+                    self.lobby.can_start() && self.lab_door_num.is_some(),
+                    Button::new("Start Game"),
+                )
+                .on_hover_text("Starts a new game for all connected players.");
+
+            // We unfortunately have to check these conditions twice since we need the Response to add the
+            // tooltips but need to enable/disable the button before we can get the response
+            if !self.lobby.can_start() {
+                start_game_response = start_game_response
+                    .on_disabled_hover_text("All players must be on the Main Menu.")
+            }
+
+            if self.lab_door_num.is_none() {
+                start_game_response = start_game_response
+                    .on_disabled_hover_text("'Lab Door Cost' must be a number from 1-82");
+            }
+
+            if start_game_response.clicked() {
+                // TODO: Send a message to the network thread to start the game.
+                self.network_sender
+                    .blocking_send(Message::GameBegin {})
+                    .unwrap();
+            }
+        });
+    }
+}
