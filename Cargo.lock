@@ -48,6 +48,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahash"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57e6e951cfbb2db8de1828d49073a113a29fd7117b1596caa781a258c7e38d72"
+dependencies = [
+ "cfg-if 1.0.0",
+ "getrandom",
+ "once_cell",
+ "version_check",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -389,7 +401,7 @@ dependencies = [
  "bfbb",
  "bincode",
  "bytes",
- "epaint",
+ "epaint 0.19.0",
  "log",
  "serde",
  "thiserror",
@@ -793,7 +805,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a3cd1d47e12f7a17912595241622e373aa652a4e0fa90b3f9278f90a64aedf7"
 dependencies = [
  "ahash 0.7.6",
- "epaint",
+ "epaint 0.17.0",
  "nohash-hasher",
  "tracing",
 ]
@@ -866,6 +878,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "emath"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9542a40106fdba943a055f418d1746a050e1a903a049b030c2b097d4686a33cf"
+
+[[package]]
 name = "enumflags2"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -909,7 +927,20 @@ dependencies = [
  "ahash 0.7.6",
  "atomic_refcell",
  "bytemuck",
- "emath",
+ "emath 0.17.0",
+ "nohash-hasher",
+]
+
+[[package]]
+name = "epaint"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ba04741be7f6602b1a1b28f1082cce45948a7032961c52814f8946b28493300"
+dependencies = [
+ "ab_glyph",
+ "ahash 0.8.0",
+ "atomic_refcell",
+ "emath 0.19.0",
  "nohash-hasher",
  "parking_lot 0.12.1",
 ]
