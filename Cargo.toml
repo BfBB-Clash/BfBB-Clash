@@ -6,4 +6,4 @@ members = [
 ]
 
 [workspace.metadata.release]
-push = false
+push = true
