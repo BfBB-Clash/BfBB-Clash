@@ -23,13 +23,5 @@ image = "0.24"
 spin_sleep = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
 
-#Memory Shenanigans
-process-memory = "0.4" # For reading external process memory
-proc-maps = "0.2" # For querying memory maps
-sysinfo = "0.25" # For getting PID by name
-
-[target.'cfg(windows)'.dependencies]
-winapi = "0.3"
-
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"

@@ -204,7 +204,7 @@ dependencies = [
  "serde",
  "strum",
  "strum_macros",
- "sysinfo 0.23.13",
+ "sysinfo",
  "thiserror",
  "winapi",
 ]
@@ -407,13 +407,9 @@ dependencies = [
  "env_logger",
  "image",
  "log",
- "proc-maps",
- "process-memory",
  "spin_sleep",
- "sysinfo 0.25.3",
  "thiserror",
  "tokio",
- "winapi",
  "winres",
 ]
 
@@ -2395,21 +2391,6 @@ name = "sysinfo"
 version = "0.23.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3977ec2e0520829be45c8a2df70db2bf364714d8a748316a10c3c35d4d2b01c9"
-dependencies = [
- "cfg-if 1.0.0",
- "core-foundation-sys 0.8.3",
- "libc",
- "ntapi",
- "once_cell",
- "rayon",
- "winapi",
-]
-
-[[package]]
-name = "sysinfo"
-version = "0.25.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71eb43e528fdc239f08717ec2a378fdb017dddbc3412de15fff527554591a66c"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys 0.8.3",
