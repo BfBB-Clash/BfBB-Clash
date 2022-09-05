@@ -1,24 +1,57 @@
-use crate::state::State;
+use std::collections::hash_map::Entry;
+use std::sync::{Arc, RwLock};
+
 use anyhow::Context;
 use bfbb::Spatula;
 use clash::lobby::GamePhase;
-use clash::net::{Connection, FrameError, Item, Message, ProtocolError};
+use clash::net::connection::{self, ConnectionRx, ConnectionTx};
+use clash::net::{FrameError, Item, Message, ProtocolError};
 use clash::PlayerId;
-use std::collections::hash_map::Entry;
-use std::sync::{Arc, RwLock};
 use tokio::net::TcpStream;
-use tokio::select;
-use tokio::sync::broadcast::Receiver;
 
-pub struct Client {
+use crate::state::State;
+
+/// Accept a new connection from a client and run it's message loop
+pub async fn handle_new_connection(state: Arc<RwLock<State>>, socket: TcpStream) {
+    let (tx, rx) = tokio::sync::mpsc::channel(64);
+    let (conn_tx, conn_rx) = connection::from_socket(socket);
+    let client = Client::new(state, conn_rx, tx).await.unwrap();
+
+    tokio::spawn(send_task(conn_tx, rx));
+
+    client.run().await;
+
+    // Player cleanup handled by drop impl
+}
+
+async fn broadcast_task(
+    mut rx: tokio::sync::broadcast::Receiver<Message>,
+    tx: tokio::sync::mpsc::Sender<Message>,
+) {
+    while let Ok(m) = rx.recv().await {
+        tx.send(m).await.unwrap();
+    }
+}
+
+async fn send_task(mut conn_tx: ConnectionTx, mut rx: tokio::sync::mpsc::Receiver<Message>) {
+    while let Some(m) = rx.recv().await {
+        conn_tx.write_frame(m).await.unwrap();
+    }
+}
+
+struct Client {
     state: Arc<RwLock<State>>,
-    connection: Connection,
+    conn_rx: ConnectionRx,
+    tx: tokio::sync::mpsc::Sender<Message>,
     player_id: PlayerId,
-    lobby_recv: Option<Receiver<Message>>,
 }
 
 impl Client {
-    pub async fn new(state: Arc<RwLock<State>>, socket: TcpStream) -> Result<Self, FrameError> {
+    pub async fn new(
+        state: Arc<RwLock<State>>,
+        conn_rx: ConnectionRx,
+        tx: tokio::sync::mpsc::Sender<Message>,
+    ) -> Result<Self, FrameError> {
         // Add new player
         let player_id = {
             let mut state = state.write().unwrap();
@@ -27,63 +60,61 @@ impl Client {
 
         Ok(Self {
             state,
-            connection: Connection::new(socket),
+            conn_rx,
+            tx,
             player_id,
-            lobby_recv: None,
         })
     }
 
     pub async fn run(mut self) {
         loop {
-            select! {
-                m = async { self.lobby_recv.as_mut().unwrap().recv().await }, if self.lobby_recv.is_some() => {
-                    if let Ok(m) = m {
-                        self.connection.write_frame(m).await.unwrap();
-                    }
+            let incoming = match self.conn_rx.read_frame().await {
+                Ok(Some(x)) => x,
+                Ok(None) => {
+                    log::info!("Player id {:#X} disconnected", self.player_id);
+                    break;
                 }
-                incoming = self.connection.read_frame() => {
-                    let incoming = match incoming {
-                        Ok(Some(x)) => x,
-                        Ok(None) => {
-                            log::info!("Player id {:#X} disconnected", self.player_id);
-                            break;
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "Error reading message from player id {:#X}. Closing connection\n{e:?}", self.player_id
-                            );
-                            break;
-                        }
-                    };
-
-                    log::debug!("Received message from player id {:#X} \nMessage: {incoming:#X?}", self.player_id,);
-                    if let Err(e) = self.process_incoming(incoming).await {
-                        match e.downcast_ref::<ProtocolError>() {
-                            Some(m @ ProtocolError::InvalidLobbyId(_)) |
-                            Some(m @ ProtocolError::InvalidMessage) => {
-                                log::error!("{e:?}");
-                                let _ = self.connection.write_frame(Message::Error {error: m.clone() }).await;
-                            },
-                            Some(m @ ProtocolError::VersionMismatch(_,_)) => {
-                                log::error!("{e:?}");
-                                let _ = self.connection.write_frame(Message::Error {error: m.clone() }).await;
-                                break;
-                            }
-                            Some(ProtocolError::Disconnected) => {
-                                // Close the connection without error
-                                log::info!("Player id {:#X} disconnected", self.player_id);
-                                break;
-                            }
-                            _ => {
-                                // This error means there is a problem with our internal state
-                                // TODO: Figure out how to properly resolve this error
-                                log::error!("Disconnecting player {:#X} due to unrecoverable error:\n{e:?}", self.player_id);
-                                break;
-                            }
-                        }
-                    }
+                Err(e) => {
+                    log::error!(
+                        "Error reading message from player id {:#X}. Closing connection\n{e:?}",
+                        self.player_id
+                    );
+                    break;
                 }
             };
+
+            log::debug!(
+                "Received message from player id {:#X} \nMessage: {incoming:#X?}",
+                self.player_id,
+            );
+            if let Err(e) = self.process_incoming(incoming).await {
+                match e.downcast_ref::<ProtocolError>() {
+                    Some(m @ ProtocolError::InvalidLobbyId(_))
+                    | Some(m @ ProtocolError::InvalidMessage) => {
+                        log::error!("{e:?}");
+                        let _ = self.tx.send(Message::Error { error: m.clone() }).await;
+                    }
+                    Some(m @ ProtocolError::VersionMismatch(_, _)) => {
+                        log::error!("{e:?}");
+                        let _ = self.tx.send(Message::Error { error: m.clone() }).await;
+                        break;
+                    }
+                    Some(ProtocolError::Disconnected) => {
+                        // Close the connection without error
+                        log::info!("Player id {:#X} disconnected", self.player_id);
+                        break;
+                    }
+                    _ => {
+                        // This error means there is a problem with our internal state
+                        // TODO: Figure out how to properly resolve this error
+                        log::error!(
+                            "Disconnecting player {:#X} due to unrecoverable error:\n{e:?}",
+                            self.player_id
+                        );
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -97,8 +128,8 @@ impl Client {
                 }
 
                 // Inform player of their PlayerId
-                self.connection
-                    .write_frame(Message::ConnectionAccept {
+                self.tx
+                    .send(Message::ConnectionAccept {
                         player_id: self.player_id,
                     })
                     .await?;
@@ -116,7 +147,8 @@ impl Client {
                     .get_mut(&lobby_id)
                     .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
 
-                self.lobby_recv = Some(lobby.add_player(&mut state.players, self.player_id)?);
+                let lobby_recv = lobby.add_player(&mut state.players, self.player_id)?;
+                tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
 
                 log::info!(
                     "Player {:#X} has hosted lobby {:#X}",
@@ -135,7 +167,8 @@ impl Client {
                     .get_mut(&lobby_id)
                     .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
 
-                self.lobby_recv = Some(lobby.add_player(&mut state.players, self.player_id)?);
+                let lobby_recv = lobby.add_player(&mut state.players, self.player_id)?;
+                tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
 
                 log::info!(
                     "Player {:#X} has joined lobby {lobby_id:#X}",

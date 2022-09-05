@@ -3,17 +3,13 @@
     windows_subsystem = "windows"
 )]
 
-use std::{
-    error::Error,
-    sync::mpsc::{channel, Sender},
-};
+use std::{error::Error, sync::mpsc::channel};
 
-use clash::net::{Connection, Message, ProtocolError};
-use log::{debug, error, info};
-use tokio::{net::TcpStream, select};
+use clash::net::Message;
 
 mod game;
 mod gui;
+mod net;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -38,7 +34,7 @@ fn main() {
     //       library is async.
     let _network_thread = std::thread::Builder::new()
         .name("Network".into())
-        .spawn(move || start_network(network_receiver, logic_sender, error_sender));
+        .spawn(move || net::run(network_receiver, logic_sender, error_sender));
 
     // Start Game Thread
     let (gui_sender, gui_receiver) = channel();
@@ -51,104 +47,4 @@ fn main() {
 
     // Start gui on the main thread
     gui::run(gui_receiver, error_receiver, network_sender);
-}
-
-fn load_ip_address() -> String {
-    if let Ok(mut exe_path) = std::env::current_exe() {
-        exe_path.pop();
-        exe_path.push("ipaddress");
-        if let Ok(ip) = std::fs::read_to_string(exe_path) {
-            return ip;
-        }
-    }
-
-    "127.0.0.1:42932".into()
-}
-
-#[tokio::main(flavor = "current_thread")]
-async fn start_network(
-    mut receiver: tokio::sync::mpsc::Receiver<Message>,
-    logic_sender: Sender<Message>,
-    error_sender: Sender<Box<dyn Error + Send>>,
-) {
-    let ip = load_ip_address();
-    info!("Connecting to server at '{ip}'");
-
-    let sock = TcpStream::connect(&ip).await.unwrap();
-    let mut conn = Connection::new(sock);
-    conn.write_frame(Message::Version {
-        version: VERSION.to_owned(),
-    })
-    .await
-    .unwrap();
-
-    loop {
-        select! {
-            m = receiver.recv() => {
-                debug!("Sending message {m:#?}");
-                if let Err(e) = conn.write_frame(m.unwrap()).await {
-                    error!("Error sending message to server. Disconnecting. {e:#?}");
-                    error_sender.send(Box::new(e)).expect("GUI has crashed and so will we.");
-                };
-            }
-            incoming = conn.read_frame() => {
-                let incoming = match incoming {
-                    Ok(Some(x)) => {
-                        debug!("Received message {x:#?}.");
-                        x
-                    }
-                    Ok(None) => {
-                        info!("Server closed connection. Disconnecting.");
-                        break;
-                    }
-                    Err(e) => {
-                        error!("Error reading message from server. Disconnecting.\n{e}");
-                        error_sender.send(e.into()).expect("GUI has crashed and so will we.");
-                        break;
-                    }
-                };
-
-                if let Err(e) = process_incoming(incoming, &mut conn, &logic_sender).await {
-                    log::error!("Error from server:\n{e}");
-                    error_sender.send(Box::new(e)).expect("GUI has crashed and so will we.");
-                }
-            }
-        };
-    }
-}
-
-async fn process_incoming(
-    message: Message,
-    _conn: &mut Connection,
-    logic_sender: &Sender<Message>,
-) -> Result<(), ProtocolError> {
-    match message {
-        Message::Version { version: _ } => {
-            todo!()
-        }
-        Message::Error { error } => {
-            return Err(error);
-        }
-        m @ Message::ConnectionAccept { player_id: _ } => {
-            debug!("ConnectionAccept message got :)");
-            logic_sender.send(m).unwrap();
-        }
-        Message::PlayerOptions { options: _ } => todo!(),
-        Message::GameHost => todo!(),
-        Message::GameJoin { lobby_id: _ } => todo!(),
-        Message::GameOptions { options: _ } => todo!(),
-        m @ Message::GameLobbyInfo { lobby: _ } => {
-            logic_sender.send(m).unwrap();
-        }
-        m @ Message::GameBegin => {
-            logic_sender.send(m).unwrap();
-        }
-        Message::GameCurrentLevel { level: _ } => todo!(),
-        Message::GameForceWarp { level: _ } => todo!(),
-        Message::GameItemCollected { item: _ } => todo!(),
-        Message::GameEnd => todo!(),
-        Message::GameLeave => todo!(),
-    }
-
-    Ok(())
 }

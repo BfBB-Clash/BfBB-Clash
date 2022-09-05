@@ -2,10 +2,9 @@ mod client;
 mod lobby;
 mod state;
 
-use client::Client;
 use state::State;
 use std::sync::{Arc, RwLock};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::spawn;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -30,13 +29,6 @@ async fn main() {
         let (socket, _) = listener.accept().await.unwrap();
 
         let state = state.clone();
-        spawn(handle_new_connection(state, socket));
+        spawn(client::handle_new_connection(state, socket));
     }
-}
-
-async fn handle_new_connection(state: Arc<RwLock<State>>, socket: TcpStream) {
-    let client = Client::new(state, socket).await.unwrap();
-    client.run().await;
-
-    // Player cleanup handled by drop impl
 }

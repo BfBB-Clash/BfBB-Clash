@@ -6,23 +6,45 @@ use tokio::{io::AsyncReadExt, io::AsyncWriteExt, io::BufWriter, net::TcpStream};
 
 use super::{FrameError, Message};
 
+pub fn from_socket(socket: TcpStream) -> (ConnectionTx, ConnectionRx) {
+    let (read_stream, write_stream) = socket.into_split();
+
+    (
+        ConnectionTx {
+            write_stream: BufWriter::new(write_stream),
+        },
+        ConnectionRx {
+            read_stream,
+            buffer: BytesMut::with_capacity(64),
+        },
+    )
+}
+
 #[derive(Debug)]
-pub struct Connection {
-    read_stream: OwnedReadHalf,
+pub struct ConnectionTx {
     write_stream: BufWriter<OwnedWriteHalf>,
+}
+pub struct ConnectionRx {
+    read_stream: OwnedReadHalf,
     buffer: BytesMut,
 }
 
-impl Connection {
-    pub fn new(socket: TcpStream) -> Self {
-        let (read_stream, write_stream) = socket.into_split();
-        Self {
-            read_stream,
-            write_stream: BufWriter::new(write_stream),
-            buffer: BytesMut::with_capacity(64),
+impl ConnectionTx {
+    pub async fn write_frame(&mut self, frame: Message) -> Result<(), FrameError> {
+        let mut bytes: Bytes = bincode::serialize(&frame)?.into();
+        if bytes.len() > u16::MAX.into() {
+            return Err(FrameError::FrameLength);
         }
+        let len = bytes.len() as u16;
+        let len = len.to_be_bytes();
+        self.write_stream.write_all(&len).await?;
+        self.write_stream.write_buf(&mut bytes).await?;
+        self.write_stream.flush().await?;
+        Ok(())
     }
+}
 
+impl ConnectionRx {
     pub async fn read_frame(&mut self) -> Result<Option<Message>> {
         loop {
             if let Some(frame) = self.parse_frame()? {
@@ -62,18 +84,5 @@ impl Connection {
         self.buffer.advance(message_len);
 
         Ok(Some(message))
-    }
-
-    pub async fn write_frame(&mut self, frame: Message) -> Result<(), FrameError> {
-        let mut bytes: Bytes = bincode::serialize(&frame)?.into();
-        if bytes.len() > u16::MAX.into() {
-            return Err(FrameError::FrameLength);
-        }
-        let len = bytes.len() as u16;
-        let len = len.to_be_bytes();
-        self.write_stream.write_all(&len).await?;
-        self.write_stream.write_buf(&mut bytes).await?;
-        self.write_stream.flush().await?;
-        Ok(())
     }
 }
