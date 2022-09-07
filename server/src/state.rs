@@ -1,50 +1,32 @@
-use anyhow::Context;
-use clash::{lobby::LobbyOptions, net::ProtocolError, LobbyId, PlayerId};
+use clash::{LobbyId, PlayerId};
 use rand::{thread_rng, Rng};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, RwLock};
 
-use crate::lobby::Lobby;
+use crate::lobby;
+use crate::lobby::lobby_handle::LobbyHandle;
 
-pub type PlayerMap = HashMap<PlayerId, LobbyId>;
-pub type LobbyMap = HashMap<LobbyId, Lobby>;
+pub type ServerState = Arc<RwLock<State>>;
 
+#[derive(Debug, Default)]
 pub struct State {
-    pub players: PlayerMap,
-    pub lobbies: LobbyMap,
+    pub players: HashSet<PlayerId>,
+    pub lobbies: HashMap<LobbyId, LobbyHandle>,
 }
 
 impl State {
-    pub fn new() -> Self {
-        Self {
-            players: HashMap::new(),
-            lobbies: HashMap::new(),
-        }
-    }
-
     pub fn add_player(&mut self) -> PlayerId {
-        self.gen_player_id()
+        let player_id = self.gen_player_id();
+        self.players.insert(player_id);
+        player_id
     }
 
-    pub fn add_lobby(&mut self) -> LobbyId {
-        let gen_lobby_id = self.gen_lobby_id();
-        self.lobbies.insert(
-            gen_lobby_id,
-            Lobby::new(LobbyOptions::default(), gen_lobby_id),
-        );
-        gen_lobby_id
-    }
-
-    pub fn get_lobby(&mut self, player_id: PlayerId) -> anyhow::Result<&mut Lobby> {
-        let lobby_id = *self
-            .players
-            .get(&player_id)
-            .ok_or(ProtocolError::InvalidPlayerId(player_id))
-            .context("Player not currently in a lobby")?;
-
-        self.lobbies
-            .get_mut(&lobby_id)
-            .ok_or(ProtocolError::InvalidLobbyId(lobby_id))
-            .context("Lobby specified by player list not found")
+    // TODO: Would be nice to not have to pass in a clone of ServerState here
+    pub fn add_lobby(&mut self, state: ServerState) -> LobbyHandle {
+        let lobby_id = self.gen_lobby_id();
+        let handle = lobby::start_new_lobby(state, lobby_id);
+        self.lobbies.insert(lobby_id, handle.clone());
+        handle
     }
 
     // TODO: dedupe this.
@@ -52,7 +34,7 @@ impl State {
         let mut player_id;
         loop {
             player_id = thread_rng().gen();
-            if !self.players.contains_key(&player_id) {
+            if !self.players.contains(&player_id) {
                 break;
             };
         }

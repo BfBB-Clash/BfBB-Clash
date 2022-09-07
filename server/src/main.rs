@@ -2,10 +2,8 @@ mod client;
 mod lobby;
 mod state;
 
-use state::State;
-use std::sync::{Arc, RwLock};
+use state::ServerState;
 use tokio::net::TcpListener;
-use tokio::spawn;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -24,11 +22,11 @@ async fn main() {
     log::info!("Listening on port 42932");
     // We will certainly want more than one lock for the server state. Likely at least for each
     // individual lobby
-    let state = Arc::new(RwLock::new(State::new()));
+    let state = ServerState::default();
     loop {
         let (socket, _) = listener.accept().await.unwrap();
 
         let state = state.clone();
-        spawn(client::handle_new_connection(state, socket));
+        client::handle_new_connection(state, socket).await;
     }
 }

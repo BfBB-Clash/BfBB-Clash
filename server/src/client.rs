@@ -1,25 +1,20 @@
-use std::collections::hash_map::Entry;
-use std::sync::{Arc, RwLock};
-
 use anyhow::Context;
-use bfbb::Spatula;
-use clash::lobby::GamePhase;
 use clash::net::connection::{self, ConnectionRx, ConnectionTx};
-use clash::net::{FrameError, Item, Message, ProtocolError};
+use clash::net::{Message, ProtocolError};
 use clash::PlayerId;
 use tokio::net::TcpStream;
 
-use crate::state::State;
+use crate::lobby::lobby_handle::LobbyHandle;
+use crate::state::ServerState;
 
 /// Accept a new connection from a client and run it's message loop
-pub async fn handle_new_connection(state: Arc<RwLock<State>>, socket: TcpStream) {
+pub async fn handle_new_connection(state: ServerState, socket: TcpStream) {
     let (tx, rx) = tokio::sync::mpsc::channel(64);
     let (conn_tx, conn_rx) = connection::from_socket(socket);
-    let client = Client::new(state, conn_rx, tx).await.unwrap();
+    let client = Client::new(state, conn_rx, tx);
 
     tokio::spawn(send_task(conn_tx, rx));
-
-    client.run().await;
+    tokio::spawn(client.run());
 
     // Player cleanup handled by drop impl
 }
@@ -40,38 +35,41 @@ async fn send_task(mut conn_tx: ConnectionTx, mut rx: tokio::sync::mpsc::Receive
 }
 
 struct Client {
-    state: Arc<RwLock<State>>,
+    state: ServerState,
     conn_rx: ConnectionRx,
     tx: tokio::sync::mpsc::Sender<Message>,
     player_id: PlayerId,
+    lobby: Option<LobbyHandle>,
 }
 
 impl Client {
-    pub async fn new(
-        state: Arc<RwLock<State>>,
+    pub fn new(
+        state: ServerState,
         conn_rx: ConnectionRx,
         tx: tokio::sync::mpsc::Sender<Message>,
-    ) -> Result<Self, FrameError> {
+    ) -> Self {
         // Add new player
         let player_id = {
             let mut state = state.write().unwrap();
             state.add_player()
         };
 
-        Ok(Self {
+        Self {
             state,
             conn_rx,
             tx,
             player_id,
-        })
+            lobby: None,
+        }
     }
 
+    /// Takes ownership of self to guarantee that client will be dropped when it's
+    /// message loop ends
     pub async fn run(mut self) {
         loop {
             let incoming = match self.conn_rx.read_frame().await {
                 Ok(Some(x)) => x,
                 Ok(None) => {
-                    log::info!("Player id {:#X} disconnected", self.player_id);
                     break;
                 }
                 Err(e) => {
@@ -101,7 +99,6 @@ impl Client {
                     }
                     Some(ProtocolError::Disconnected) => {
                         // Close the connection without error
-                        log::info!("Player id {:#X} disconnected", self.player_id);
                         break;
                     }
                     _ => {
@@ -116,6 +113,7 @@ impl Client {
                 }
             }
         }
+        log::info!("Player id {:#X} disconnected", self.player_id);
     }
 
     async fn process_incoming(&mut self, incoming: Message) -> anyhow::Result<()> {
@@ -136,144 +134,66 @@ impl Client {
                 log::info!("New connection for player id {:#X} opened", self.player_id);
             }
             Message::GameHost => {
-                let state = &mut *self.state.write().unwrap();
-                if state.players.contains_key(&self.player_id) {
-                    return Err(ProtocolError::InvalidMessage.into());
-                }
-
-                let lobby_id = state.add_lobby();
-                let lobby = state
-                    .lobbies
-                    .get_mut(&lobby_id)
-                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
-
-                let lobby_recv = lobby.add_player(&mut state.players, self.player_id)?;
+                let lobby_handle = {
+                    let state = &mut *self.state.write().unwrap();
+                    state.players.insert(self.player_id);
+                    state.add_lobby(self.state.clone())
+                };
+                let lobby_recv = lobby_handle.add_player(self.player_id).await?;
                 tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
 
                 log::info!(
                     "Player {:#X} has hosted lobby {:#X}",
                     self.player_id,
-                    lobby.shared.lobby_id
+                    lobby_handle.get_lobby_id()
                 );
+                self.lobby = Some(lobby_handle);
             }
             Message::GameJoin { lobby_id } => {
-                let state = &mut *self.state.write().unwrap();
-                if state.players.contains_key(&self.player_id) {
-                    return Err(ProtocolError::InvalidMessage.into());
-                }
+                let lobby_handle = {
+                    let state = &mut *self.state.write().unwrap();
+                    state.players.insert(self.player_id);
+                    state
+                        .lobbies
+                        .get_mut(&lobby_id)
+                        .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
+                        .clone()
+                };
 
-                let lobby = state
-                    .lobbies
-                    .get_mut(&lobby_id)
-                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?;
-
-                let lobby_recv = lobby.add_player(&mut state.players, self.player_id)?;
+                let lobby_recv = lobby_handle.add_player(self.player_id).await?;
                 tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
 
                 log::info!(
                     "Player {:#X} has joined lobby {lobby_id:#X}",
                     self.player_id
                 );
+                self.lobby = Some(lobby_handle);
             }
             Message::GameBegin => {
-                let state = &mut *self.state.write().unwrap();
-                let lobby = state.get_lobby(self.player_id)?;
-                if lobby.shared.can_start() {
-                    lobby.start_game();
-                } else {
-                    log::warn!(
-                        "Lobby {:#X} attempted to start when some players aren't on the Main Menu",
-                        lobby.shared.lobby_id
-                    )
-                }
+                let lobby = self.lobby.as_mut().unwrap();
+                lobby.start_game(self.player_id).await?;
             }
             Message::GameLeave => {
-                // Remove player from their lobby
-                let state = &mut *self.state.write().unwrap();
-
-                self.leave_lobby(state);
+                let lobby = self.lobby.as_mut().unwrap();
+                lobby.rem_player(self.player_id).await?;
+                self.lobby = None;
+                // TODO: Abort broadcast receiver task (preferably by closing connection)
             }
-            Message::PlayerOptions { mut options } => {
-                let state = &mut *self.state.write().unwrap();
-                let lobby = state.get_lobby(self.player_id)?;
-
-                let player = lobby
-                    .shared
-                    .players
-                    .get_mut(&self.player_id)
-                    .ok_or(ProtocolError::InvalidPlayerId(self.player_id))
-                    .context("Player not found in lobby specified by the playerlist")?;
-
-                // TODO: Unhardcode player color
-                options.color = player.options.color;
-                player.options = options;
-
-                let message = Message::GameLobbyInfo {
-                    lobby: lobby.shared.clone(),
-                };
-                let _ = lobby.sender.send(message);
+            Message::PlayerOptions { options } => {
+                let lobby = self.lobby.as_mut().unwrap();
+                lobby.set_player_options(self.player_id, options).await?;
             }
             Message::GameOptions { options } => {
-                let state = &mut *self.state.write().unwrap();
-                let lobby = state.get_lobby(self.player_id)?;
-
-                if lobby.shared.host_id != Some(self.player_id) {
-                    return Err(ProtocolError::InvalidMessage)
-                        .context("Only the host can change Lobby Options");
-                }
-                lobby.shared.options = options;
-
-                let message = Message::GameLobbyInfo {
-                    lobby: lobby.shared.clone(),
-                };
-                let _ = lobby.sender.send(message);
+                let lobby = self.lobby.as_mut().unwrap();
+                lobby.set_game_options(self.player_id, options).await?;
             }
             Message::GameCurrentLevel { level } => {
-                let state = &mut *self.state.write().unwrap();
-                let lobby = state.get_lobby(self.player_id)?;
-
-                let player = lobby
-                    .shared
-                    .players
-                    .get_mut(&self.player_id)
-                    .ok_or(ProtocolError::InvalidPlayerId(self.player_id))
-                    .context("Player not found in lobby specified by the playerlist")?;
-
-                player.current_level = level;
-                log::info!("Player {:#X} entered {level:?}", self.player_id);
-
-                let message = Message::GameLobbyInfo {
-                    lobby: lobby.shared.clone(),
-                };
-                let _ = lobby.sender.send(message);
+                let lobby = self.lobby.as_mut().unwrap();
+                lobby.set_player_level(self.player_id, level).await?;
             }
             Message::GameItemCollected { item } => {
-                let state = &mut *self.state.write().unwrap();
-                let lobby = state.get_lobby(self.player_id)?;
-
-                match item {
-                    Item::Spatula(spat) => {
-                        if let Entry::Vacant(e) = lobby.shared.game_state.spatulas.entry(spat) {
-                            e.insert(Some(self.player_id));
-                            lobby
-                                .shared
-                                .players
-                                .get_mut(&self.player_id)
-                                .ok_or(ProtocolError::InvalidPlayerId(self.player_id))?
-                                .score += 1;
-                            log::info!("Player {:#X} collected {spat:?}", self.player_id);
-
-                            if spat == Spatula::TheSmallShallRuleOrNot {
-                                lobby.shared.game_phase = GamePhase::Finished;
-                            }
-
-                            let message = Message::GameLobbyInfo {
-                                lobby: lobby.shared.clone(),
-                            };
-                            let _ = lobby.sender.send(message);
-                        }
-                    }
-                }
+                let lobby = self.lobby.as_mut().unwrap();
+                lobby.player_collected_item(self.player_id, item).await?;
             }
             _ => {
                 return Err(ProtocolError::InvalidMessage)
@@ -282,20 +202,6 @@ impl Client {
         }
         Ok(())
     }
-
-    fn leave_lobby(&self, state: &mut State) {
-        if let Entry::Occupied(e) = state.players.entry(self.player_id) {
-            let lobby_id = e.remove();
-
-            if let Entry::Occupied(mut lobby) = state.lobbies.entry(lobby_id) {
-                if lobby.get_mut().rem_player(self.player_id) == 0 {
-                    // Remove this lobby from the server
-                    log::info!("Closing lobby {:#X}", lobby.key());
-                    lobby.remove();
-                }
-            }
-        }
-    }
 }
 
 impl Drop for Client {
@@ -303,6 +209,6 @@ impl Drop for Client {
         // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
         // and that's fine for now.
         let state = &mut *self.state.write().unwrap();
-        self.leave_lobby(state);
+        state.players.remove(&self.player_id);
     }
 }
