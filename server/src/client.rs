@@ -3,6 +3,7 @@ use clash::net::connection::{self, ConnectionRx, ConnectionTx};
 use clash::net::{Message, ProtocolError};
 use clash::PlayerId;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 
 use crate::lobby::lobby_handle::LobbyHandle;
 use crate::state::ServerState;
@@ -37,7 +38,7 @@ async fn send_task(mut conn_tx: ConnectionTx, mut rx: tokio::sync::mpsc::Receive
 struct Client {
     state: ServerState,
     conn_rx: ConnectionRx,
-    tx: tokio::sync::mpsc::Sender<Message>,
+    tx: mpsc::Sender<Message>,
     player_id: PlayerId,
     lobby: Option<LobbyHandle>,
 }
@@ -170,29 +171,29 @@ impl Client {
                 self.lobby = Some(lobby_handle);
             }
             Message::GameBegin => {
-                let lobby = self.lobby.as_mut().unwrap();
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.start_game(self.player_id).await?;
             }
             Message::GameLeave => {
-                let lobby = self.lobby.as_mut().unwrap();
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.rem_player(self.player_id).await?;
                 self.lobby = None;
                 // TODO: Abort broadcast receiver task (preferably by closing connection)
             }
             Message::PlayerOptions { options } => {
-                let lobby = self.lobby.as_mut().unwrap();
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.set_player_options(self.player_id, options).await?;
             }
             Message::GameOptions { options } => {
-                let lobby = self.lobby.as_mut().unwrap();
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.set_game_options(self.player_id, options).await?;
             }
             Message::GameCurrentLevel { level } => {
-                let lobby = self.lobby.as_mut().unwrap();
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.set_player_level(self.player_id, level).await?;
             }
             Message::GameItemCollected { item } => {
-                let lobby = self.lobby.as_mut().unwrap();
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.player_collected_item(self.player_id, item).await?;
             }
             _ => {
