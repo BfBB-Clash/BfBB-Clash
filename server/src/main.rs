@@ -20,8 +20,6 @@ async fn main() {
         .init();
     let listener = TcpListener::bind("0.0.0.0:42932").await.unwrap();
     log::info!("Listening on port 42932");
-    // We will certainly want more than one lock for the server state. Likely at least for each
-    // individual lobby
     let state = ServerState::default();
     loop {
         let (socket, _) = listener.accept().await.unwrap();

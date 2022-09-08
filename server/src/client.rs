@@ -50,7 +50,7 @@ impl Client {
     ) -> Self {
         // Add new player
         let player_id = {
-            let mut state = state.write().unwrap();
+            let mut state = state.lock().unwrap();
             state.add_player()
         };
 
@@ -135,7 +135,7 @@ impl Client {
             }
             Message::GameHost => {
                 let lobby_handle = {
-                    let state = &mut *self.state.write().unwrap();
+                    let state = &mut *self.state.lock().unwrap();
                     state.players.insert(self.player_id);
                     state.add_lobby(self.state.clone())
                 };
@@ -151,7 +151,7 @@ impl Client {
             }
             Message::GameJoin { lobby_id } => {
                 let lobby_handle = {
-                    let state = &mut *self.state.write().unwrap();
+                    let state = &mut *self.state.lock().unwrap();
                     state.players.insert(self.player_id);
                     state
                         .lobbies
@@ -208,7 +208,7 @@ impl Drop for Client {
     fn drop(&mut self) {
         // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
         // and that's fine for now.
-        let state = &mut *self.state.write().unwrap();
+        let state = &mut *self.state.lock().unwrap();
         state.players.remove(&self.player_id);
     }
 }

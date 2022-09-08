@@ -1,12 +1,12 @@
 use clash::{LobbyId, PlayerId};
 use rand::{thread_rng, Rng};
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use crate::lobby;
 use crate::lobby::lobby_handle::LobbyHandle;
 
-pub type ServerState = Arc<RwLock<State>>;
+pub type ServerState = Arc<Mutex<State>>;
 
 #[derive(Debug, Default)]
 pub struct State {

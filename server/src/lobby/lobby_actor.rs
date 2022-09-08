@@ -113,7 +113,7 @@ impl LobbyActor {
         }
 
         // Remove this lobby from the server
-        let state = &mut *self.state.write().unwrap();
+        let state = &mut *self.state.lock().unwrap();
         state.lobbies.remove(&self.shared.lobby_id);
         log::info!("Closing lobby {:#X}", self.shared.lobby_id);
     }
