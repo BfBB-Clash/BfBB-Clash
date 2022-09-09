@@ -3,9 +3,23 @@ name = "clash"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [workspace]
 members = ["client", "server"]
+
+# Remove unneeded debug info from linux binaries
+[profile.release]
+strip = true
+
+# Optimize our dependencies for better performance when debugging
+[profile.dev.package."*"]
+opt-level = 3
+
+# Don't optimize on CI though
+[profile.ci]
+inherits = "dev"
+
+[profile.ci.package."*"]
+opt-level = 0
 
 [dependencies]
 bfbb = { version = "0.1", features = ["serde"]}
