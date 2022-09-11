@@ -142,7 +142,7 @@ mod test {
     #[tokio::test]
     async fn start_game() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
@@ -153,12 +153,13 @@ mod test {
             ));
         });
         let _ = handle.start_game(1234).await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
     async fn add_player() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
@@ -169,22 +170,24 @@ mod test {
             ));
         });
         let _ = handle.add_player(0x12123434).await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
     async fn rem_player() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             assert!(matches!(m, LobbyMessage::RemovePlayer { id: 0x13371337 }));
         });
         let _ = handle.rem_player(0x13371337).await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
     async fn set_player_options() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             if let LobbyMessage::SetPlayerOptions {
                 respond_to: _,
@@ -213,12 +216,13 @@ mod test {
                 },
             )
             .await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
     async fn set_player_level() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
@@ -232,12 +236,13 @@ mod test {
         let _ = handle
             .set_player_level(0x12123434, Some(Level::MainMenu))
             .await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
     async fn player_collected_item() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
@@ -251,12 +256,13 @@ mod test {
         let _ = handle
             .player_collected_item(0x12123434, Item::Spatula(Spatula::OnTopOfThePineapple))
             .await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
     async fn set_game_options() {
         let (mut rx, handle) = setup();
-        tokio::spawn(async move {
+        let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             if let LobbyMessage::SetGameOptions {
                 respond_to: _,
@@ -285,6 +291,7 @@ mod test {
                 },
             )
             .await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]
