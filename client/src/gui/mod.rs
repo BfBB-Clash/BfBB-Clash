@@ -12,6 +12,7 @@ mod clash;
 mod lobby;
 mod main_menu;
 mod state;
+mod val_text;
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;

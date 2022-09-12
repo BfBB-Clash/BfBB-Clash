@@ -16,6 +16,8 @@ use crate::gui::PADDING;
 use player_ui::PlayerUi;
 use tracker::Tracker;
 
+use super::val_text::ValText;
+
 mod player_ui;
 mod tracker;
 
@@ -25,9 +27,7 @@ pub struct Game {
     network_sender: tokio::sync::mpsc::Sender<Message>,
     lobby: NetworkedLobby,
     local_player_id: PlayerId,
-
-    lab_door_buf: String,
-    lab_door_num: Option<u8>,
+    lab_door_num: ValText<u8>,
 }
 
 impl Game {
@@ -42,8 +42,9 @@ impl Game {
             network_sender,
             lobby: NetworkedLobby::new(0),
             local_player_id: 0,
-            lab_door_buf: Default::default(),
-            lab_door_num: None,
+            lab_door_num: ValText::with_validator(|text| {
+                text.parse::<u8>().ok().filter(|&n| n > 0 && n <= 82)
+            }),
         }
     }
 }
@@ -56,8 +57,7 @@ impl App for Game {
         // Receive gamestate updates
         while let Ok((local_player_id, new_lobby)) = self.gui_receiver.try_recv() {
             self.local_player_id = local_player_id;
-            self.lab_door_buf = new_lobby.options.lab_door_cost.to_string();
-            self.lab_door_num = Some(new_lobby.options.lab_door_cost);
+            self.lab_door_num.set_val(new_lobby.options.lab_door_cost);
             self.lobby = new_lobby;
         }
 
@@ -105,11 +105,11 @@ impl Game {
 
             let door_cost_response = ui
                 .horizontal(|ui| {
-                    if self.lab_door_num.is_none() {
+                    if !self.lab_door_num.is_valid() {
                         ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
                     }
                     ui.label("Lab Door Cost: ");
-                    ui.text_edit_singleline(&mut self.lab_door_buf)
+                    ui.text_edit_singleline(&mut self.lab_door_num)
                 })
                 .inner;
 
@@ -117,20 +117,8 @@ impl Game {
                 return;
             }
 
-            // Validate input
-            let mut door_cost_change_valid = false;
-            if door_cost_response.changed() {
-                self.lab_door_num = self
-                    .lab_door_buf
-                    .parse::<u8>()
-                    .ok()
-                    .filter(|&n| n > 0 && n <= 82);
-                if let Some(n) = self.lab_door_num {
-                    self.lobby.options.lab_door_cost = n;
-                    door_cost_change_valid = true;
-                }
-            }
-
+            let door_cost_change_valid =
+                self.lab_door_num.is_valid() && door_cost_response.changed();
             if door_cost_change_valid || ng_plus_response.changed() {
                 self.network_sender
                     .blocking_send(Message::GameOptions {
@@ -141,19 +129,19 @@ impl Game {
 
             let mut start_game_response = ui
                 .add_enabled(
-                    self.lobby.can_start() && self.lab_door_num.is_some(),
+                    self.lobby.can_start() && self.lab_door_num.is_valid(),
                     Button::new("Start Game"),
                 )
                 .on_hover_text("Starts a new game for all connected players.");
 
-            // We unfortunately have to check these conditions twice since we need the Response to add the
-            // tooltips but need to enable/disable the button before we can get the response
+            // We need to check these conditions twice separately so that we only add tooltips for
+            // the particular conditons that are preventing the game from starting.
             if !self.lobby.can_start() {
                 start_game_response = start_game_response
                     .on_disabled_hover_text("All players must be on the Main Menu.")
             }
 
-            if self.lab_door_num.is_none() {
+            if !self.lab_door_num.is_valid() {
                 start_game_response = start_game_response
                     .on_disabled_hover_text("'Lab Door Cost' must be a number from 1-82");
             }
