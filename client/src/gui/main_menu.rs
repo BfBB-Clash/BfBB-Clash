@@ -6,21 +6,14 @@ use eframe::{
     App,
 };
 
-use crate::gui::state::{Screen, State};
+use crate::gui::state::{Screen, State, Submenu};
 use crate::gui::BORDER;
 
 use super::val_text::ValText;
 
-enum Submenu {
-    Root,
-    Host,
-    Join,
-}
-
 pub struct MainMenu {
     state: Rc<State>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
-    submenu: Submenu,
     player_name: String,
     lobby_id: ValText<u32>,
 }
@@ -30,7 +23,6 @@ impl MainMenu {
         Self {
             state,
             network_sender,
-            submenu: Submenu::Root,
             player_name: Default::default(),
             // TODO: atm it is not strictly true that the lobby_id must be 8 digits,
             //  since it's just a random u32. When this is resolved on the server-side,
@@ -42,7 +34,11 @@ impl MainMenu {
 
 impl App for MainMenu {
     fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
-        match self.submenu {
+        let submenu = match self.state.screen.get() {
+            Screen::MainMenu(submenu) => submenu,
+            _ => unreachable!("Attempted to extract Main Menu submenu while not on Main Menu"),
+        };
+        match submenu {
             Submenu::Root => {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
@@ -54,10 +50,10 @@ impl App for MainMenu {
                             frame.close();
                         }
                         if ui.button("Join Game").clicked() {
-                            self.submenu = Submenu::Join;
+                            self.state.screen.set(Screen::MainMenu(Submenu::Join));
                         }
                         if ui.button("Host Game").clicked() {
-                            self.submenu = Submenu::Host;
+                            self.state.screen.set(Screen::MainMenu(Submenu::Host));
                         }
                     });
                 });
@@ -86,7 +82,7 @@ impl App for MainMenu {
                         }
                     });
                     if ui.button("Back").clicked() {
-                        self.submenu = Submenu::Root;
+                        self.state.screen.set(Screen::MainMenu(Submenu::Root));
                     }
                     ui.add_space(BORDER);
                 });
@@ -124,7 +120,7 @@ impl App for MainMenu {
                     }
 
                     if ui.button("Back").clicked() {
-                        self.submenu = Submenu::Root;
+                        self.state.screen.set(Screen::MainMenu(Submenu::Root));
                     }
                     ui.add_space(BORDER);
                 });

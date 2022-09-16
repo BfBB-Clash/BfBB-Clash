@@ -117,7 +117,7 @@ impl App for Clash {
         });
 
         match self.state.screen.get() {
-            Screen::MainMenu => self.main_menu.update(ctx, frame),
+            Screen::MainMenu(_) => self.main_menu.update(ctx, frame),
             Screen::Lobby => self.game_screen.update(ctx, frame),
         }
 

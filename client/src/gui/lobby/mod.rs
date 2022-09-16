@@ -11,7 +11,7 @@ use eframe::{
     App,
 };
 
-use crate::gui::state::{Screen, State};
+use crate::gui::state::{Screen, State, Submenu};
 use crate::gui::PADDING;
 use player_ui::PlayerUi;
 use tracker::Tracker;
@@ -84,7 +84,7 @@ impl App for Game {
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {
                     let _ = self.network_sender.blocking_send(Message::GameLeave);
-                    self.state.screen.set(Screen::MainMenu);
+                    self.state.screen.set(Screen::MainMenu(Submenu::Root));
                 }
             })
         });

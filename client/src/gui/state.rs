@@ -7,8 +7,15 @@ use eframe::{
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Screen {
-    MainMenu,
+    MainMenu(Submenu),
     Lobby,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Submenu {
+    Root,
+    Host,
+    Join,
 }
 
 pub struct State {
@@ -24,7 +31,7 @@ impl State {
             eframe::egui::TextureFilter::Linear,
         );
         Self {
-            screen: Cell::new(Screen::MainMenu),
+            screen: Cell::new(Screen::MainMenu(Submenu::Root)),
             logo,
         }
     }
