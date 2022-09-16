@@ -117,9 +117,19 @@ impl Game {
                 return;
             }
 
-            let door_cost_change_valid =
-                self.lab_door_num.is_valid() && door_cost_response.changed();
-            if door_cost_change_valid || ng_plus_response.changed() {
+            // It shouldn't be possible to change multiple options in one update, so not batching
+            // them here shouldn't result in potential to "double update" the server
+            if door_cost_response.changed() {
+                if let Some(n) = self.lab_door_num.get_val() {
+                    self.lobby.options.lab_door_cost = *n;
+                    self.network_sender
+                        .blocking_send(Message::GameOptions {
+                            options: self.lobby.options.clone(),
+                        })
+                        .unwrap();
+                }
+            }
+            if ng_plus_response.changed() {
                 self.network_sender
                     .blocking_send(Message::GameOptions {
                         options: self.lobby.options.clone(),
