@@ -24,6 +24,7 @@ fn main() {
         .parse_env("CLASH_LOG")
         .init();
 
+    let (connect_sender, connect_recv) = tokio::sync::mpsc::channel(1);
     let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<Message>(100);
     let (logic_sender, logic_receiver) = channel::<Message>();
     let (error_sender, error_receiver) = channel::<Box<dyn Error + Send>>();
@@ -34,7 +35,7 @@ fn main() {
     //       library is async.
     let _network_thread = std::thread::Builder::new()
         .name("Network".into())
-        .spawn(move || net::run(network_receiver, logic_sender, error_sender));
+        .spawn(move || net::run(connect_recv, network_receiver, logic_sender, error_sender));
 
     // Start Game Thread
     let (gui_sender, gui_receiver) = channel();
@@ -46,5 +47,5 @@ fn main() {
     };
 
     // Start gui on the main thread
-    gui::run(gui_receiver, error_receiver, network_sender);
+    gui::run(gui_receiver, error_receiver, network_sender, connect_sender);
 }

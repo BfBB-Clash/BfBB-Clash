@@ -40,7 +40,7 @@ impl GameMode for ClashGame {
         if local_player.current_level != level {
             local_player.current_level = level;
             network_sender
-                .blocking_send(Message::GameCurrentLevel { level })
+                .try_send(Message::GameCurrentLevel { level })
                 .unwrap();
         }
 
@@ -91,7 +91,7 @@ impl GameMode for ClashGame {
             if interface.is_task_complete(spat)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .blocking_send(Message::GameItemCollected {
+                    .try_send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
                     })
                     .unwrap();
@@ -102,7 +102,7 @@ impl GameMode for ClashGame {
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .blocking_send(Message::GameItemCollected {
+                    .try_send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
                     })
                     .unwrap();

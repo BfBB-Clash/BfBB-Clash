@@ -1,14 +1,37 @@
 use std::{error::Error, sync::mpsc::Sender};
 
+use async_scoped::TokioScope;
 use clash_lib::net::{
-    connection::{self, ConnectionTx},
+    connection::{self, ConnectionRx},
     Message, ProtocolError,
 };
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Connect;
 
 #[tokio::main]
 pub async fn run(
-    receiver: tokio::sync::mpsc::Receiver<Message>,
+    mut connect_recv: mpsc::Receiver<Connect>,
+    mut receiver: mpsc::Receiver<Message>,
+    logic_sender: Sender<Message>,
+    error_sender: Sender<Box<dyn Error + Send>>,
+) {
+    while let Some(Connect) = connect_recv.recv().await {
+        TokioScope::scope_and_block(|s| {
+            s.spawn(main_task(
+                &mut receiver,
+                logic_sender.clone(),
+                error_sender.clone(),
+            ));
+        });
+        log::info!("Disconnected from server.");
+    }
+}
+
+async fn main_task(
+    receiver: &mut tokio::sync::mpsc::Receiver<Message>,
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
 ) {
@@ -16,7 +39,7 @@ pub async fn run(
     log::info!("Connecting to server at '{ip}'");
 
     let sock = TcpStream::connect(&ip).await.unwrap();
-    let (mut conn_tx, mut conn_rx) = connection::from_socket(sock);
+    let (mut conn_tx, conn_rx) = connection::from_socket(sock);
     conn_tx
         .write_frame(Message::Version {
             version: crate::VERSION.to_owned(),
@@ -24,7 +47,29 @@ pub async fn run(
         .await
         .unwrap();
 
-    tokio::spawn(send_task(receiver, conn_tx, error_sender.clone()));
+    // TODO: This disconection scheme is very fragile and relies on the server dropping the connection,
+    // causing our recv_task to complete and then break from the send loop
+    let mut handle = tokio::spawn(recv_task(conn_rx, error_sender.clone(), logic_sender));
+    loop {
+        let m = tokio::select! {
+            _ = &mut handle => break,
+            m = receiver.recv() => m,
+        };
+        log::debug!("Sending message {m:#?}");
+        if let Err(e) = conn_tx.write_frame(m.unwrap()).await {
+            log::error!("Error sending message to server. Disconnecting. {e:#?}");
+            error_sender
+                .send(Box::new(e))
+                .expect("GUI has crashed and so will we.");
+        }
+    }
+}
+
+async fn recv_task(
+    mut conn_rx: ConnectionRx,
+    error_sender: Sender<Box<dyn Error + Send>>,
+    logic_sender: Sender<Message>,
+) {
     loop {
         let incoming = match conn_rx.read_frame().await {
             Ok(Some(x)) => {
@@ -46,23 +91,6 @@ pub async fn run(
 
         if let Err(e) = process_incoming(incoming, &logic_sender) {
             log::error!("Error from server:\n{e}");
-            error_sender
-                .send(Box::new(e))
-                .expect("GUI has crashed and so will we.");
-        }
-    }
-}
-
-async fn send_task(
-    mut receiver: tokio::sync::mpsc::Receiver<Message>,
-    mut tx: ConnectionTx,
-    error_sender: Sender<Box<dyn Error + Send>>,
-) {
-    loop {
-        let m = receiver.recv().await;
-        log::debug!("Sending message {m:#?}");
-        if let Err(e) = tx.write_frame(m.unwrap()).await {
-            log::error!("Error sending message to server. Disconnecting. {e:#?}");
             error_sender
                 .send(Box::new(e))
                 .expect("GUI has crashed and so will we.");

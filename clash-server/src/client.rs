@@ -105,6 +105,7 @@ impl Client {
                     }
                     Some(ProtocolError::Disconnected) => {
                         // Close the connection without error
+                        // TODO: Abort broadcast receiver task (preferably by closing connection)
                         break;
                     }
                     _ => {
@@ -183,7 +184,7 @@ impl Client {
                 let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.rem_player(self.player_id).await?;
                 self.lobby = None;
-                // TODO: Abort broadcast receiver task (preferably by closing connection)
+                return Err(ProtocolError::Disconnected.into());
             }
             Message::PlayerOptions { options } => {
                 let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;

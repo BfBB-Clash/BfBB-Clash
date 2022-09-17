@@ -60,7 +60,7 @@ pub fn start_game(
                     if local_player.current_level != None {
                         local_player.current_level = None;
                         network_sender
-                            .blocking_send(Message::GameCurrentLevel { level: None })
+                            .try_send(Message::GameCurrentLevel { level: None })
                             .unwrap();
                         network_sender
                             .blocking_send(Message::PlayerCanStart(false))

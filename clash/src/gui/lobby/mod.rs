@@ -91,7 +91,7 @@ impl App for Game {
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {
-                    let _ = self.network_sender.blocking_send(Message::GameLeave);
+                    let _ = self.network_sender.try_send(Message::GameLeave);
                     self.state.screen.set(Screen::MainMenu(Submenu::Root));
                 }
             })

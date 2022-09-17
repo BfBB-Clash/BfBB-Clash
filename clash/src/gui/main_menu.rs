@@ -6,23 +6,32 @@ use eframe::{
     App,
 };
 
-use crate::gui::state::{Screen, State, Submenu};
 use crate::gui::BORDER;
+use crate::{
+    gui::state::{Screen, State, Submenu},
+    net::Connect,
+};
 
 use super::val_text::ValText;
 
 pub struct MainMenu {
     state: Rc<State>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
+    connect_sender: tokio::sync::mpsc::Sender<Connect>,
     player_name: String,
     lobby_id: ValText<u32>,
 }
 
 impl MainMenu {
-    pub fn new(state: Rc<State>, network_sender: tokio::sync::mpsc::Sender<Message>) -> Self {
+    pub fn new(
+        state: Rc<State>,
+        network_sender: tokio::sync::mpsc::Sender<Message>,
+        connect_sender: tokio::sync::mpsc::Sender<Connect>,
+    ) -> Self {
         Self {
             state,
             network_sender,
+            connect_sender,
             player_name: Default::default(),
             // TODO: atm it is not strictly true that the lobby_id must be 8 digits,
             //  since it's just a random u32. When this is resolved on the server-side,
@@ -62,15 +71,14 @@ impl App for MainMenu {
                 TopBottomPanel::top("Title").show(ctx, |ui| {
                     ui.vertical_centered(|ui| ui.label("Host Game"));
                 });
-                TopBottomPanel::bottom("Join Panel").show(ctx, |ui| {
+                TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
                     ui.add(TextEdit::singleline(&mut self.player_name).hint_text("Name"));
                     ui.add_enabled_ui(!self.player_name.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
+                            self.connect_sender.try_send(Connect).unwrap();
+                            self.network_sender.try_send(Message::GameHost).unwrap();
                             self.network_sender
-                                .blocking_send(Message::GameHost)
-                                .unwrap();
-                            self.network_sender
-                                .blocking_send(Message::PlayerOptions {
+                                .try_send(Message::PlayerOptions {
                                     options: PlayerOptions {
                                         name: self.player_name.clone(),
                                         color: (0, 0, 0),
@@ -91,7 +99,7 @@ impl App for MainMenu {
                 TopBottomPanel::top("Title").show(ctx, |ui| {
                     ui.label("Join Game");
                 });
-                TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
+                TopBottomPanel::bottom("Join Panel").show(ctx, |ui| {
                     ui.add(TextEdit::singleline(&mut self.player_name).hint_text("Name"));
                     ui.add(
                         TextEdit::singleline(&mut self.lobby_id)
@@ -103,13 +111,14 @@ impl App for MainMenu {
                         .add_enabled(self.lobby_id.is_valid(), Button::new("Join Game"))
                         .on_disabled_hover_text("Lobby ID must be an 8 digit hexadecimal number");
                     if join_button.clicked() {
+                        self.connect_sender.try_send(Connect).unwrap();
                         self.network_sender
-                            .blocking_send(Message::GameJoin {
+                            .try_send(Message::GameJoin {
                                 lobby_id: *self.lobby_id.get_val().unwrap(),
                             })
                             .unwrap();
                         self.network_sender
-                            .blocking_send(Message::PlayerOptions {
+                            .try_send(Message::PlayerOptions {
                                 options: PlayerOptions {
                                     name: self.player_name.clone(),
                                     color: (0, 0, 0),
