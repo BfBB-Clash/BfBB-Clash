@@ -7,17 +7,17 @@ use eframe::{
     epaint::Vec2,
 };
 
-pub struct GameMenu<'a> {
+pub struct Tracker<'a> {
     game: &'a GameState,
     players: &'a HashMap<PlayerId, NetworkedPlayer>,
 }
 
-impl<'a> GameMenu<'a> {
+impl<'a> Tracker<'a> {
     pub fn new(game: &'a GameState, players: &'a HashMap<PlayerId, NetworkedPlayer>) -> Self {
         Self { game, players }
     }
 }
-impl<'a> Widget for GameMenu<'a> {
+impl<'a> Widget for Tracker<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
         let available_size = ui.available_size();
 
