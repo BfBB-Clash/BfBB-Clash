@@ -11,7 +11,7 @@ pub const COLORS: [(u8, u8, u8); 6] = [
     (254, 154, 95),
 ];
 
-#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct PlayerOptions {
     pub name: String,
     pub color: (u8, u8, u8),

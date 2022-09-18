@@ -2,7 +2,7 @@ mod game_menu;
 mod player_widget;
 
 use self::{game_menu::GameMenu, player_widget::PlayerUi};
-use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
+use clash::lobby::{GamePhase, NetworkedLobby};
 use clash::net::Message;
 use clash::player::PlayerOptions;
 use clash::PlayerId;
@@ -67,7 +67,7 @@ impl Clash {
             lab_door_buf: Default::default(),
             lab_door_num: None,
             player_id: 0,
-            lobby: NetworkedLobby::new(0, LobbyOptions::default()),
+            lobby: NetworkedLobby::new(0),
             error_queue: Vec::new(),
         }
     }

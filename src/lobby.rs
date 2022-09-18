@@ -4,7 +4,7 @@ use crate::{game_state::GameState, player::NetworkedPlayer, LobbyId, PlayerId};
 use bfbb::Level;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct LobbyOptions {
     pub lab_door_cost: u8,
     pub ng_plus: bool,
@@ -37,11 +37,11 @@ pub struct NetworkedLobby {
 }
 
 impl NetworkedLobby {
-    pub fn new(lobby_id: u32, options: LobbyOptions) -> Self {
+    pub fn new(lobby_id: u32) -> Self {
         Self {
             game_state: GameState::default(),
             lobby_id,
-            options,
+            options: LobbyOptions::default(),
             players: HashMap::new(),
             game_phase: GamePhase::Setup,
             host_id: None,
@@ -59,14 +59,14 @@ impl NetworkedLobby {
 
 #[cfg(test)]
 mod tests {
-    use super::{LobbyOptions, NetworkedLobby};
+    use super::NetworkedLobby;
     use crate::player::{NetworkedPlayer, PlayerOptions};
 
     use bfbb::Level;
 
     #[test]
     fn can_start() {
-        let mut lobby = NetworkedLobby::new(0, LobbyOptions::default());
+        let mut lobby = NetworkedLobby::new(0);
         let player_0 = lobby
             .players
             .entry(0)
