@@ -25,13 +25,18 @@ async fn broadcast_task(
     tx: tokio::sync::mpsc::Sender<Message>,
 ) {
     while let Ok(m) = rx.recv().await {
-        tx.send(m).await.unwrap();
+        if tx.send(m).await.is_err() {
+            // The client has disconnected and the send_task has completed.
+            break;
+        }
     }
 }
 
 async fn send_task(mut conn_tx: ConnectionTx, mut rx: tokio::sync::mpsc::Receiver<Message>) {
     while let Some(m) = rx.recv().await {
-        conn_tx.write_frame(m).await.unwrap();
+        if conn_tx.write_frame(m).await.is_err() {
+            break;
+        }
     }
 }
 
