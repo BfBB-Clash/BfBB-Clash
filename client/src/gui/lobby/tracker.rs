@@ -1,11 +1,5 @@
-use std::collections::HashMap;
-
 use bfbb::{IntoEnumIterator, Spatula};
-use clash::{
-    game_state::{GameState, SpatulaState},
-    player::NetworkedPlayer,
-    PlayerId,
-};
+use clash::game_state::{GameState, SpatulaState};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
@@ -13,12 +7,11 @@ use eframe::{
 
 pub struct Tracker<'a> {
     game: &'a GameState,
-    players: &'a HashMap<PlayerId, NetworkedPlayer>,
 }
 
 impl<'a> Tracker<'a> {
-    pub fn new(game: &'a GameState, players: &'a HashMap<PlayerId, NetworkedPlayer>) -> Self {
-        Self { game, players }
+    pub fn new(game: &'a GameState) -> Self {
+        Self { game }
     }
 }
 impl<'a> Widget for Tracker<'a> {

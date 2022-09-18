@@ -283,18 +283,18 @@ impl LobbyActor {
                     }
                 };
                 if e.tier != SpatulaTier::None {
-                    let mut score = self
+                    let mut score = *self
                         .shared
                         .game_state
                         .scores
                         .get_mut(&player_id)
-                        .unwrap_or(&mut 0)
-                        .clone();
+                        .unwrap_or(&mut 0);
+
                     score += GAME_CONSTS.spat_scores[e.tier.clone() as usize];
                     self.shared.game_state.scores.insert(player_id, score);
 
                     e.collection_vec
-                        .insert(e.tier.clone() as usize, Some(player_id.clone()));
+                        .insert(e.tier.clone() as usize, Some(player_id));
                     log::info!(
                         "Player {:#X} collected {spat:?} with tier {:?}",
                         player_id,

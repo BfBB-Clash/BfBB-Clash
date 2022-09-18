@@ -69,13 +69,7 @@ impl App for Game {
                 let mut values = self.lobby.players.iter().collect::<Vec<_>>();
                 values.sort_by(|&a, &b| a.1.menu_order.cmp(&b.1.menu_order));
                 for (player_id, player) in values {
-                    let score = self
-                        .lobby
-                        .game_state
-                        .scores
-                        .get(player_id)
-                        .unwrap_or(&0)
-                        .clone();
+                    let score = *self.lobby.game_state.scores.get(player_id).unwrap_or(&0);
                     ui.add(PlayerUi::new(player, score));
                 }
             });
@@ -88,7 +82,7 @@ impl App for Game {
                     }
                 }
                 GamePhase::Playing => {
-                    ui.add(Tracker::new(&self.lobby.game_state, &self.lobby.players));
+                    ui.add(Tracker::new(&self.lobby.game_state));
                 }
                 GamePhase::Finished => todo!(),
             }
