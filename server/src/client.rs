@@ -207,6 +207,10 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
+        if let Some(lobby) = self.lobby.take() {
+            let player_id = self.player_id;
+            tokio::spawn(async move { lobby.rem_player(player_id).await });
+        }
         // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
         // and that's fine for now.
         let state = &mut *self.state.lock().unwrap();
