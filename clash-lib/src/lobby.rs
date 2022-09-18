@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::{game_state::GameState, player::NetworkedPlayer, LobbyId, PlayerId};
-use bfbb::Level;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -50,10 +49,8 @@ impl NetworkedLobby {
 
     /// True when all connected players are on the Main Menu
     pub fn can_start(&self) -> bool {
-        // TODO: Solve the "Demo Cutscene" issue. We can probably detect when players are on the autosave preference screen instead.
-        self.players
-            .values()
-            .all(|p| p.current_level == Some(Level::MainMenu))
+        // TODO: Now find a way to skip/remove the demo cutscene to make it easier to start a game
+        self.players.values().all(|p| p.ready_to_start)
     }
 }
 

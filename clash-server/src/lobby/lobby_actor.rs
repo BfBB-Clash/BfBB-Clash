@@ -36,6 +36,11 @@ pub enum LobbyMessage {
         id: PlayerId,
         options: PlayerOptions,
     },
+    SetPlayerCanStart {
+        respond_to: oneshot::Sender<LobbyResult<()>>,
+        id: PlayerId,
+        can_start: bool,
+    },
     SetPlayerLevel {
         respond_to: oneshot::Sender<LobbyResult<()>>,
         id: PlayerId,
@@ -86,6 +91,13 @@ impl LobbyActor {
                     options,
                 } => {
                     let _ = respond_to.send(self.set_player_options(id, options));
+                }
+                LobbyMessage::SetPlayerCanStart {
+                    respond_to,
+                    id,
+                    can_start,
+                } => {
+                    let _ = respond_to.send(self.set_player_can_start(id, can_start));
                 }
                 LobbyMessage::SetPlayerLevel {
                     respond_to,
@@ -246,6 +258,21 @@ impl LobbyActor {
         options.color = player.options.color;
         player.options = options;
 
+        let message = Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        };
+        let _ = self.sender.send(message);
+        Ok(())
+    }
+
+    fn set_player_can_start(&mut self, player_id: PlayerId, can_start: bool) -> LobbyResult<()> {
+        let player = self
+            .shared
+            .players
+            .get_mut(&player_id)
+            .ok_or(LobbyError::PlayerInvalid(player_id))?;
+
+        player.ready_to_start = can_start;
         let message = Message::GameLobbyInfo {
             lobby: self.shared.clone(),
         };

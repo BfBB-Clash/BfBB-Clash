@@ -1,14 +1,13 @@
 use std::collections::HashSet;
 
-use bfbb::game_interface::{GameInterface, InterfaceResult};
+use bfbb::game_interface::{GameInterface, InterfaceError, InterfaceResult};
+use bfbb::game_state::{GameMode as BfBBGameMode, GameOstrich};
 use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash_lib::game_state::SpatulaTier;
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{Item, Message};
 use clash_lib::PlayerId;
 use log::info;
-
-use crate::game::InterfaceError;
 
 use super::game_mode::GameMode;
 
@@ -43,6 +42,17 @@ impl GameMode for ClashGame {
             local_player.current_level = level;
             network_sender
                 .blocking_send(Message::GameCurrentLevel { level })
+                .unwrap();
+        }
+
+        // We need to be on the title screen to start a new game
+        // but we can't if the Demo FMV is active, so we also check that we're currently in a scene.
+        let can_start = interface.get_current_game_mode()? == BfBBGameMode::Title
+            && interface.get_current_game_ostrich()? == GameOstrich::InScene;
+        if local_player.ready_to_start != can_start {
+            local_player.ready_to_start = can_start;
+            network_sender
+                .blocking_send(Message::PlayerCanStart(can_start))
                 .unwrap();
         }
 

@@ -12,6 +12,7 @@ pub enum Message {
     Error { error: ProtocolError },
     ConnectionAccept { player_id: u32 },
     PlayerOptions { options: PlayerOptions },
+    PlayerCanStart(bool),
     GameHost,
     GameJoin { lobby_id: u32 },
     GameOptions { options: LobbyOptions },

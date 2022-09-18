@@ -20,6 +20,7 @@ tokio.workspace = true
 
 eframe = "0.19"
 image = "0.24"
+itertools = "0.10.5"
 spin_sleep = "1"
 
 [target.'cfg(windows)'.build-dependencies]
