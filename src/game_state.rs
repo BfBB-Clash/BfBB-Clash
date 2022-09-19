@@ -41,7 +41,7 @@ impl SpatulaTier {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpatulaState {
     pub tier: SpatulaTier,
-    pub collection_vec: Vec<Option<PlayerId>>,
+    pub collection_vec: Vec<PlayerId>,
 }
 
 impl Default for SpatulaState {
