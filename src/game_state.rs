@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use bfbb::{EnumCount, Spatula};
 use serde::{Deserialize, Serialize};
-use strum::EnumCount as _;
 use strum_macros::{EnumCount, EnumIter};
 
 use crate::{PlayerId, MAX_PLAYERS};
@@ -56,6 +55,7 @@ impl Default for SpatulaState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
+    /// Mapping from between spatulas and how many times it's been collected.
     pub spatulas: HashMap<Spatula, SpatulaState>,
     pub scores: HashMap<PlayerId, u32>,
 }

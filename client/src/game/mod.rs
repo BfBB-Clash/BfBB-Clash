@@ -1,17 +1,13 @@
 mod game_mode;
 mod game_state;
 
-use bfbb::{
-    game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult},
-    EnumCount, Spatula,
-};
+use bfbb::game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError};
+use bfbb::{EnumCount, Spatula};
 use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
 use log::error;
 use spin_sleep::LoopHelper;
-use std::{
-    collections::HashSet,
-    sync::mpsc::{Receiver, Sender},
-};
+use std::collections::HashSet;
+use std::sync::mpsc::{Receiver, Sender};
 
 use self::{game_mode::GameMode, game_state::ClashGame};
 

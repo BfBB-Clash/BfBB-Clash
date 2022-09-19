@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use crate::game::{GameInterface, InterfaceResult};
-use bfbb::{IntoEnumIterator, Spatula};
+use bfbb::game_interface::{GameInterface, InterfaceResult};
+use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash::game_state::SpatulaTier;
 use clash::lobby::{GamePhase, NetworkedLobby};
 use clash::net::{Item, Message};

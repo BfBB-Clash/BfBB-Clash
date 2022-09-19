@@ -271,18 +271,13 @@ impl LobbyActor {
 
         match item {
             Item::Spatula(spat) => {
-                let e = match self.shared.game_state.spatulas.get_mut(&spat) {
-                    Some(spat) => spat,
-                    None => {
-                        log::info!("adding spat");
-                        self.shared
-                            .game_state
-                            .spatulas
-                            .insert(spat, SpatulaState::default());
-                        self.shared.game_state.spatulas.get_mut(&spat).unwrap()
-                    }
-                };
-                if e.tier != SpatulaTier::None {
+                let state = self
+                    .shared
+                    .game_state
+                    .spatulas
+                    .entry(spat)
+                    .or_insert_with(SpatulaState::default);
+                if state.tier != SpatulaTier::None {
                     let mut score = *self
                         .shared
                         .game_state
@@ -290,21 +285,22 @@ impl LobbyActor {
                         .get_mut(&player_id)
                         .unwrap_or(&mut 0);
 
-                    score += GAME_CONSTS.spat_scores[e.tier.clone() as usize];
+                    score += GAME_CONSTS.spat_scores[state.tier.clone() as usize];
                     self.shared.game_state.scores.insert(player_id, score);
 
-                    e.collection_vec
-                        .insert(e.tier.clone() as usize, Some(player_id));
+                    state
+                        .collection_vec
+                        .insert(state.tier.clone() as usize, Some(player_id));
                     log::info!(
                         "Player {:#X} collected {spat:?} with tier {:?}",
                         player_id,
-                        e.tier
+                        state.tier
                     );
 
                     //This probably could be better.
-                    e.tier = SpatulaTier::from(e.tier.clone() as i32 + 1);
-                    if e.tier.clone() as i32 >= tier_count {
-                        e.tier = SpatulaTier::None
+                    state.tier = SpatulaTier::from(state.tier.clone() as i32 + 1);
+                    if state.tier.clone() as i32 >= tier_count {
+                        state.tier = SpatulaTier::None
                     }
 
                     if spat == Spatula::TheSmallShallRuleOrNot {
