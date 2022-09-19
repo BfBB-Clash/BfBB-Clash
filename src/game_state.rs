@@ -4,7 +4,7 @@ use bfbb::{EnumCount, Spatula};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumCount, EnumIter};
 
-use crate::{PlayerId, MAX_PLAYERS};
+use crate::PlayerId;
 
 // TODO: Maybe don't hardcode these?
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, EnumCount, Serialize, Deserialize)]
@@ -57,14 +57,12 @@ impl Default for SpatulaState {
 pub struct GameState {
     /// Mapping from between spatulas and how many times it's been collected.
     pub spatulas: HashMap<Spatula, SpatulaState>,
-    pub scores: HashMap<PlayerId, u32>,
 }
 
 impl Default for GameState {
     fn default() -> Self {
         Self {
             spatulas: HashMap::with_capacity(Spatula::COUNT),
-            scores: HashMap::with_capacity(MAX_PLAYERS),
         }
     }
 }
@@ -72,6 +70,5 @@ impl Default for GameState {
 impl GameState {
     pub fn reset_state(&mut self) {
         self.spatulas.clear();
-        self.scores.clear();
     }
 }

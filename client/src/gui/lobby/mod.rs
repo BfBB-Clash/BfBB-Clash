@@ -66,11 +66,10 @@ impl App for Game {
             .show(ctx, |ui| {
                 ui.add_space(PADDING);
                 // TODO: Cache this
-                let mut values = self.lobby.players.iter().collect::<Vec<_>>();
-                values.sort_by(|&a, &b| a.1.menu_order.cmp(&b.1.menu_order));
-                for (player_id, player) in values {
-                    let score = *self.lobby.game_state.scores.get(player_id).unwrap_or(&0);
-                    ui.add(PlayerUi::new(player, score));
+                let mut players = self.lobby.players.values().collect::<Vec<_>>();
+                players.sort_by(|&a, &b| a.menu_order.cmp(&b.menu_order));
+                for player in players {
+                    ui.add(PlayerUi::new(player));
                 }
             });
         CentralPanel::default().show(ctx, |ui| {

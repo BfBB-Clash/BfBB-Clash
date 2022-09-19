@@ -4,18 +4,17 @@ use eframe::egui::{Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
 pub struct PlayerUi<'a> {
     player: &'a NetworkedPlayer,
-    score: u32,
 }
 
 impl<'a> PlayerUi<'a> {
-    pub fn new(player: &'a NetworkedPlayer, score: u32) -> Self {
-        Self { player, score }
+    pub fn new(player: &'a NetworkedPlayer) -> Self {
+        Self { player }
     }
 }
 
 impl<'a> Widget for PlayerUi<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let PlayerUi { player, score } = self;
+        let PlayerUi { player } = self;
         let color = player.options.color();
 
         // Use individual layouts instead of a single one to be able to add padding between each line
@@ -27,7 +26,7 @@ impl<'a> Widget for PlayerUi<'a> {
             color,
         );
         let score_galley = ui.painter().layout_no_wrap(
-            format!("Score: {}", score),
+            format!("Score: {}", player.score),
             TextStyle::Body.resolve(ui.style()),
             color,
         );

@@ -119,6 +119,10 @@ impl LobbyActor {
 
     fn reset_game(&mut self) {
         self.shared.game_state.reset_state();
+        self.shared
+            .players
+            .values_mut()
+            .for_each(NetworkedPlayer::reset_state);
     }
 
     fn start_game(&mut self, player_id: PlayerId) -> LobbyResult<()> {
@@ -267,9 +271,11 @@ impl LobbyActor {
     }
 
     fn player_collected_item(&mut self, player_id: PlayerId, item: Item) -> LobbyResult<()> {
-        if let None = self.shared.players.get_mut(&player_id) {
-            return Err(LobbyError::PlayerInvalid(player_id));
-        }
+        let player = self
+            .shared
+            .players
+            .get_mut(&player_id)
+            .ok_or(LobbyError::PlayerInvalid(player_id))?;
         let tier_count = 3;
 
         match item {
@@ -285,15 +291,7 @@ impl LobbyActor {
                     return Err(LobbyError::InvalidAction(player_id));
                 }
 
-                let mut score = *self
-                    .shared
-                    .game_state
-                    .scores
-                    .get_mut(&player_id)
-                    .unwrap_or(&mut 0);
-
-                score += GAME_CONSTS.spat_scores[state.tier.clone() as usize];
-                self.shared.game_state.scores.insert(player_id, score);
+                player.score += GAME_CONSTS.spat_scores[state.tier.clone() as usize];
 
                 state
                     .collection_vec
@@ -534,16 +532,13 @@ mod test {
             .contains_key(&Spatula::CowaBungee));
 
         let points = &clash::GAME_CONSTS.spat_scores;
+        assert_eq!(lobby.shared.players.get(&0).unwrap().score, points[0] * 2);
         assert_eq!(
-            *lobby.shared.game_state.scores.get(&0).unwrap(),
-            points[0] * 2
-        );
-        assert_eq!(
-            *lobby.shared.game_state.scores.get(&1).unwrap(),
+            lobby.shared.players.get(&1).unwrap().score,
             points[0] + points[1]
         );
-        assert_eq!(*lobby.shared.game_state.scores.get(&2).unwrap(), points[2]);
-        assert!(lobby.shared.game_state.scores.get(&3).is_none());
+        assert_eq!(lobby.shared.players.get(&2).unwrap().score, points[2]);
+        assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
     }
 
     #[test]
@@ -571,10 +566,7 @@ mod test {
         );
 
         let first_points = clash::GAME_CONSTS.spat_scores[0];
-        assert_eq!(
-            *lobby.shared.game_state.scores.get(&0).unwrap(),
-            first_points
-        );
+        assert_eq!(lobby.shared.players.get(&0).unwrap().score, first_points);
     }
 
     #[tokio::test]
