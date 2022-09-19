@@ -47,7 +47,7 @@ impl GameMode for ClashGame {
         }
 
         // Don't proceed if the game is not active
-        if lobby.game_phase != GamePhase::Playing {
+        if lobby.game_phase != GamePhase::Playing || level == Some(Level::MainMenu) {
             return Ok(());
         }
 
