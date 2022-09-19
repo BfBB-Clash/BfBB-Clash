@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Additions
+
 - Full Linux support
 - Networking Improvements
+- "Tiered Spatula" Gameplay update. Points awarded for a spatula depends on how many times it was collected previously.
+
+### Fixed
+
+- New games should no longer sometimes start with a previous unfinished game's state.
 
 ## [0.1.0] - 2022-03-27
 
