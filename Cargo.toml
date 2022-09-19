@@ -22,7 +22,7 @@ inherits = "dev"
 opt-level = 0
 
 [dependencies]
-bfbb = { version = "0.1", features = ["serde"]}
+bfbb = { version = "0.2.1", features = ["serde"]}
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros"] }
 epaint = "0.19"
 
