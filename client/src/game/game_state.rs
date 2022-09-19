@@ -68,7 +68,7 @@ impl GameMode for ClashGame {
 
             if let Some(spat_ref) = lobby.game_state.spatulas.get_mut(&spat) {
                 if spat_ref.tier != SpatulaTier::Golden {
-                    interface.mark_task_complete(spat)?;
+                    interface.unlock_task(spat)?;
                 }
                 if spat_ref.tier == SpatulaTier::None {
                     // Sync collected spatulas
@@ -76,7 +76,18 @@ impl GameMode for ClashGame {
                     continue;
                 }
             }
-            // TODO: Is there a way to detect missed collections now?
+
+            // Check menu for any potentially missed collection events
+            // This is the only way to detect Kah-Rah-Tae and Small Shall Rule
+            if interface.is_task_complete(spat)? {
+                local_spat_state.insert(spat);
+                network_sender
+                    .blocking_send(Message::GameItemCollected {
+                        item: Item::Spatula(spat),
+                    })
+                    .unwrap();
+                info!("Collected (from menu) {spat:?}");
+            }
 
             // Detect spatula collection events
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {

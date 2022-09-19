@@ -47,6 +47,7 @@ pub fn start_game(
             &mut lobby,
             &mut logic_receiver,
             &mut gui_sender,
+            &mut local_spat_state,
         )
         .unwrap();
 
@@ -82,6 +83,7 @@ fn update_from_network<T: GameInterface>(
     lobby: &mut Option<NetworkedLobby>,
     logic_receiver: &mut Receiver<Message>,
     gui_sender: &mut Sender<(PlayerId, NetworkedLobby)>,
+    local_spat_state: &mut HashSet<Spatula>,
 ) -> Result<(), InterfaceError> {
     while let Ok(m) = logic_receiver.try_recv() {
         match m {
@@ -89,6 +91,7 @@ fn update_from_network<T: GameInterface>(
                 *player_id = id;
             }
             Message::GameBegin => {
+                local_spat_state.clear();
                 let _ = game.start_new_game();
                 let lobby = lobby
                     .as_mut()
