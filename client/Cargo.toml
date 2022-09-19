@@ -10,7 +10,7 @@ console = []
 
 [dependencies]
 clash = { path = ".." }
-bfbb = { version = "0.1", features = ["game-interface"]}
+bfbb = { version = "0.2", features = ["game-interface"]}
 
 thiserror = "1"
 anyhow = "1"
