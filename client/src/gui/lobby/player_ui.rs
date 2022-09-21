@@ -26,7 +26,7 @@ impl<'a> Widget for PlayerUi<'a> {
             color,
         );
         let score_galley = ui.painter().layout_no_wrap(
-            format!("Spatulas: {}", player.score),
+            format!("Score: {}", player.score),
             TextStyle::Body.resolve(ui.style()),
             color,
         );

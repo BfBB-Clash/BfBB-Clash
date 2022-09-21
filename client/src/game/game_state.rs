@@ -1,5 +1,8 @@
-use crate::game::{GameInterface, InterfaceResult};
-use bfbb::{IntoEnumIterator, Spatula};
+use std::collections::HashSet;
+
+use bfbb::game_interface::{GameInterface, InterfaceResult};
+use bfbb::{IntoEnumIterator, Level, Spatula};
+use clash::game_state::SpatulaTier;
 use clash::lobby::{GamePhase, NetworkedLobby};
 use clash::net::{Item, Message};
 use clash::PlayerId;
@@ -21,6 +24,7 @@ impl GameMode for ClashGame {
         lobby: &mut NetworkedLobby,
         local_player: PlayerId,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
+        local_spat_state: &mut HashSet<Spatula>,
     ) -> Self::Result {
         if interface.is_loading()? {
             return Ok(());
@@ -43,7 +47,7 @@ impl GameMode for ClashGame {
         }
 
         // Don't proceed if the game is not active
-        if lobby.game_phase != GamePhase::Playing {
+        if lobby.game_phase != GamePhase::Playing || level == Some(Level::MainMenu) {
             return Ok(());
         }
 
@@ -56,16 +60,27 @@ impl GameMode for ClashGame {
         // Check for newly collected spatulas
         for spat in Spatula::iter() {
             // Skip already collected spatulas
-            if lobby.game_state.spatulas.contains_key(&spat) {
-                // Sync collected spatulas
-                interface.collect_spatula(spat, local_player.current_level)?;
+            if local_spat_state.contains(&spat) {
                 interface.mark_task_complete(spat)?;
+                interface.collect_spatula(spat, local_player.current_level)?;
                 continue;
             }
 
+            if let Some(spat_ref) = lobby.game_state.spatulas.get_mut(&spat) {
+                if spat_ref.tier != SpatulaTier::Golden {
+                    interface.unlock_task(spat)?;
+                }
+                if spat_ref.tier == SpatulaTier::None {
+                    // Sync collected spatulas
+                    interface.collect_spatula(spat, local_player.current_level)?;
+                    continue;
+                }
+            }
+
             // Check menu for any potentially missed collection events
+            // This is the only way to detect Kah-Rah-Tae and Small Shall Rule
             if interface.is_task_complete(spat)? {
-                lobby.game_state.spatulas.insert(spat, None);
+                local_spat_state.insert(spat);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
@@ -76,7 +91,7 @@ impl GameMode for ClashGame {
 
             // Detect spatula collection events
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {
-                lobby.game_state.spatulas.insert(spat, None);
+                local_spat_state.insert(spat);
                 network_sender
                     .blocking_send(Message::GameItemCollected {
                         item: Item::Spatula(spat),

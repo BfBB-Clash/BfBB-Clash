@@ -1,4 +1,6 @@
-use bfbb::game_interface::GameInterface;
+use std::collections::HashSet;
+
+use bfbb::{game_interface::GameInterface, Spatula};
 use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
 
 // TODO: Revisit this when new unique game modes are created.
@@ -13,5 +15,6 @@ pub trait GameMode {
         lobby: &mut NetworkedLobby,
         local_player: PlayerId,
         network_sender: &mut tokio::sync::mpsc::Sender<Message>,
+        local_spat_state: &mut HashSet<Spatula>,
     ) -> Self::Result;
 }

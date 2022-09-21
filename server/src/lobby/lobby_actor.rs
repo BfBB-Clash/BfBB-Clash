@@ -1,10 +1,9 @@
-use std::collections::hash_map::Entry;
-
 use bfbb::{Level, Spatula};
+use clash::game_state::{SpatulaState, SpatulaTier};
 use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash::net::{Item, Message};
 use clash::player::{NetworkedPlayer, PlayerOptions};
-use clash::{LobbyId, PlayerId, MAX_PLAYERS};
+use clash::{LobbyId, PlayerId, GAME_CONSTS, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::state::ServerState;
@@ -118,6 +117,14 @@ impl LobbyActor {
         log::info!("Closing lobby {:#X}", self.shared.lobby_id);
     }
 
+    fn reset_game(&mut self) {
+        self.shared.game_state.reset_state();
+        self.shared
+            .players
+            .values_mut()
+            .for_each(NetworkedPlayer::reset_state);
+    }
+
     fn start_game(&mut self, player_id: PlayerId) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
@@ -132,7 +139,11 @@ impl LobbyActor {
             return Ok(());
         }
 
+        self.reset_game();
         self.shared.game_phase = GamePhase::Playing;
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
         if self.sender.send(Message::GameBegin).is_err() {
             log::warn!(
                 "Lobby {:#X} started with no players in lobby.",
@@ -141,6 +152,19 @@ impl LobbyActor {
         }
 
         Ok(())
+    }
+
+    fn stop_game(&mut self) {
+        self.shared.game_phase = GamePhase::Setup;
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
+        if self.sender.send(Message::GameEnd).is_err() {
+            log::warn!(
+                "Lobby {:#X} started with no players in lobby.",
+                self.shared.lobby_id
+            )
+        }
     }
 
     /// Adds a new player to this lobby. If there is currently no host, they will become it.
@@ -252,23 +276,46 @@ impl LobbyActor {
             .players
             .get_mut(&player_id)
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
+        let tier_count = 3;
 
         match item {
             Item::Spatula(spat) => {
-                if let Entry::Vacant(e) = self.shared.game_state.spatulas.entry(spat) {
-                    e.insert(Some(player_id));
-                    player.score += 1;
-                    log::info!("Player {:#X} collected {spat:?}", player_id);
+                let state = self
+                    .shared
+                    .game_state
+                    .spatulas
+                    .entry(spat)
+                    .or_insert_with(SpatulaState::default);
 
-                    if spat == Spatula::TheSmallShallRuleOrNot {
-                        self.shared.game_phase = GamePhase::Finished;
-                    }
-
-                    let message = Message::GameLobbyInfo {
-                        lobby: self.shared.clone(),
-                    };
-                    let _ = self.sender.send(message);
+                if state.tier == SpatulaTier::None || state.collection_vec.contains(&player_id) {
+                    return Err(LobbyError::InvalidAction(player_id));
                 }
+
+                player.score += GAME_CONSTS.spat_scores[state.tier.clone() as usize];
+
+                state
+                    .collection_vec
+                    .insert(state.tier.clone() as usize, player_id);
+                log::info!(
+                    "Player {:#X} collected {spat:?} with tier {:?}",
+                    player_id,
+                    state.tier
+                );
+
+                //This probably could be better.
+                state.tier = SpatulaTier::from(state.tier.clone() as i32 + 1);
+                if state.tier.clone() as i32 >= tier_count {
+                    state.tier = SpatulaTier::None
+                }
+
+                if spat == Spatula::TheSmallShallRuleOrNot {
+                    self.stop_game();
+                }
+
+                let message = Message::GameLobbyInfo {
+                    lobby: self.shared.clone(),
+                };
+                let _ = self.sender.send(message);
             }
         }
         Ok(())
@@ -294,7 +341,7 @@ mod test {
     use std::time::Duration;
 
     use bfbb::{Level, Spatula};
-    use clash::{lobby::GamePhase, net::Item, player::PlayerOptions};
+    use clash::{game_state::SpatulaTier, lobby::GamePhase, net::Item, player::PlayerOptions};
     use tokio::{sync::mpsc, time::timeout};
 
     use crate::lobby::{lobby_handle::LobbyHandle, LobbyError};
@@ -415,10 +462,25 @@ mod test {
     }
 
     #[test]
-    fn player_collected_item() {
+    fn collect_small_shall_rule() {
+        let mut lobby = setup();
+        lobby.add_player(0).unwrap();
+
+        // Collecting Small Shall Rule finishes the match
+        assert!(lobby
+            .player_collected_item(0, Item::Spatula(Spatula::TheSmallShallRuleOrNot))
+            .is_ok());
+        // TODO: This will transition to GamePhase::Finished when the GUI is implemented for it
+        assert_eq!(lobby.shared.game_phase, GamePhase::Setup);
+    }
+
+    #[test]
+    fn player_collected_item_score() {
         let mut lobby = setup();
         lobby.add_player(0).unwrap();
         lobby.add_player(1).unwrap();
+        lobby.add_player(2).unwrap();
+        lobby.add_player(3).unwrap();
 
         // Non-existant player can't collect an item
         assert_eq!(
@@ -426,7 +488,7 @@ mod test {
             Err(LobbyError::PlayerInvalid(1337))
         );
 
-        // Collecting a spatula increases score by 1
+        // Collecting a spatula first grants highest score
         assert!(lobby
             .player_collected_item(0, Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
@@ -437,39 +499,74 @@ mod test {
             .player_collected_item(0, Item::Spatula(Spatula::CowaBungee))
             .is_ok());
 
-        assert_eq!(
-            lobby.shared.game_state.spatulas,
-            [
-                (Spatula::SpongebobsCloset, Some(0)),
-                (Spatula::OnTopOfThePineapple, Some(1)),
-                (Spatula::CowaBungee, Some(0)),
-            ]
-            .into()
-        );
-        assert_eq!(lobby.shared.players.get(&0).unwrap().score, 2);
-        assert_eq!(lobby.shared.players.get(&1).unwrap().score, 1);
-
-        // Can't collect an item that has already been collected
-        // This is expected behavior though, so it should fail silently
+        // A new player collecting a spatula again gives fewer points
         assert!(lobby
-            .player_collected_item(1, Item::Spatula(Spatula::CowaBungee))
+            .player_collected_item(1, Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
+        assert!(lobby
+            .player_collected_item(2, Item::Spatula(Spatula::SpongebobsCloset))
+            .is_ok());
+
+        // Spatula can only be collected 3 times
+        assert_eq!(
+            lobby.player_collected_item(3, Item::Spatula(Spatula::SpongebobsCloset)),
+            Err(LobbyError::InvalidAction(3))
+        );
+
+        // Only three unique spatulas were collected
+        assert_eq!(lobby.shared.game_state.spatulas.len(), 3);
+        assert!(lobby
+            .shared
+            .game_state
+            .spatulas
+            .contains_key(&Spatula::SpongebobsCloset));
+        assert!(lobby
+            .shared
+            .game_state
+            .spatulas
+            .contains_key(&Spatula::OnTopOfThePineapple));
+        assert!(lobby
+            .shared
+            .game_state
+            .spatulas
+            .contains_key(&Spatula::CowaBungee));
+
+        let points = &clash::GAME_CONSTS.spat_scores;
+        assert_eq!(lobby.shared.players.get(&0).unwrap().score, points[0] * 2);
+        assert_eq!(
+            lobby.shared.players.get(&1).unwrap().score,
+            points[0] + points[1]
+        );
+        assert_eq!(lobby.shared.players.get(&2).unwrap().score, points[2]);
+        assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
+    }
+
+    #[test]
+    fn player_collected_item_twice() {
+        let mut lobby = setup();
+        lobby.add_player(0).unwrap();
+
+        // Same player can't collect an item that they already collected once
+        assert!(lobby
+            .player_collected_item(0, Item::Spatula(Spatula::CowaBungee))
+            .is_ok());
+        assert_eq!(
+            lobby.player_collected_item(0, Item::Spatula(Spatula::CowaBungee)),
+            Err(LobbyError::InvalidAction(0))
+        );
         assert_eq!(
             lobby
                 .shared
                 .game_state
                 .spatulas
                 .get(&Spatula::CowaBungee)
-                .unwrap(),
-            &Some(0)
+                .unwrap()
+                .tier,
+            SpatulaTier::Silver
         );
-        assert_eq!(lobby.shared.players.get(&1).unwrap().score, 1);
 
-        // Collecting Small Shall Rule finishes the match
-        assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::TheSmallShallRuleOrNot))
-            .is_ok());
-        assert_eq!(lobby.shared.game_phase, GamePhase::Finished);
+        let first_points = clash::GAME_CONSTS.spat_scores[0];
+        assert_eq!(lobby.shared.players.get(&0).unwrap().score, first_points);
     }
 
     #[tokio::test]

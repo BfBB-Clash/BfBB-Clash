@@ -95,7 +95,9 @@ fn process_incoming(message: Message, logic_sender: &Sender<Message>) -> Result<
         Message::GameCurrentLevel { level: _ } => todo!(),
         Message::GameForceWarp { level: _ } => todo!(),
         Message::GameItemCollected { item: _ } => todo!(),
-        Message::GameEnd => todo!(),
+        Message::GameEnd => {
+            // This message isn't supposed to do anything until the GUI gets updated.
+        }
         Message::GameLeave => todo!(),
     }
 

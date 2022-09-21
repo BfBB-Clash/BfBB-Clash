@@ -21,7 +21,7 @@ pub struct PlayerOptions {
 pub struct NetworkedPlayer {
     pub options: PlayerOptions,
     pub current_level: Option<Level>,
-    pub score: u8,
+    pub score: u32,
     pub menu_order: u8,
 }
 
@@ -33,6 +33,10 @@ impl NetworkedPlayer {
             score: 0,
             menu_order,
         }
+    }
+
+    pub fn reset_state(&mut self) {
+        self.score = 0;
     }
 }
 

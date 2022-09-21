@@ -66,20 +66,24 @@ impl App for Game {
             .show(ctx, |ui| {
                 ui.add_space(PADDING);
                 // TODO: Cache this
-                let mut values = self.lobby.players.values().collect::<Vec<_>>();
-                values.sort_by(|&a, &b| a.menu_order.cmp(&b.menu_order));
-                for player in values {
+                let mut players = self.lobby.players.values().collect::<Vec<_>>();
+                players.sort_by(|&a, &b| a.menu_order.cmp(&b.menu_order));
+                for player in players {
                     ui.add(PlayerUi::new(player));
                 }
             });
         CentralPanel::default().show(ctx, |ui| {
-            if self.lobby.game_phase == GamePhase::Setup {
-                self.paint_options(ui);
-                if ui.button("Copy Lobby ID").clicked() {
-                    ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+            match self.lobby.game_phase {
+                GamePhase::Setup => {
+                    self.paint_options(ui);
+                    if ui.button("Copy Lobby ID").clicked() {
+                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                    }
                 }
-            } else {
-                ui.add(Tracker::new(&self.lobby.game_state, &self.lobby.players));
+                GamePhase::Playing => {
+                    ui.add(Tracker::new(&self.lobby.game_state));
+                }
+                GamePhase::Finished => todo!(),
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {

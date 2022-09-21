@@ -15,6 +15,8 @@ pub enum LobbyError {
     LobbyFull,
     #[error("Action attempted by Player {0:#} who is not in this lobby")]
     PlayerInvalid(PlayerId),
+    #[error("Action attempted by Player {0:#} was invalid.")]
+    InvalidAction(PlayerId),
     #[error("Non-host attempted a host-only action")]
     NeedsHost,
     #[error("The Lobby Handle is no longer connected to a lobby.")]

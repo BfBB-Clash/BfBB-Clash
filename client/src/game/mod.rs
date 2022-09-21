@@ -1,16 +1,12 @@
 mod game_mode;
 mod game_state;
 
-use bfbb::game_interface::{
-    dolphin::DolphinInterface, GameInterface, InterfaceError, InterfaceResult,
-};
-use clash::{
-    lobby::{GamePhase, NetworkedLobby},
-    net::Message,
-    PlayerId,
-};
+use bfbb::game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError};
+use bfbb::{EnumCount, Spatula};
+use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
 use log::error;
 use spin_sleep::LoopHelper;
+use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
 
 use self::{game_mode::GameMode, game_state::ClashGame};
@@ -30,6 +26,10 @@ pub fn start_game(
     let mut game = ClashGame;
     let mut player_id = 0;
     let mut lobby = None;
+    // Not sure if this is the best approach, the idea is that it would be faster
+    // to store a local state of what we as a client have collected rather
+    // than searching to see if we've collected it.
+    let mut local_spat_state = HashSet::<Spatula>::with_capacity(Spatula::COUNT);
 
     loop {
         loop_helper.loop_start();
@@ -43,13 +43,18 @@ pub fn start_game(
             &mut lobby,
             &mut logic_receiver,
             &mut gui_sender,
+            &mut local_spat_state,
         )
         .unwrap();
 
         if let Some(lobby) = lobby.as_mut() {
-            if let Err(InterfaceError::Unhooked) =
-                game.update(&interface, lobby, player_id, &mut network_sender)
-            {
+            if let Err(InterfaceError::Unhooked) = game.update(
+                &interface,
+                lobby,
+                player_id,
+                &mut network_sender,
+                &mut local_spat_state,
+            ) {
                 // We lost dolphin
                 if let Some(local_player) = lobby.players.get_mut(&player_id) {
                     if local_player.current_level != None {
@@ -74,6 +79,7 @@ fn update_from_network<T: GameInterface>(
     lobby: &mut Option<NetworkedLobby>,
     logic_receiver: &mut Receiver<Message>,
     gui_sender: &mut Sender<(PlayerId, NetworkedLobby)>,
+    local_spat_state: &mut HashSet<Spatula>,
 ) -> Result<(), InterfaceError> {
     while let Ok(m) = logic_receiver.try_recv() {
         match m {
@@ -81,6 +87,7 @@ fn update_from_network<T: GameInterface>(
                 *player_id = id;
             }
             Message::GameBegin => {
+                local_spat_state.clear();
                 let _ = game.start_new_game();
                 let lobby = lobby
                     .as_mut()
@@ -89,7 +96,6 @@ fn update_from_network<T: GameInterface>(
                 if lobby.options.ng_plus {
                     let _ = game.unlock_powers();
                 }
-                lobby.game_phase = GamePhase::Playing;
                 gui_sender
                     .send((*player_id, lobby.clone()))
                     .expect("GUI has crashed and so will we");
