@@ -6,6 +6,7 @@ use state::ServerState;
 use tokio::net::TcpListener;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const DEFAULT_PORT: u16 = 42932;
 
 #[tokio::main]
 async fn main() {
@@ -18,8 +19,14 @@ async fn main() {
         .filter_level(log::LevelFilter::Debug)
         .parse_env("CLASH_LOG")
         .init();
-    let listener = TcpListener::bind("0.0.0.0:42932").await.unwrap();
-    log::info!("Listening on port 42932");
+
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(DEFAULT_PORT);
+    let listener = TcpListener::bind(("0.0.0.0", port)).await.unwrap();
+    log::info!("Listening on port {port}");
+
     let state = ServerState::default();
     loop {
         let (socket, _) = listener.accept().await.unwrap();
