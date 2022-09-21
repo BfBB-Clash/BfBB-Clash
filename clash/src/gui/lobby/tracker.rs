@@ -28,14 +28,15 @@ impl<'a> Widget for Tracker<'a> {
             ui.allocate_exact_size(desired_size, Sense::focusable_noninteractive());
 
         for spat in Spatula::iter() {
-            let mut spat_state = self
+            let spat_state = self
                 .game
                 .spatulas
                 .get(&spat)
                 .unwrap_or(&SpatulaState::default())
                 .clone();
-            let color = spat_state.tier.get_color();
-            let color = Color32::from_rgb(color.0, color.1, color.2);
+            // TODO: issue #57
+            let color = spat_state.collection_count * 50;
+            let color = Color32::from_rgb(color, color, color);
             let (y, x) = spat.into();
             ui.painter().circle_filled(
                 (

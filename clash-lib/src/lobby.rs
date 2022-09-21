@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct LobbyOptions {
-    pub lab_door_cost: u8,
     pub ng_plus: bool,
+    pub lab_door_cost: u8,
+    pub tier_count: u8,
 }
 
 impl Default for LobbyOptions {
@@ -14,6 +15,7 @@ impl Default for LobbyOptions {
         Self {
             lab_door_cost: 75,
             ng_plus: false,
+            tier_count: 3,
         }
     }
 }

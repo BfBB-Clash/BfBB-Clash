@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use bfbb::game_interface::{GameInterface, InterfaceError, InterfaceResult};
 use bfbb::game_state::{GameMode as BfBBGameMode, GameOstrich};
 use bfbb::{IntoEnumIterator, Level, Spatula};
-use clash_lib::game_state::SpatulaTier;
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{Item, Message};
 use clash_lib::PlayerId;
@@ -77,10 +76,10 @@ impl GameMode for ClashGame {
             }
 
             if let Some(spat_ref) = lobby.game_state.spatulas.get_mut(&spat) {
-                if spat_ref.tier != SpatulaTier::Golden {
+                if spat_ref.collection_count != lobby.options.tier_count {
                     interface.unlock_task(spat)?;
                 }
-                if spat_ref.tier == SpatulaTier::None {
+                if spat_ref.collection_count == lobby.options.tier_count {
                     // Sync collected spatulas
                     interface.collect_spatula(spat, local_player.current_level)?;
                     continue;

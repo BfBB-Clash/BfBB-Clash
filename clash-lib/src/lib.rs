@@ -1,6 +1,3 @@
-use game_state::SpatulaTier;
-use strum::EnumCount;
-
 pub mod game_state;
 pub mod lobby;
 pub mod net;
@@ -9,11 +6,11 @@ pub mod player;
 pub const MAX_PLAYERS: usize = 6;
 
 pub struct GameRuleConsts {
-    pub spat_scores: [u32; SpatulaTier::COUNT],
+    pub spat_scores: [u32; 6],
 }
 
 pub const GAME_CONSTS: GameRuleConsts = GameRuleConsts {
-    spat_scores: [300, 100, 50, 0],
+    spat_scores: [300, 100, 50, 40, 25, 15],
 };
 
 // NOTE: We can considering using the newtype pattern here to avoid the possiblity of mixing up these id types,
