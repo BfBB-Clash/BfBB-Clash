@@ -9,7 +9,7 @@ use eframe::{
 use crate::gui::BORDER;
 use crate::{
     gui::state::{Screen, State, Submenu},
-    net::Connect,
+    net::NetCommand,
 };
 
 use super::val_text::ValText;
@@ -17,7 +17,7 @@ use super::val_text::ValText;
 pub struct MainMenu {
     state: Rc<State>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
-    connect_sender: tokio::sync::mpsc::Sender<Connect>,
+    connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
     player_name: String,
     lobby_id: ValText<u32>,
 }
@@ -26,7 +26,7 @@ impl MainMenu {
     pub fn new(
         state: Rc<State>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
-        connect_sender: tokio::sync::mpsc::Sender<Connect>,
+        connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
     ) -> Self {
         Self {
             state,
@@ -75,7 +75,7 @@ impl App for MainMenu {
                     ui.add(TextEdit::singleline(&mut self.player_name).hint_text("Name"));
                     ui.add_enabled_ui(!self.player_name.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
-                            self.connect_sender.try_send(Connect).unwrap();
+                            self.connect_sender.try_send(NetCommand::Connect).unwrap();
                             self.network_sender.try_send(Message::GameHost).unwrap();
                             self.network_sender
                                 .try_send(Message::PlayerOptions {
@@ -111,7 +111,7 @@ impl App for MainMenu {
                         .add_enabled(self.lobby_id.is_valid(), Button::new("Join Game"))
                         .on_disabled_hover_text("Lobby ID must be an 8 digit hexadecimal number");
                     if join_button.clicked() {
-                        self.connect_sender.try_send(Connect).unwrap();
+                        self.connect_sender.try_send(NetCommand::Connect).unwrap();
                         self.network_sender
                             .try_send(Message::GameJoin {
                                 lobby_id: *self.lobby_id.get_val().unwrap(),

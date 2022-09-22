@@ -116,7 +116,6 @@ fn update_from_network<T: GameInterface>(
             }
             Message::GameForceWarp { level: _ } => todo!(),
             Message::GameEnd => todo!(),
-            Message::GameLeave => todo!(),
 
             m => {
                 error!("Logic received invalid message {m:?}");

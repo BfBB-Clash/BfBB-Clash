@@ -15,7 +15,7 @@ use crate::gui::lobby::Game;
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::{Screen, State};
 use crate::gui::PADDING;
-use crate::net::Connect;
+use crate::net::NetCommand;
 
 pub struct Clash {
     state: Rc<State>,
@@ -32,7 +32,7 @@ impl Clash {
         gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
         error_receiver: Receiver<Box<dyn Error + Send>>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
-        connect_sender: tokio::sync::mpsc::Sender<Connect>,
+        connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
     ) -> Self {
         Self::setup(&cc.egui_ctx);
 
@@ -40,7 +40,12 @@ impl Clash {
         Self {
             error_receiver,
             state: state.clone(),
-            game_screen: Game::new(state.clone(), gui_receiver, network_sender.clone()),
+            game_screen: Game::new(
+                state.clone(),
+                gui_receiver,
+                network_sender.clone(),
+                connect_sender.clone(),
+            ),
             main_menu: MainMenu::new(state, network_sender, connect_sender),
             error_queue: Vec::new(),
         }

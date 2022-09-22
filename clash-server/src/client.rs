@@ -97,11 +97,7 @@ impl Client {
                 self.player_id,
             );
             match handler.process(incoming).await {
-                Ok(false) => (),
-                Ok(true) => {
-                    drop(handler);
-                    break;
-                }
+                Ok(()) => (),
                 Err(e) => {
                     log::error!("Player {:#X} encountered error {e:?}", self.player_id);
                     let _ = self
@@ -188,13 +184,10 @@ impl MessageHandler {
         }
     }
 
-    async fn process(&mut self, msg: Message) -> Result<bool, LobbyError> {
+    async fn process(&mut self, msg: Message) -> Result<(), LobbyError> {
         match msg {
             Message::GameBegin => {
                 self.lobby_handle.start_game().await?;
-            }
-            Message::GameLeave => {
-                return Ok(true);
             }
             Message::PlayerOptions { options } => {
                 self.lobby_handle.set_player_options(options).await?;
@@ -219,7 +212,7 @@ impl MessageHandler {
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 }
 

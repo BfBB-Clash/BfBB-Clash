@@ -9,18 +9,22 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Connect;
+pub enum NetCommand {
+    Connect,
+    Disconnect,
+}
 
 #[tokio::main]
 pub async fn run(
-    mut connect_recv: mpsc::Receiver<Connect>,
+    mut connect_recv: mpsc::Receiver<NetCommand>,
     mut receiver: mpsc::Receiver<Message>,
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
 ) {
-    while let Some(Connect) = connect_recv.recv().await {
+    while let Some(NetCommand::Connect) = connect_recv.recv().await {
         TokioScope::scope_and_block(|s| {
             s.spawn(main_task(
+                &mut connect_recv,
                 &mut receiver,
                 logic_sender.clone(),
                 error_sender.clone(),
@@ -31,6 +35,7 @@ pub async fn run(
 }
 
 async fn main_task(
+    connect_recv: &mut mpsc::Receiver<NetCommand>,
     receiver: &mut tokio::sync::mpsc::Receiver<Message>,
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
@@ -53,6 +58,7 @@ async fn main_task(
     loop {
         let m = tokio::select! {
             _ = &mut handle => break,
+            Some(NetCommand::Disconnect) = connect_recv.recv() => break,
             m = receiver.recv() => m,
         };
         log::debug!("Sending message {m:#?}");
@@ -63,6 +69,7 @@ async fn main_task(
                 .expect("GUI has crashed and so will we.");
         }
     }
+    handle.abort();
 }
 
 async fn recv_task(
@@ -127,7 +134,6 @@ fn process_incoming(message: Message, logic_sender: &Sender<Message>) -> Result<
         Message::GameEnd => {
             // This message isn't supposed to do anything until the GUI gets updated.
         }
-        Message::GameLeave => todo!(),
     }
 
     Ok(())

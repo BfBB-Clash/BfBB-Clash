@@ -22,7 +22,6 @@ pub enum Message {
     GameForceWarp { level: Level },
     GameItemCollected { item: Item },
     GameEnd,
-    GameLeave,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

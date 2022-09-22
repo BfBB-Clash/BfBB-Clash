@@ -8,8 +8,11 @@ use eframe::epaint::Color32;
 use eframe::App;
 use itertools::intersperse;
 
-use crate::gui::state::{Screen, State, Submenu};
 use crate::gui::PADDING;
+use crate::{
+    gui::state::{Screen, State, Submenu},
+    net::NetCommand,
+};
 use player_ui::PlayerUi;
 use tracker::Tracker;
 
@@ -22,6 +25,7 @@ pub struct Game {
     state: Rc<State>,
     gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
+    connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
     lobby: NetworkedLobby,
     local_player_id: PlayerId,
     lab_door_cost: ValText<u8>,
@@ -33,11 +37,13 @@ impl Game {
         state: Rc<State>,
         gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
         network_sender: tokio::sync::mpsc::Sender<Message>,
+        connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
     ) -> Self {
         Self {
             state,
             gui_receiver,
             network_sender,
+            connect_sender,
             lobby: NetworkedLobby::new(0),
             local_player_id: 0,
             lab_door_cost: ValText::with_validator(|text| {
@@ -91,7 +97,7 @@ impl App for Game {
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {
-                    let _ = self.network_sender.try_send(Message::GameLeave);
+                    let _ = self.connect_sender.try_send(NetCommand::Disconnect);
                     self.state.screen.set(Screen::MainMenu(Submenu::Root));
                 }
             })

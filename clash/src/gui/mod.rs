@@ -6,7 +6,7 @@ use clash_lib::net::Message;
 use clash_lib::PlayerId;
 use eframe::{run_native, IconData, NativeOptions};
 
-use crate::net::Connect;
+use crate::net::NetCommand;
 
 use self::clash::Clash;
 
@@ -25,7 +25,7 @@ pub fn run(
     gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
     error_receiver: Receiver<Box<dyn Error + Send>>,
     network_sender: tokio::sync::mpsc::Sender<Message>,
-    connect_sender: tokio::sync::mpsc::Sender<Connect>,
+    connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
 ) {
     let icon_bytes = include_bytes!("../../res/icon.ico");
     let icon = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
