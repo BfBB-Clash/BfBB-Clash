@@ -144,7 +144,7 @@ impl LobbyActor {
 
         if !self.shared.can_start() {
             log::warn!(
-                "Lobby {:#X} attempted to start when some players aren't on the Main Menu",
+                "Lobby {:#X} attempted to start when some players aren't able to start.",
                 self.shared.lobby_id
             );
             // Maybe this should be an error, I'm not sure
@@ -390,12 +390,12 @@ mod test {
         assert_eq!(lobby.start_game(1), Err(LobbyError::NeedsHost));
 
         // Starting while not all players are on the main menu silently fails (at least for now)
-        lobby.set_player_level(0, Some(Level::MainMenu)).unwrap();
+        lobby.set_player_can_start(0, true).unwrap();
         assert!(lobby.start_game(0).is_ok());
         assert_eq!(lobby.shared.game_phase, GamePhase::Setup);
 
         // Now we can start
-        lobby.set_player_level(1, Some(Level::MainMenu)).unwrap();
+        lobby.set_player_can_start(1, true).unwrap();
         assert!(lobby.start_game(0).is_ok());
         assert_eq!(lobby.shared.game_phase, GamePhase::Playing);
     }

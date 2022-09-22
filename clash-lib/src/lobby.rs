@@ -59,8 +59,6 @@ mod tests {
     use super::NetworkedLobby;
     use crate::player::{NetworkedPlayer, PlayerOptions};
 
-    use bfbb::Level;
-
     #[test]
     fn can_start() {
         let mut lobby = NetworkedLobby::new(0);
@@ -68,7 +66,7 @@ mod tests {
             .players
             .entry(0)
             .or_insert_with(|| NetworkedPlayer::new(PlayerOptions::default(), 0));
-        player_0.current_level = Some(Level::MainMenu);
+        player_0.ready_to_start = true;
 
         assert!(lobby.can_start());
 
@@ -78,7 +76,7 @@ mod tests {
             .or_insert_with(|| NetworkedPlayer::new(PlayerOptions::default(), 1));
         assert!(!lobby.can_start());
 
-        lobby.players.get_mut(&1).unwrap().current_level = Some(Level::MainMenu);
+        lobby.players.get_mut(&1).unwrap().ready_to_start = true;
         assert!(lobby.can_start());
     }
 }
