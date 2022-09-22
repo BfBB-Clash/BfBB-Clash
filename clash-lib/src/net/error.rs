@@ -1,12 +1,10 @@
-use crate::{LobbyId, PlayerId};
+use crate::LobbyId;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Clone, Debug, Serialize, Deserialize)]
 pub enum ProtocolError {
-    #[error("Invalid Player ID {0:#X}")]
-    InvalidPlayerId(PlayerId),
     #[error("Invalid Lobby ID {0:#X}")]
     InvalidLobbyId(LobbyId),
     #[error("Invalid Message")]
@@ -16,6 +14,8 @@ pub enum ProtocolError {
     Disconnected,
     #[error("Client version '{0}' does not match server version '{1}'")]
     VersionMismatch(String, String),
+    #[error("{0}")]
+    Message(String),
 }
 
 #[derive(Debug, Error)]

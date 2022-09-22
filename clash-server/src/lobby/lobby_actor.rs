@@ -651,6 +651,7 @@ mod test {
             let handle = LobbyHandle {
                 sender: tx,
                 lobby_id: 0,
+                player_id: 0,
             };
             actor.add_player(0).unwrap();
             (actor, handle)
@@ -685,7 +686,7 @@ mod test {
                 .await
                 .expect("Lobby failed to close");
             // Explicitly drop handle to ensure it's not dropped early
-            assert_eq!(handle.start_game(1).await, Err(LobbyError::HandleInvalid));
+            assert_eq!(handle.start_game().await, Err(LobbyError::HandleInvalid));
         }
     }
 }

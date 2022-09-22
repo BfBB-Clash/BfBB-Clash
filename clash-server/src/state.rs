@@ -26,6 +26,7 @@ impl State {
         let lobby_id = self.gen_lobby_id();
         let handle = lobby::start_new_lobby(state, lobby_id);
         self.lobbies.insert(lobby_id, handle.clone());
+        log::info!("Lobby {lobby_id:#X} opened");
         handle
     }
 

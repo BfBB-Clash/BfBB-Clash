@@ -1,4 +1,5 @@
-use anyhow::Context;
+use std::mem::ManuallyDrop;
+
 use clash_lib::net::connection::{self, ConnectionRx, ConnectionTx};
 use clash_lib::net::{Message, ProtocolError};
 use clash_lib::PlayerId;
@@ -6,6 +7,7 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
 use crate::lobby::lobby_handle::LobbyHandle;
+use crate::lobby::LobbyError;
 use crate::state::ServerState;
 
 /// Accept a new connection from a client and run it's message loop
@@ -14,8 +16,11 @@ pub async fn handle_new_connection(state: ServerState, socket: TcpStream) {
     let (conn_tx, conn_rx) = connection::from_socket(socket);
     let client = Client::new(state, conn_rx, tx);
 
-    tokio::spawn(send_task(conn_tx, rx));
-    tokio::spawn(client.run());
+    tokio::spawn(async move {
+        let send_handle = tokio::spawn(send_task(conn_tx, rx));
+        client.run().await;
+        send_handle.abort();
+    });
 
     // Player cleanup handled by drop impl
 }
@@ -45,7 +50,6 @@ struct Client {
     conn_rx: ConnectionRx,
     tx: mpsc::Sender<Message>,
     player_id: PlayerId,
-    lobby: Option<LobbyHandle>,
 }
 
 impl Client {
@@ -65,13 +69,14 @@ impl Client {
             conn_rx,
             tx,
             player_id,
-            lobby: None,
         }
     }
 
     /// Takes ownership of self to guarantee that client will be dropped when it's
     /// message loop ends
     pub async fn run(mut self) {
+        let lobby_handle = self.handshake().await.unwrap();
+        let mut handler = MessageHandler::new(lobby_handle);
         loop {
             let incoming = match self.conn_rx.read_frame().await {
                 Ok(Some(x)) => x,
@@ -91,72 +96,56 @@ impl Client {
                 "Received message from player id {:#X} \nMessage: {incoming:#X?}",
                 self.player_id,
             );
-            if let Err(e) = self.process_incoming(incoming).await {
-                match e.downcast_ref::<ProtocolError>() {
-                    Some(m @ ProtocolError::InvalidLobbyId(_))
-                    | Some(m @ ProtocolError::InvalidMessage) => {
-                        log::error!("{e:?}");
-                        let _ = self.tx.send(Message::Error { error: m.clone() }).await;
-                    }
-                    Some(m @ ProtocolError::VersionMismatch(_, _)) => {
-                        log::error!("{e:?}");
-                        let _ = self.tx.send(Message::Error { error: m.clone() }).await;
-                        break;
-                    }
-                    Some(ProtocolError::Disconnected) => {
-                        // Close the connection without error
-                        // TODO: Abort broadcast receiver task (preferably by closing connection)
-                        break;
-                    }
-                    _ => {
-                        // This error means there is a problem with our internal state
-                        // TODO: Figure out how to properly resolve this error
-                        log::error!(
-                            "Disconnecting player {:#X} due to unrecoverable error:\n{e:?}",
-                            self.player_id
-                        );
-                        break;
-                    }
+            match handler.process(incoming).await {
+                Ok(false) => (),
+                Ok(true) => {
+                    drop(handler);
+                    break;
+                }
+                Err(e) => {
+                    log::error!("Player {:#X} encountered error {e:?}", self.player_id);
+                    let _ = self
+                        .tx
+                        .send(Message::Error {
+                            error: ProtocolError::Message(e.to_string()),
+                        })
+                        .await;
                 }
             }
         }
-        log::info!("Player id {:#X} disconnected", self.player_id);
+        log::info!("Player {:#X} disconnected", self.player_id);
     }
 
-    async fn process_incoming(&mut self, incoming: Message) -> anyhow::Result<()> {
-        match incoming {
-            Message::Version { version } => {
-                if version != crate::VERSION {
-                    return Err(
-                        ProtocolError::VersionMismatch(version, crate::VERSION.to_owned()).into(),
-                    );
-                }
+    async fn handshake(&mut self) -> Result<LobbyHandle, ProtocolError> {
+        let version = match self.conn_rx.read_frame().await.unwrap() {
+            Some(Message::Version { version }) => version,
+            Some(_) => return Err(ProtocolError::InvalidMessage),
+            None => return Err(ProtocolError::Disconnected),
+        };
 
-                // Inform player of their PlayerId
-                self.tx
-                    .send(Message::ConnectionAccept {
-                        player_id: self.player_id,
-                    })
-                    .await?;
-                log::info!("New connection for player id {:#X} opened", self.player_id);
-            }
-            Message::GameHost => {
+        if version != crate::VERSION {
+            return Err(ProtocolError::VersionMismatch(version, crate::VERSION.to_owned()).into());
+        }
+
+        // Inform player of their PlayerId
+        self.tx
+            .send(Message::ConnectionAccept {
+                player_id: self.player_id,
+            })
+            .await
+            .unwrap();
+        log::info!("New connection for player id {:#X} opened", self.player_id);
+
+        let (lobby_recv, lobby_handle) = match self.conn_rx.read_frame().await.unwrap() {
+            Some(Message::GameHost) => {
                 let lobby_handle = {
                     let state = &mut *self.state.lock().unwrap();
                     state.players.insert(self.player_id);
                     state.add_lobby(self.state.clone())
                 };
-                let lobby_recv = lobby_handle.add_player(self.player_id).await?;
-                tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
-
-                log::info!(
-                    "Player {:#X} has hosted lobby {:#X}",
-                    self.player_id,
-                    lobby_handle.get_lobby_id()
-                );
-                self.lobby = Some(lobby_handle);
+                lobby_handle.join(self.player_id).await.unwrap()
             }
-            Message::GameJoin { lobby_id } => {
+            Some(Message::GameJoin { lobby_id }) => {
                 let lobby_handle = {
                     let state = &mut *self.state.lock().unwrap();
                     state.players.insert(self.player_id);
@@ -167,63 +156,78 @@ impl Client {
                         .clone()
                 };
 
-                let lobby_recv = lobby_handle.add_player(self.player_id).await?;
-                tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
+                lobby_handle.join(self.player_id).await.unwrap()
+            }
+            Some(_) => return Err(ProtocolError::InvalidMessage),
+            None => return Err(ProtocolError::Disconnected),
+        };
 
-                log::info!(
-                    "Player {:#X} has joined lobby {lobby_id:#X}",
-                    self.player_id
-                );
-                self.lobby = Some(lobby_handle);
-            }
-            Message::GameBegin => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.start_game(self.player_id).await?;
-            }
-            Message::GameLeave => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.rem_player(self.player_id).await?;
-                self.lobby = None;
-                return Err(ProtocolError::Disconnected.into());
-            }
-            Message::PlayerOptions { options } => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.set_player_options(self.player_id, options).await?;
-            }
-            Message::PlayerCanStart(val) => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.set_player_can_start(self.player_id, val).await?;
-            }
-            Message::GameOptions { options } => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.set_game_options(self.player_id, options).await?;
-            }
-            Message::GameCurrentLevel { level } => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.set_player_level(self.player_id, level).await?;
-            }
-            Message::GameItemCollected { item } => {
-                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
-                lobby.player_collected_item(self.player_id, item).await?;
-            }
-            _ => {
-                return Err(ProtocolError::InvalidMessage)
-                    .context("Client sent a server-only message.")
-            }
-        }
-        Ok(())
+        tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
+        return Ok(lobby_handle);
     }
 }
 
 impl Drop for Client {
     fn drop(&mut self) {
-        if let Some(lobby) = self.lobby.take() {
-            let player_id = self.player_id;
-            tokio::spawn(async move { lobby.rem_player(player_id).await });
-        }
         // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
         // and that's fine for now.
         let state = &mut *self.state.lock().unwrap();
         state.players.remove(&self.player_id);
+    }
+}
+
+// TODO: Separate handlers for host/non-host clients. May be difficult to deal with transferring host to another player
+struct MessageHandler {
+    lobby_handle: ManuallyDrop<LobbyHandle>,
+}
+
+impl MessageHandler {
+    fn new(lobby_handle: LobbyHandle) -> Self {
+        Self {
+            lobby_handle: ManuallyDrop::new(lobby_handle),
+        }
+    }
+
+    async fn process(&mut self, msg: Message) -> Result<bool, LobbyError> {
+        match msg {
+            Message::GameBegin => {
+                self.lobby_handle.start_game().await?;
+            }
+            Message::GameLeave => {
+                return Ok(true);
+            }
+            Message::PlayerOptions { options } => {
+                self.lobby_handle.set_player_options(options).await?;
+            }
+            Message::PlayerCanStart(val) => {
+                self.lobby_handle.set_player_can_start(val).await?;
+            }
+            Message::GameOptions { options } => {
+                self.lobby_handle.set_game_options(options).await?;
+            }
+            Message::GameCurrentLevel { level } => {
+                self.lobby_handle.set_player_level(level).await?;
+            }
+            Message::GameItemCollected { item } => {
+                self.lobby_handle.player_collected_item(item).await?;
+            }
+            _ => {
+                // return Err(ProtocolError::InvalidMessage)
+                //     .context("Client sent a server-only message.")
+                // TODO: return error
+                todo!("Client sent a server-only message");
+            }
+        }
+
+        Ok(false)
+    }
+}
+
+impl Drop for MessageHandler {
+    fn drop(&mut self) {
+        // SAFETY: ManuallyDrop::take requires us to never use the original container again.
+        // Since we are currently dropping ourself, self.lobby_handle will never be used again.
+        let lobby_handle = unsafe { ManuallyDrop::take(&mut self.lobby_handle) };
+        tokio::spawn(async move { lobby_handle.rem_player().await });
     }
 }

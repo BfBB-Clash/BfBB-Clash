@@ -33,5 +33,9 @@ pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandle {
     LobbyHandle {
         sender,
         lobby_id: id,
+        // TODO: We need to store a handle on the state but there's no player_id then, using an Option would be
+        // unergonomic so this should suffice for now. Any errors resulting from this should be caught by the lobby_actor
+        // Maybe we need a LobbyHandleProvider type that stores the sender and hands out LobbyHandles
+        player_id: 0,
     }
 }
