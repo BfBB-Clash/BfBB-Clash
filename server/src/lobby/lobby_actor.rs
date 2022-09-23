@@ -1,9 +1,9 @@
 use bfbb::{Level, Spatula};
-use clash::game_state::{SpatulaState, SpatulaTier};
-use clash::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
-use clash::net::{Item, Message};
-use clash::player::{NetworkedPlayer, PlayerOptions};
-use clash::{LobbyId, PlayerId, GAME_CONSTS, MAX_PLAYERS};
+use clash_lib::game_state::{SpatulaState, SpatulaTier};
+use clash_lib::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
+use clash_lib::net::{Item, Message};
+use clash_lib::player::{NetworkedPlayer, PlayerOptions};
+use clash_lib::{LobbyId, PlayerId, GAME_CONSTS, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::state::ServerState;
@@ -181,7 +181,7 @@ impl LobbyActor {
 
         // TODO: Unhardcode player color
         let mut player = NetworkedPlayer::new(PlayerOptions::default(), self.next_menu_order);
-        player.options.color = clash::player::COLORS[self.shared.players.len()];
+        player.options.color = clash_lib::player::COLORS[self.shared.players.len()];
         self.next_menu_order += 1;
 
         self.shared.players.insert(player_id, player);
@@ -341,7 +341,7 @@ mod test {
     use std::time::Duration;
 
     use bfbb::{Level, Spatula};
-    use clash::{game_state::SpatulaTier, lobby::GamePhase, net::Item, player::PlayerOptions};
+    use clash_lib::{game_state::SpatulaTier, lobby::GamePhase, net::Item, player::PlayerOptions};
     use tokio::{sync::mpsc, time::timeout};
 
     use crate::lobby::{lobby_handle::LobbyHandle, LobbyError};
@@ -377,7 +377,7 @@ mod test {
     fn add_player() {
         let mut lobby = setup();
 
-        for i in 0..clash::MAX_PLAYERS as u32 {
+        for i in 0..clash_lib::MAX_PLAYERS as u32 {
             assert!(lobby.add_player(i).is_ok());
             assert!(lobby.shared.players.contains_key(&i));
         }
@@ -531,7 +531,7 @@ mod test {
             .spatulas
             .contains_key(&Spatula::CowaBungee));
 
-        let points = &clash::GAME_CONSTS.spat_scores;
+        let points = &clash_lib::GAME_CONSTS.spat_scores;
         assert_eq!(lobby.shared.players.get(&0).unwrap().score, points[0] * 2);
         assert_eq!(
             lobby.shared.players.get(&1).unwrap().score,
@@ -565,7 +565,7 @@ mod test {
             SpatulaTier::Silver
         );
 
-        let first_points = clash::GAME_CONSTS.spat_scores[0];
+        let first_points = clash_lib::GAME_CONSTS.spat_scores[0];
         assert_eq!(lobby.shared.players.get(&0).unwrap().score, first_points);
     }
 

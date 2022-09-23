@@ -1,4 +1,4 @@
-use clash::{LobbyId, PlayerId};
+use clash_lib::{LobbyId, PlayerId};
 use rand::{thread_rng, Rng};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};

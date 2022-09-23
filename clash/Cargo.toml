@@ -4,16 +4,23 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
+[features]
+console = []
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 anyhow.workspace = true
-bfbb = { workspace = true, features = ["serde"] }
+bfbb = { version = "0.2.1", features = ["game-interface"] }
+clash_lib.workspace = true
+env_logger.workspace = true
 log.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
-bincode = "1"
-bytes = "1"
-epaint = "0.19"
-serde = { version = "1", features = ["derive"] }
-strum = "0.24.1"
-strum_macros = "0.24.1"
+eframe = "0.19"
+image = "0.24"
+spin_sleep = "1"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"

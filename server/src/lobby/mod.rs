@@ -1,4 +1,4 @@
-use clash::{LobbyId, PlayerId};
+use clash_lib::{LobbyId, PlayerId};
 use thiserror::Error;
 use tokio::sync::mpsc;
 

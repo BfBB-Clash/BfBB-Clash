@@ -2,10 +2,10 @@ use std::collections::HashSet;
 
 use bfbb::game_interface::{GameInterface, InterfaceResult};
 use bfbb::{IntoEnumIterator, Level, Spatula};
-use clash::game_state::SpatulaTier;
-use clash::lobby::{GamePhase, NetworkedLobby};
-use clash::net::{Item, Message};
-use clash::PlayerId;
+use clash_lib::game_state::SpatulaTier;
+use clash_lib::lobby::{GamePhase, NetworkedLobby};
+use clash_lib::net::{Item, Message};
+use clash_lib::PlayerId;
 use log::info;
 
 use crate::game::InterfaceError;

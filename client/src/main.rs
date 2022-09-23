@@ -5,7 +5,7 @@
 
 use std::{error::Error, sync::mpsc::channel};
 
-use clash::net::Message;
+use clash_lib::net::Message;
 
 mod game;
 mod gui;

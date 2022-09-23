@@ -2,9 +2,9 @@ use std::error::Error;
 use std::rc::Rc;
 use std::sync::mpsc::Receiver;
 
-use clash::lobby::NetworkedLobby;
-use clash::net::Message;
-use clash::PlayerId;
+use clash_lib::lobby::NetworkedLobby;
+use clash_lib::net::Message;
+use clash_lib::PlayerId;
 use eframe::egui::{
     Area, Context, FontData, FontDefinitions, Label, RichText, Style, TextStyle, TopBottomPanel,
 };

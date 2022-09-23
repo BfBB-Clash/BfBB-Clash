@@ -294,7 +294,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "clash"
+name = "clash_lib"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -316,7 +316,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bfbb",
- "clash",
+ "clash_lib",
  "eframe",
  "env_logger",
  "image",
@@ -1854,7 +1854,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bfbb",
- "clash",
+ "clash_lib",
  "env_logger",
  "log",
  "rand",

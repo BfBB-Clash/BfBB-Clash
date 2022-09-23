@@ -1,6 +1,6 @@
 use std::{rc::Rc, sync::mpsc::Receiver};
 
-use clash::{
+use clash_lib::{
     lobby::{GamePhase, NetworkedLobby},
     net::Message,
     PlayerId,

@@ -1,5 +1,5 @@
 use bfbb::{IntoEnumIterator, Spatula};
-use clash::game_state::{GameState, SpatulaState};
+use clash_lib::game_state::{GameState, SpatulaState};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,

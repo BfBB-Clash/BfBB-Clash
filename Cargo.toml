@@ -1,5 +1,5 @@
 [workspace]
-members = ["clash", "client", "server"]
+members = ["clash-lib", "client", "server"]
 
 [workspace.package]
 version = "0.1.0"
@@ -8,7 +8,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1"
 bfbb = "0.2.1"
-clash = { path = "clash" }
+clash_lib = { path = "clash-lib" }
 env_logger = "0.9"
 log = "0.4"
 thiserror = "1"

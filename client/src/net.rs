@@ -1,6 +1,6 @@
 use std::{error::Error, sync::mpsc::Sender};
 
-use clash::net::{
+use clash_lib::net::{
     connection::{self, ConnectionTx},
     Message, ProtocolError,
 };

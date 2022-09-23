@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 bfbb.workspace = true
-clash.workspace = true
+clash_lib.workspace = true
 tokio.workspace = true
 thiserror.workspace = true
 env_logger.workspace = true
