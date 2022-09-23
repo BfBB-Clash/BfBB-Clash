@@ -336,8 +336,6 @@ dependencies = [
  "epaint",
  "log",
  "serde",
- "strum",
- "strum_macros",
  "thiserror",
  "tokio",
 ]
