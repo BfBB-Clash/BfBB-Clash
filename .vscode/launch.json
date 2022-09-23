@@ -13,7 +13,6 @@
                     "build",
                     "--bin=client",
                     "--package=client",
-                    "--features=console"
                 ],
                 "filter": {
                     "name": "client",
