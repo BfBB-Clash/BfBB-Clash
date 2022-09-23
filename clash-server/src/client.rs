@@ -132,32 +132,28 @@ impl Client {
             .unwrap();
         log::info!("New connection for player id {:#X} opened", self.player_id);
 
-        let (lobby_recv, lobby_handle) = match self.conn_rx.read_frame().await.unwrap() {
+        let lobby_handle = match self.conn_rx.read_frame().await.unwrap() {
             Some(Message::GameHost) => {
-                let lobby_handle = {
-                    let state = &mut *self.state.lock().unwrap();
-                    state.players.insert(self.player_id);
-                    state.add_lobby(self.state.clone())
-                };
-                lobby_handle.join(self.player_id).await.unwrap()
+                let state = &mut *self.state.lock().unwrap();
+                state.players.insert(self.player_id);
+                state
+                    .add_lobby(self.state.clone())
+                    .get_handle(self.player_id)
             }
             Some(Message::GameJoin { lobby_id }) => {
-                let lobby_handle = {
-                    let state = &mut *self.state.lock().unwrap();
-                    state.players.insert(self.player_id);
-                    state
-                        .lobbies
-                        .get_mut(&lobby_id)
-                        .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
-                        .clone()
-                };
-
-                lobby_handle.join(self.player_id).await.unwrap()
+                let state = &mut *self.state.lock().unwrap();
+                state.players.insert(self.player_id);
+                state
+                    .lobbies
+                    .get_mut(&lobby_id)
+                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
+                    .get_handle(self.player_id)
             }
             Some(_) => return Err(ProtocolError::InvalidMessage),
             None => return Err(ProtocolError::Disconnected),
         };
 
+        let lobby_recv = lobby_handle.join_lobby().await.unwrap();
         tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
         return Ok(lobby_handle);
     }

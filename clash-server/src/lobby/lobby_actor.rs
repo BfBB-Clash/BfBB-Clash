@@ -374,7 +374,7 @@ mod test {
     use clash_lib::{lobby::GamePhase, net::Item, player::PlayerOptions};
     use tokio::{sync::mpsc, time::timeout};
 
-    use crate::lobby::{lobby_handle::LobbyHandle, LobbyError};
+    use crate::lobby::{lobby_handle::LobbyHandleProvider, LobbyError};
 
     use super::LobbyActor;
 
@@ -648,11 +648,11 @@ mod test {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
             let mut actor = LobbyActor::new(Default::default(), rx, 0);
-            let handle = LobbyHandle {
+            let handle = LobbyHandleProvider {
                 sender: tx,
                 lobby_id: 0,
-                player_id: 0,
-            };
+            }
+            .get_handle(0);
             actor.add_player(0).unwrap();
             (actor, handle)
         };

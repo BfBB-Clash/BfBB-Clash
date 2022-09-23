@@ -10,12 +10,29 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use super::lobby_actor::LobbyMessage;
 use super::LobbyError;
 
+#[derive(Debug)]
+pub struct LobbyHandleProvider {
+    pub(super) sender: mpsc::Sender<LobbyMessage>,
+    pub(super) lobby_id: LobbyId,
+}
+
+impl LobbyHandleProvider {
+    /// Adds a new player to this lobby. If there is currently no host, they will become it.
+    pub fn get_handle(&self, player_id: PlayerId) -> LobbyHandle {
+        LobbyHandle {
+            sender: self.sender.clone(),
+            lobby_id: self.lobby_id,
+            player_id,
+        }
+    }
+}
+
 /// Automatically removes player from lobby when dropped.
 #[derive(Clone, Debug)]
 pub struct LobbyHandle {
-    pub(super) sender: mpsc::Sender<LobbyMessage>,
-    pub(super) lobby_id: LobbyId,
-    pub(super) player_id: PlayerId,
+    sender: mpsc::Sender<LobbyMessage>,
+    lobby_id: LobbyId,
+    player_id: PlayerId,
 }
 
 impl LobbyHandle {
@@ -40,30 +57,23 @@ impl LobbyHandle {
     }
 
     /// Adds a new player to this lobby. If there is currently no host, they will become it.
-    /// TODO: Move this when LobbyHandleProvider is implemented.
-    pub async fn join(
-        &self,
-        player_id: PlayerId,
-    ) -> Result<(broadcast::Receiver<Message>, Self), LobbyError> {
+    ///
+    /// TODO: Would be nice to not have to manually call this. Since it's async we can't
+    /// currently do this in the object constructor without holding a reference to the LobbyHandleProvider
+    /// across an await boundary.
+    pub async fn join_lobby(&self) -> Result<broadcast::Receiver<Message>, LobbyError> {
         let (tx, rx) = oneshot::channel();
         let msg = LobbyMessage::AddPlayer {
             respond_to: tx,
-            id: player_id,
+            id: self.player_id,
         };
         self.execute(msg, rx).await.map(|recv| {
             log::info!(
                 "Player {:#X} has joined lobby {:#X}",
-                player_id,
+                self.player_id,
                 self.lobby_id,
             );
-            (
-                recv,
-                Self {
-                    sender: self.sender.clone(),
-                    lobby_id: self.lobby_id,
-                    player_id,
-                },
-            )
+            recv
         })
     }
 
@@ -131,11 +141,11 @@ impl LobbyHandle {
 mod test {
     use bfbb::{Level, Spatula};
     use clash_lib::{lobby::LobbyOptions, net::Item, player::PlayerOptions};
-    use tokio::sync::{broadcast, mpsc};
+    use tokio::sync::mpsc;
 
     use crate::lobby::{lobby_actor::LobbyMessage, LobbyError};
 
-    use super::LobbyHandle;
+    use super::{LobbyHandle, LobbyHandleProvider};
 
     fn setup() -> (mpsc::Receiver<LobbyMessage>, LobbyHandle) {
         let (tx, rx) = mpsc::channel(2);
@@ -147,24 +157,15 @@ mod test {
         (rx, handle)
     }
 
-    #[tokio::test]
-    async fn join_uses_new_player_id() {
-        let (mut rx, handle) = setup();
+    #[test]
+    fn lobby_provider_provides_new_handle() {
+        let handle_provider = LobbyHandleProvider {
+            sender: mpsc::channel(2).0,
+            lobby_id: 0,
+        };
 
-        let actor = tokio::spawn(async move {
-            let m = rx.recv().await.unwrap();
-            match m {
-                LobbyMessage::AddPlayer { respond_to, id } => {
-                    assert_eq!(id, 1);
-                    respond_to.send(Ok(broadcast::channel(1).1)).unwrap();
-                }
-                _ => panic!("{m:?} received instead of AddPlayer"),
-            }
-        });
-
-        let (_, new_handle) = handle.join(1).await.unwrap();
-        assert_eq!(new_handle.player_id, 1);
-        actor.await.unwrap();
+        let handle = handle_provider.get_handle(123);
+        assert_eq!(handle.player_id, 123);
     }
 
     #[tokio::test]
@@ -193,11 +194,11 @@ mod test {
                 m,
                 LobbyMessage::AddPlayer {
                     respond_to: _,
-                    id: 0x12123434
+                    id: 123
                 }
             ));
         });
-        let _ = handle.join(0x12123434).await;
+        let _ = handle.join_lobby().await;
         actor.await.unwrap();
     }
 

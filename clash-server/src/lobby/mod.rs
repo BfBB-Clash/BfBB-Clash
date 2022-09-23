@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use crate::state::ServerState;
 
-use self::{lobby_actor::LobbyActor, lobby_handle::LobbyHandle};
+use self::{lobby_actor::LobbyActor, lobby_handle::LobbyHandleProvider};
 
 mod lobby_actor;
 pub mod lobby_handle;
@@ -25,17 +25,13 @@ pub enum LobbyError {
 
 pub type LobbyResult<T> = Result<T, LobbyError>;
 
-pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandle {
+pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandleProvider {
     let (sender, receiver) = mpsc::channel(64);
     let actor = LobbyActor::new(state, receiver, id);
     tokio::spawn(actor.run());
 
-    LobbyHandle {
+    LobbyHandleProvider {
         sender,
         lobby_id: id,
-        // TODO: We need to store a handle on the state but there's no player_id then, using an Option would be
-        // unergonomic so this should suffice for now. Any errors resulting from this should be caught by the lobby_actor
-        // Maybe we need a LobbyHandleProvider type that stores the sender and hands out LobbyHandles
-        player_id: 0,
     }
 }
