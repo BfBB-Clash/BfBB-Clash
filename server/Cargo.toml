@@ -1,18 +1,18 @@
 [package]
 name = "server"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bfbb = "0.2.1"
-clash = { path=".." }
+anyhow.workspace = true
+bfbb.workspace = true
+clash.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+env_logger.workspace = true
+log.workspace = true
 
-anyhow = "1"
-thiserror = "1"
-
-env_logger = "0.9"
-log = "0.4"
 rand = "0.8"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync", "time"] }
