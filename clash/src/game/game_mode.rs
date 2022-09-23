@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use bfbb::{game_interface::GameInterface, Spatula};
-use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
+use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
 
 // TODO: Revisit this when new unique game modes are created.
 //  Idea is to allow game mode logic to be implemented by an arbitrary

@@ -1,11 +1,11 @@
 #![cfg_attr(
-    all(target_os = "windows", not(feature = "console")),
+    all(target_os = "windows", not(debug_assertions), not(feature = "console")),
     windows_subsystem = "windows"
 )]
 
 use std::{error::Error, sync::mpsc::channel};
 
-use clash::net::Message;
+use clash_lib::net::Message;
 
 mod game;
 mod gui;

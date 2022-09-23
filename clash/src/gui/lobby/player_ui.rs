@@ -1,5 +1,5 @@
 use bfbb::Level;
-use clash::player::NetworkedPlayer;
+use clash_lib::player::NetworkedPlayer;
 use eframe::egui::{Response, Sense, Stroke, TextStyle, Ui, Vec2, Widget};
 
 pub struct PlayerUi<'a> {

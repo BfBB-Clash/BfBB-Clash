@@ -1,5 +1,5 @@
 use bfbb::Level;
-use clash::{
+use clash_lib::{
     lobby::LobbyOptions,
     net::{Item, Message},
     player::PlayerOptions,
@@ -123,7 +123,7 @@ impl LobbyHandle {
 #[cfg(test)]
 mod test {
     use bfbb::{Level, Spatula};
-    use clash::{lobby::LobbyOptions, net::Item, player::PlayerOptions};
+    use clash_lib::{lobby::LobbyOptions, net::Item, player::PlayerOptions};
     use tokio::sync::mpsc;
 
     use crate::lobby::{lobby_actor::LobbyMessage, LobbyError};

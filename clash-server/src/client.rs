@@ -1,7 +1,7 @@
 use anyhow::Context;
-use clash::net::connection::{self, ConnectionRx, ConnectionTx};
-use clash::net::{Message, ProtocolError};
-use clash::PlayerId;
+use clash_lib::net::connection::{self, ConnectionRx, ConnectionTx};
+use clash_lib::net::{Message, ProtocolError};
+use clash_lib::PlayerId;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 

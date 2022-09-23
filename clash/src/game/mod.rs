@@ -3,7 +3,7 @@ mod game_state;
 
 use bfbb::game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError};
 use bfbb::{EnumCount, Spatula};
-use clash::{lobby::NetworkedLobby, net::Message, PlayerId};
+use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
 use log::error;
 use spin_sleep::LoopHelper;
 use std::collections::HashSet;

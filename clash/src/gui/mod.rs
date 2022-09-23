@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::sync::mpsc::Receiver;
 
-use ::clash::lobby::NetworkedLobby;
-use ::clash::net::Message;
-use ::clash::PlayerId;
+use clash_lib::lobby::NetworkedLobby;
+use clash_lib::net::Message;
+use clash_lib::PlayerId;
 use eframe::{run_native, IconData, NativeOptions};
 
 use self::clash::Clash;

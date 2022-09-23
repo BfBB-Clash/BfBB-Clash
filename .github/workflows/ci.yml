@@ -25,23 +25,18 @@ jobs:
       - run: rustup component add rustfmt
       - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Verify formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-      - name: Verify build
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all
-      - name: Deny Clippy warnings
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all --tests -- -D warnings
       - name: Run Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --profile ci
+          args: --profile ci
+      - name: Deny Clippy warnings
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --tests -- -D warnings
+      - name: Verify formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check

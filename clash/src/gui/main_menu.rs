@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use clash::{net::Message, player::PlayerOptions};
+use clash_lib::{net::Message, player::PlayerOptions};
 use eframe::{
     egui::{Align, Button, CentralPanel, Layout, TextEdit, TopBottomPanel},
     App,
