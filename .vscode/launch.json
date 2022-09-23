@@ -1,4 +1,10 @@
 {
+    "compounds": [
+        {
+            "name": "Debug Client/Server",
+            "configurations": ["Debug Client", "Debug Server"]
+        }
+    ],
     "configurations": [
         {
             "type": "lldb",
