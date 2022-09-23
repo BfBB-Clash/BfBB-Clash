@@ -29,14 +29,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --profile ci
+          args: --profile ci
       - name: Deny Clippy warnings
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all --tests -- -D warnings
+          args: --tests -- -D warnings
       - name: Verify formatting
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --all -- --check
+          args: -- --check

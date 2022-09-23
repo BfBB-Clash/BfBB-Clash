@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "client", "server"]
+members = ["clash", "client", "server"]
 
 [workspace.package]
 version = "0.1.0"
@@ -8,7 +8,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1"
 bfbb = "0.2.1"
-clash = { path = "." }
+clash = { path = "clash" }
 env_logger = "0.9"
 log = "0.4"
 thiserror = "1"
@@ -36,25 +36,3 @@ inherits = "dev"
 
 [profile.ci.package."*"]
 opt-level = 0
-
-# Lib Package
-
-[package]
-name = "clash"
-version.workspace = true
-edition.workspace = true
-publish = false
-
-[dependencies]
-anyhow.workspace = true
-bfbb = { workspace = true, features = ["serde"] }
-log.workspace = true
-thiserror.workspace = true
-tokio.workspace = true
-
-bincode = "1"
-bytes = "1"
-epaint = "0.19"
-serde = { version = "1", features = ["derive"] }
-strum = "0.24.1"
-strum_macros = "0.24.1"

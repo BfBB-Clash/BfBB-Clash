@@ -1,0 +1,19 @@
+[package]
+name = "clash"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+bfbb = { workspace = true, features = ["serde"] }
+log.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+bincode = "1"
+bytes = "1"
+epaint = "0.19"
+serde = { version = "1", features = ["derive"] }
+strum = "0.24.1"
+strum_macros = "0.24.1"
