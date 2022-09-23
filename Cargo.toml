@@ -1,5 +1,5 @@
 [workspace]
-members = ["clash-lib", "client", "server"]
+members = ["clash", "clash-lib", "clash-server"]
 
 [workspace.package]
 version = "0.1.0"

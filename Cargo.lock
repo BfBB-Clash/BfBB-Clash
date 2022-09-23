@@ -294,6 +294,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "clash"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bfbb",
+ "clash_lib",
+ "eframe",
+ "env_logger",
+ "image",
+ "log",
+ "spin_sleep",
+ "thiserror",
+ "tokio",
+ "winres",
+]
+
+[[package]]
+name = "clash-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bfbb",
+ "clash_lib",
+ "env_logger",
+ "log",
+ "rand",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "clash_lib"
 version = "0.1.0"
 dependencies = [
@@ -308,23 +339,6 @@ dependencies = [
  "strum_macros",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bfbb",
- "clash_lib",
- "eframe",
- "env_logger",
- "image",
- "log",
- "spin_sleep",
- "thiserror",
- "tokio",
- "winres",
 ]
 
 [[package]]
@@ -1846,20 +1860,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bfbb",
- "clash_lib",
- "env_logger",
- "log",
- "rand",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
