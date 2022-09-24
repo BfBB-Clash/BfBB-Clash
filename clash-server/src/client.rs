@@ -120,7 +120,10 @@ impl Client {
         };
 
         if version != crate::VERSION {
-            return Err(ProtocolError::VersionMismatch(version, crate::VERSION.to_owned()).into());
+            return Err(ProtocolError::VersionMismatch(
+                version,
+                crate::VERSION.to_owned(),
+            ));
         }
 
         // Inform player of their PlayerId
@@ -155,7 +158,7 @@ impl Client {
 
         let lobby_recv = lobby_handle.join_lobby().await.unwrap();
         tokio::spawn(broadcast_task(lobby_recv, self.tx.clone()));
-        return Ok(lobby_handle);
+        Ok(lobby_handle)
     }
 }
 
