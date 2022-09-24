@@ -4,7 +4,7 @@ use bfbb::game_interface::{GameInterface, InterfaceError, InterfaceResult};
 use bfbb::game_state::{GameMode as BfBBGameMode, GameOstrich};
 use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
-use clash_lib::net::{Item, Message};
+use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::PlayerId;
 use log::info;
 
@@ -42,7 +42,9 @@ impl GameMode for ClashGame {
         if local_player.current_level != level {
             local_player.current_level = level;
             network_sender
-                .try_send(NetCommand::Send(Message::GameCurrentLevel { level }))
+                .try_send(NetCommand::Send(Message::Lobby(
+                    LobbyMessage::GameCurrentLevel { level },
+                )))
                 .unwrap();
         }
 
@@ -53,7 +55,9 @@ impl GameMode for ClashGame {
         if local_player.ready_to_start != can_start {
             local_player.ready_to_start = can_start;
             network_sender
-                .try_send(NetCommand::Send(Message::PlayerCanStart(can_start)))
+                .try_send(NetCommand::Send(Message::Lobby(
+                    LobbyMessage::PlayerCanStart(can_start),
+                )))
                 .unwrap();
         }
 
@@ -93,9 +97,11 @@ impl GameMode for ClashGame {
             if interface.is_task_complete(spat)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .try_send(NetCommand::Send(Message::GameItemCollected {
-                        item: Item::Spatula(spat),
-                    }))
+                    .try_send(NetCommand::Send(Message::Lobby(
+                        LobbyMessage::GameItemCollected {
+                            item: Item::Spatula(spat),
+                        },
+                    )))
                     .unwrap();
                 info!("Collected (from menu) {spat:?}");
             }
@@ -104,9 +110,11 @@ impl GameMode for ClashGame {
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .try_send(NetCommand::Send(Message::GameItemCollected {
-                        item: Item::Spatula(spat),
-                    }))
+                    .try_send(NetCommand::Send(Message::Lobby(
+                        LobbyMessage::GameItemCollected {
+                            item: Item::Spatula(spat),
+                        },
+                    )))
                     .unwrap();
                 info!("Collected {spat:?}");
             }

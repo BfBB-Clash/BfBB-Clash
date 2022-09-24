@@ -1,7 +1,7 @@
 use std::mem::ManuallyDrop;
 
 use clash_lib::net::connection::{self, ConnectionRx, ConnectionTx};
-use clash_lib::net::{Message, ProtocolError};
+use clash_lib::net::{LobbyMessage, Message, ProtocolError};
 use clash_lib::PlayerId;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -79,7 +79,20 @@ impl Client {
         let mut handler = MessageHandler::new(lobby_handle);
         loop {
             let incoming = match self.conn_rx.read_frame().await {
-                Ok(Some(x)) => x,
+                Ok(Some(Message::Lobby(x))) => x,
+                Ok(Some(m)) => {
+                    log::error!(
+                        "Invalid message received from Player {:#X}: \n{m:?}",
+                        self.player_id
+                    );
+                    let _ = self
+                        .tx
+                        .send(Message::Error {
+                            error: ProtocolError::InvalidMessage,
+                        })
+                        .await;
+                    continue;
+                }
                 Ok(None) => {
                     break;
                 }
@@ -183,32 +196,28 @@ impl MessageHandler {
         }
     }
 
-    async fn process(&mut self, msg: Message) -> Result<(), LobbyError> {
+    async fn process(&mut self, msg: LobbyMessage) -> Result<(), LobbyError> {
         match msg {
-            Message::GameBegin => {
-                self.lobby_handle.start_game().await?;
-            }
-            Message::PlayerOptions { options } => {
+            LobbyMessage::PlayerOptions { options } => {
                 self.lobby_handle.set_player_options(options).await?;
             }
-            Message::PlayerCanStart(val) => {
+            LobbyMessage::PlayerCanStart(val) => {
                 self.lobby_handle.set_player_can_start(val).await?;
             }
-            Message::GameOptions { options } => {
+            LobbyMessage::GameOptions { options } => {
                 self.lobby_handle.set_game_options(options).await?;
             }
-            Message::GameCurrentLevel { level } => {
+            LobbyMessage::GameBegin => {
+                self.lobby_handle.start_game().await?;
+            }
+            LobbyMessage::GameCurrentLevel { level } => {
                 self.lobby_handle.set_player_level(level).await?;
             }
-            Message::GameItemCollected { item } => {
+            LobbyMessage::GameItemCollected { item } => {
                 self.lobby_handle.player_collected_item(item).await?;
             }
-            _ => {
-                // return Err(ProtocolError::InvalidMessage)
-                //     .context("Client sent a server-only message.")
-                // TODO: return error
-                todo!("Client sent a server-only message");
-            }
+            LobbyMessage::GameEnd => todo!(),
+            LobbyMessage::GameLobbyInfo { lobby: _ } => todo!(),
         }
 
         Ok(())

@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use clash_lib::{net::Message, player::PlayerOptions};
+use clash_lib::{
+    net::{LobbyMessage, Message},
+    player::PlayerOptions,
+};
 use eframe::{
     egui::{Align, Button, CentralPanel, Layout, TextEdit, TopBottomPanel},
     App,
@@ -74,12 +77,14 @@ impl App for MainMenu {
                                 .try_send(NetCommand::Send(Message::GameHost))
                                 .unwrap();
                             self.network_sender
-                                .try_send(NetCommand::Send(Message::PlayerOptions {
-                                    options: PlayerOptions {
-                                        name: self.player_name.clone(),
-                                        color: (0, 0, 0),
+                                .try_send(NetCommand::Send(Message::Lobby(
+                                    LobbyMessage::PlayerOptions {
+                                        options: PlayerOptions {
+                                            name: self.player_name.clone(),
+                                            color: (0, 0, 0),
+                                        },
                                     },
-                                }))
+                                )))
                                 .unwrap();
 
                             self.state.screen.set(Screen::Lobby);
@@ -114,12 +119,14 @@ impl App for MainMenu {
                             }))
                             .unwrap();
                         self.network_sender
-                            .try_send(NetCommand::Send(Message::PlayerOptions {
-                                options: PlayerOptions {
-                                    name: self.player_name.clone(),
-                                    color: (0, 0, 0),
+                            .try_send(NetCommand::Send(Message::Lobby(
+                                LobbyMessage::PlayerOptions {
+                                    options: PlayerOptions {
+                                        name: self.player_name.clone(),
+                                        color: (0, 0, 0),
+                                    },
                                 },
-                            }))
+                            )))
                             .unwrap();
                         self.state.screen.set(Screen::Lobby);
                     }

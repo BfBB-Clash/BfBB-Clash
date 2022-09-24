@@ -7,12 +7,12 @@ use clash_lib::{
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-use super::lobby_actor::LobbyMessage;
+use super::lobby_actor::LobbyAction;
 use super::LobbyError;
 
 #[derive(Debug)]
 pub struct LobbyHandleProvider {
-    pub(super) sender: mpsc::Sender<LobbyMessage>,
+    pub(super) sender: mpsc::Sender<LobbyAction>,
     pub(super) lobby_id: LobbyId,
 }
 
@@ -30,7 +30,7 @@ impl LobbyHandleProvider {
 /// Automatically removes player from lobby when dropped.
 #[derive(Clone, Debug)]
 pub struct LobbyHandle {
-    sender: mpsc::Sender<LobbyMessage>,
+    sender: mpsc::Sender<LobbyAction>,
     lobby_id: LobbyId,
     player_id: PlayerId,
 }
@@ -38,7 +38,7 @@ pub struct LobbyHandle {
 impl LobbyHandle {
     async fn execute<T>(
         &self,
-        msg: LobbyMessage,
+        msg: LobbyAction,
         rx: oneshot::Receiver<Result<T, LobbyError>>,
     ) -> Result<T, LobbyError> {
         // Ignore first error, if there is an error, rx.await will fail aswell since it's sender
@@ -49,7 +49,7 @@ impl LobbyHandle {
 
     pub async fn start_game(&self) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::StartGame {
+        let msg = LobbyAction::StartGame {
             respond_to: tx,
             id: self.player_id,
         };
@@ -63,7 +63,7 @@ impl LobbyHandle {
     /// across an await boundary.
     pub async fn join_lobby(&self) -> Result<broadcast::Receiver<Message>, LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::AddPlayer {
+        let msg = LobbyAction::AddPlayer {
             respond_to: tx,
             id: self.player_id,
         };
@@ -81,14 +81,14 @@ impl LobbyHandle {
     pub async fn rem_player(&self) -> Result<(), LobbyError> {
         // TODO: Do this with self.execute somehow?
         self.sender
-            .send(LobbyMessage::RemovePlayer { id: self.player_id })
+            .send(LobbyAction::RemovePlayer { id: self.player_id })
             .await
             .map_err(|_| LobbyError::HandleInvalid)
     }
 
     pub async fn set_player_options(&self, options: PlayerOptions) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::SetPlayerOptions {
+        let msg = LobbyAction::SetPlayerOptions {
             respond_to: tx,
             id: self.player_id,
             options,
@@ -98,7 +98,7 @@ impl LobbyHandle {
 
     pub async fn set_player_can_start(&self, can_start: bool) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::SetPlayerCanStart {
+        let msg = LobbyAction::SetPlayerCanStart {
             respond_to: tx,
             id: self.player_id,
             can_start,
@@ -108,7 +108,7 @@ impl LobbyHandle {
 
     pub async fn set_player_level(&self, level: Option<Level>) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::SetPlayerLevel {
+        let msg = LobbyAction::SetPlayerLevel {
             respond_to: tx,
             id: self.player_id,
             level,
@@ -118,7 +118,7 @@ impl LobbyHandle {
 
     pub async fn player_collected_item(&self, item: Item) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::PlayerCollectedItem {
+        let msg = LobbyAction::PlayerCollectedItem {
             respond_to: tx,
             id: self.player_id,
             item,
@@ -128,7 +128,7 @@ impl LobbyHandle {
 
     pub async fn set_game_options(&self, options: LobbyOptions) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
-        let msg = LobbyMessage::SetGameOptions {
+        let msg = LobbyAction::SetGameOptions {
             respond_to: tx,
             id: self.player_id,
             options,
@@ -143,11 +143,11 @@ mod test {
     use clash_lib::{lobby::LobbyOptions, net::Item, player::PlayerOptions};
     use tokio::sync::mpsc;
 
-    use crate::lobby::{lobby_actor::LobbyMessage, LobbyError};
+    use crate::lobby::{lobby_actor::LobbyAction, LobbyError};
 
     use super::{LobbyHandle, LobbyHandleProvider};
 
-    fn setup() -> (mpsc::Receiver<LobbyMessage>, LobbyHandle) {
+    fn setup() -> (mpsc::Receiver<LobbyAction>, LobbyHandle) {
         let (tx, rx) = mpsc::channel(2);
         let handle = LobbyHandle {
             sender: tx,
@@ -175,7 +175,7 @@ mod test {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
-                LobbyMessage::StartGame {
+                LobbyAction::StartGame {
                     respond_to: _,
                     id: 123
                 }
@@ -192,7 +192,7 @@ mod test {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
-                LobbyMessage::AddPlayer {
+                LobbyAction::AddPlayer {
                     respond_to: _,
                     id: 123
                 }
@@ -207,7 +207,7 @@ mod test {
         let (mut rx, handle) = setup();
         let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
-            assert!(matches!(m, LobbyMessage::RemovePlayer { id: 123 }));
+            assert!(matches!(m, LobbyAction::RemovePlayer { id: 123 }));
         });
         let _ = handle.rem_player().await;
         actor.await.unwrap();
@@ -218,7 +218,7 @@ mod test {
         let (mut rx, handle) = setup();
         let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
-            if let LobbyMessage::SetPlayerOptions {
+            if let LobbyAction::SetPlayerOptions {
                 respond_to: _,
                 id,
                 options,
@@ -252,7 +252,7 @@ mod test {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
-                LobbyMessage::SetPlayerLevel {
+                LobbyAction::SetPlayerLevel {
                     respond_to: _,
                     id: 123,
                     level: Some(Level::MainMenu)
@@ -270,7 +270,7 @@ mod test {
             let m = rx.recv().await.unwrap();
             assert!(matches!(
                 m,
-                LobbyMessage::PlayerCollectedItem {
+                LobbyAction::PlayerCollectedItem {
                     respond_to: _,
                     id: 123,
                     item: Item::Spatula(Spatula::OnTopOfThePineapple)
@@ -288,7 +288,7 @@ mod test {
         let (mut rx, handle) = setup();
         let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
-            if let LobbyMessage::SetGameOptions {
+            if let LobbyAction::SetGameOptions {
                 respond_to: _,
                 id,
                 options,

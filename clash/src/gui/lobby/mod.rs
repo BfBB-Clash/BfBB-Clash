@@ -1,7 +1,7 @@
 use std::{rc::Rc, sync::mpsc::Receiver};
 
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
-use clash_lib::net::Message;
+use clash_lib::net::{LobbyMessage, Message};
 use clash_lib::PlayerId;
 use eframe::egui::{Align, Button, CentralPanel, Checkbox, Layout, SidePanel, Ui};
 use eframe::epaint::Color32;
@@ -167,7 +167,9 @@ impl Game {
 
         if let Some(options) = updated_options {
             self.network_sender
-                .try_send(NetCommand::Send(Message::GameOptions { options }))
+                .blocking_send(NetCommand::Send(Message::Lobby(
+                    LobbyMessage::GameOptions { options },
+                )))
                 .unwrap();
         }
     }
@@ -210,7 +212,7 @@ impl Game {
         if start_game_response.clicked() {
             // TODO: Send a message to the network thread to start the game.
             self.network_sender
-                .try_send(NetCommand::Send(Message::GameBegin {}))
+                .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin {})))
                 .unwrap();
         }
     }

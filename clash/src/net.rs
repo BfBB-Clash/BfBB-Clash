@@ -3,7 +3,7 @@ use std::{error::Error, sync::mpsc::Sender};
 use async_scoped::TokioScope;
 use clash_lib::net::{
     connection::{self, ConnectionRx},
-    Message, ProtocolError,
+    LobbyMessage, Message,
 };
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -108,47 +108,46 @@ async fn recv_task(
             }
         };
 
-        if let Err(e) = process_incoming(incoming, &logic_sender) {
-            log::error!("Error from server:\n{e}");
-            error_sender
-                .send(Box::new(e))
-                .expect("GUI has crashed and so will we.");
+        match incoming {
+            Message::Lobby(act) => process_action(act, &logic_sender),
+            m @ Message::ConnectionAccept { player_id: _ } => {
+                log::debug!("ConnectionAccept message got :)");
+                logic_sender.send(m).unwrap();
+                continue;
+            }
+            Message::Error { error } => {
+                log::error!("Error from server:\n{error}");
+                error_sender
+                    .send(Box::new(error))
+                    .expect("GUI has crashed and so will we.");
+                continue;
+            }
+            _ => {
+                log::error!("Invalid message received from server");
+                continue;
+            }
         }
     }
 }
 
-fn process_incoming(message: Message, logic_sender: &Sender<Message>) -> Result<(), ProtocolError> {
-    match message {
-        Message::Version { version: _ } => {
-            todo!()
+fn process_action(action: LobbyMessage, logic_sender: &Sender<Message>) {
+    match action {
+        m @ LobbyMessage::GameLobbyInfo { lobby: _ } => {
+            logic_sender.send(Message::Lobby(m)).unwrap();
         }
-        Message::Error { error } => {
-            return Err(error);
+        m @ LobbyMessage::GameBegin => {
+            logic_sender.send(Message::Lobby(m)).unwrap();
         }
-        m @ Message::ConnectionAccept { player_id: _ } => {
-            log::debug!("ConnectionAccept message got :)");
-            logic_sender.send(m).unwrap();
-        }
-        Message::PlayerOptions { options: _ } => todo!(),
-        Message::PlayerCanStart(_) => todo!(),
-        Message::GameHost => todo!(),
-        Message::GameJoin { lobby_id: _ } => todo!(),
-        Message::GameOptions { options: _ } => todo!(),
-        m @ Message::GameLobbyInfo { lobby: _ } => {
-            logic_sender.send(m).unwrap();
-        }
-        m @ Message::GameBegin => {
-            logic_sender.send(m).unwrap();
-        }
-        Message::GameCurrentLevel { level: _ } => todo!(),
-        Message::GameForceWarp { level: _ } => todo!(),
-        Message::GameItemCollected { item: _ } => todo!(),
-        Message::GameEnd => {
+        LobbyMessage::GameEnd => {
             // This message isn't supposed to do anything until the GUI gets updated.
         }
+        // We aren't yet doing partial
+        LobbyMessage::PlayerOptions { options: _ } => todo!(),
+        LobbyMessage::PlayerCanStart(_) => todo!(),
+        LobbyMessage::GameOptions { options: _ } => todo!(),
+        LobbyMessage::GameCurrentLevel { level: _ } => todo!(),
+        LobbyMessage::GameItemCollected { item: _ } => todo!(),
     }
-
-    Ok(())
 }
 
 fn load_ip_address() -> String {
