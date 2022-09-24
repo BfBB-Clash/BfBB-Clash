@@ -83,6 +83,7 @@ fn process_incoming(message: Message, logic_sender: &Sender<Message>) -> Result<
             logic_sender.send(m).unwrap();
         }
         Message::PlayerOptions { options: _ } => todo!(),
+        Message::PlayerCanStart(_) => todo!(),
         Message::GameHost => todo!(),
         Message::GameJoin { lobby_id: _ } => todo!(),
         Message::GameOptions { options: _ } => todo!(),

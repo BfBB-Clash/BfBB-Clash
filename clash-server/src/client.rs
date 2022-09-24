@@ -189,6 +189,10 @@ impl Client {
                 let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.set_player_options(self.player_id, options).await?;
             }
+            Message::PlayerCanStart(val) => {
+                let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
+                lobby.set_player_can_start(self.player_id, val).await?;
+            }
             Message::GameOptions { options } => {
                 let lobby = self.lobby.as_mut().ok_or(ProtocolError::InvalidMessage)?;
                 lobby.set_game_options(self.player_id, options).await?;

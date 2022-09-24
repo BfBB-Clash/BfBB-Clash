@@ -23,6 +23,7 @@ pub struct NetworkedPlayer {
     pub current_level: Option<Level>,
     pub score: u32,
     pub menu_order: u8,
+    pub ready_to_start: bool,
 }
 
 impl NetworkedPlayer {
@@ -32,6 +33,7 @@ impl NetworkedPlayer {
             current_level: None,
             score: 0,
             menu_order,
+            ready_to_start: false,
         }
     }
 

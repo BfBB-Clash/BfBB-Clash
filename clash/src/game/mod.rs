@@ -62,6 +62,9 @@ pub fn start_game(
                         network_sender
                             .blocking_send(Message::GameCurrentLevel { level: None })
                             .unwrap();
+                        network_sender
+                            .blocking_send(Message::PlayerCanStart(false))
+                            .unwrap();
                     }
                 }
 

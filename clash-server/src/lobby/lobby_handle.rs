@@ -77,6 +77,20 @@ impl LobbyHandle {
         self.execute(msg, rx).await
     }
 
+    pub async fn set_player_can_start(
+        &self,
+        player_id: PlayerId,
+        can_start: bool,
+    ) -> Result<(), LobbyError> {
+        let (tx, rx) = oneshot::channel();
+        let msg = LobbyMessage::SetPlayerCanStart {
+            respond_to: tx,
+            id: player_id,
+            can_start,
+        };
+        self.execute(msg, rx).await
+    }
+
     pub async fn set_player_level(
         &self,
         player_id: PlayerId,

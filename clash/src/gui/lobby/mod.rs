@@ -1,15 +1,12 @@
 use std::{rc::Rc, sync::mpsc::Receiver};
 
-use clash_lib::{
-    lobby::{GamePhase, NetworkedLobby},
-    net::Message,
-    PlayerId,
-};
-use eframe::{
-    egui::{Align, Button, CentralPanel, Checkbox, Layout, SidePanel, Ui},
-    epaint::Color32,
-    App,
-};
+use clash_lib::lobby::{GamePhase, NetworkedLobby};
+use clash_lib::net::Message;
+use clash_lib::PlayerId;
+use eframe::egui::{Align, Button, CentralPanel, Checkbox, Layout, SidePanel, Ui};
+use eframe::epaint::Color32;
+use eframe::App;
+use itertools::intersperse;
 
 use crate::gui::state::{Screen, State, Submenu};
 use crate::gui::PADDING;
@@ -153,6 +150,14 @@ impl Game {
             if !self.lobby.can_start() {
                 start_game_response = start_game_response
                     .on_disabled_hover_text("All players must be on the Main Menu.")
+                    .on_disabled_hover_text(format!(
+                        "Waiting on: {}",
+                        intersperse(
+                            self.lobby.players.values().map(|p| p.options.name.as_str()),
+                            ", "
+                        )
+                        .collect::<String>()
+                    ))
             }
 
             if !self.lab_door_num.is_valid() {
