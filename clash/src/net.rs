@@ -8,16 +8,18 @@ use clash_lib::net::{
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
-#[derive(Clone, Copy, Debug)]
+pub type NetCommandSender = mpsc::Sender<NetCommand>;
+
+#[derive(Clone, Debug)]
 pub enum NetCommand {
     Connect,
     Disconnect,
+    Send(Message),
 }
 
 #[tokio::main]
 pub async fn run(
     mut connect_recv: mpsc::Receiver<NetCommand>,
-    mut receiver: mpsc::Receiver<Message>,
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
 ) {
@@ -27,7 +29,6 @@ pub async fn run(
                 TokioScope::scope_and_block(|s| {
                     s.spawn(main_task(
                         &mut connect_recv,
-                        &mut receiver,
                         logic_sender.clone(),
                         error_sender.clone(),
                     ));
@@ -37,13 +38,15 @@ pub async fn run(
             // We may receieve a disconnect command here if the server connection is lost and the client
             // then clicks the "Leave Lobby" button.
             NetCommand::Disconnect => continue,
+            NetCommand::Send(_) => {
+                log::error!("Attempted to send message while not connected to server.");
+            }
         }
     }
 }
 
 async fn main_task(
-    connect_recv: &mut mpsc::Receiver<NetCommand>,
-    receiver: &mut tokio::sync::mpsc::Receiver<Message>,
+    receiver: &mut mpsc::Receiver<NetCommand>,
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
 ) {
@@ -59,16 +62,19 @@ async fn main_task(
         .await
         .unwrap();
 
-    let mut recv_task = tokio::spawn(recv_task(conn_rx, error_sender.clone(), logic_sender));
-    loop {
-        // If recv_task finishes (server connection lost), or We receieve a Disconnect command, disconnect.
-        let msg = tokio::select! {
-            _ = &mut recv_task => break,
-            Some(NetCommand::Disconnect) = connect_recv.recv() => break,
-            m = receiver.recv() => m,
+    let recv_task = tokio::spawn(recv_task(conn_rx, error_sender.clone(), logic_sender));
+    while let Some(command) = receiver.recv().await {
+        // NetCommand should be a Disconnect or Send command
+        let msg = match command {
+            NetCommand::Connect => {
+                log::error!("Attempted to connect to server while already connected");
+                continue;
+            }
+            NetCommand::Disconnect => break,
+            NetCommand::Send(m) => m,
         };
         log::debug!("Sending message {msg:#?}");
-        if let Err(e) = conn_tx.write_frame(msg.unwrap()).await {
+        if let Err(e) = conn_tx.write_frame(msg).await {
             log::error!("Error sending message to server. Disconnecting. {e:#?}");
             error_sender
                 .send(Box::new(e))

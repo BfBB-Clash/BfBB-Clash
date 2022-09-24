@@ -9,11 +9,13 @@ use spin_sleep::LoopHelper;
 use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
 
+use crate::net::{NetCommand, NetCommandSender};
+
 use self::{game_mode::GameMode, game_state::ClashGame};
 
 pub fn start_game(
     mut gui_sender: Sender<(PlayerId, NetworkedLobby)>,
-    mut network_sender: tokio::sync::mpsc::Sender<Message>,
+    mut network_sender: NetCommandSender,
     mut logic_receiver: Receiver<Message>,
 ) {
     let mut loop_helper = LoopHelper::builder()
@@ -60,10 +62,10 @@ pub fn start_game(
                     if local_player.current_level != None {
                         local_player.current_level = None;
                         network_sender
-                            .try_send(Message::GameCurrentLevel { level: None })
+                            .try_send(NetCommand::Send(Message::GameCurrentLevel { level: None }))
                             .unwrap();
                         network_sender
-                            .blocking_send(Message::PlayerCanStart(false))
+                            .blocking_send(NetCommand::Send(Message::PlayerCanStart(false)))
                             .unwrap();
                     }
                 }

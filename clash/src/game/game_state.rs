@@ -8,6 +8,8 @@ use clash_lib::net::{Item, Message};
 use clash_lib::PlayerId;
 use log::info;
 
+use crate::net::{NetCommand, NetCommandSender};
+
 use super::game_mode::GameMode;
 
 pub struct ClashGame;
@@ -21,7 +23,7 @@ impl GameMode for ClashGame {
         interface: &G,
         lobby: &mut NetworkedLobby,
         local_player: PlayerId,
-        network_sender: &mut tokio::sync::mpsc::Sender<Message>,
+        network_sender: &mut NetCommandSender,
         local_spat_state: &mut HashSet<Spatula>,
     ) -> Self::Result {
         if interface.is_loading()? {
@@ -40,7 +42,7 @@ impl GameMode for ClashGame {
         if local_player.current_level != level {
             local_player.current_level = level;
             network_sender
-                .try_send(Message::GameCurrentLevel { level })
+                .try_send(NetCommand::Send(Message::GameCurrentLevel { level }))
                 .unwrap();
         }
 
@@ -51,7 +53,7 @@ impl GameMode for ClashGame {
         if local_player.ready_to_start != can_start {
             local_player.ready_to_start = can_start;
             network_sender
-                .blocking_send(Message::PlayerCanStart(can_start))
+                .try_send(NetCommand::Send(Message::PlayerCanStart(can_start)))
                 .unwrap();
         }
 
@@ -91,9 +93,9 @@ impl GameMode for ClashGame {
             if interface.is_task_complete(spat)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .try_send(Message::GameItemCollected {
+                    .try_send(NetCommand::Send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
-                    })
+                    }))
                     .unwrap();
                 info!("Collected (from menu) {spat:?}");
             }
@@ -102,9 +104,9 @@ impl GameMode for ClashGame {
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .try_send(Message::GameItemCollected {
+                    .try_send(NetCommand::Send(Message::GameItemCollected {
                         item: Item::Spatula(spat),
-                    })
+                    }))
                     .unwrap();
                 info!("Collected {spat:?}");
             }

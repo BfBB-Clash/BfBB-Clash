@@ -3,7 +3,6 @@ use std::rc::Rc;
 use std::sync::mpsc::Receiver;
 
 use clash_lib::lobby::NetworkedLobby;
-use clash_lib::net::Message;
 use clash_lib::PlayerId;
 use eframe::egui::{
     Area, Context, FontData, FontDefinitions, Label, RichText, Style, TextStyle, TopBottomPanel,
@@ -15,7 +14,7 @@ use crate::gui::lobby::Game;
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::{Screen, State};
 use crate::gui::PADDING;
-use crate::net::NetCommand;
+use crate::net::NetCommandSender;
 
 pub struct Clash {
     state: Rc<State>,
@@ -31,8 +30,7 @@ impl Clash {
         cc: &CreationContext<'_>,
         gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
         error_receiver: Receiver<Box<dyn Error + Send>>,
-        network_sender: tokio::sync::mpsc::Sender<Message>,
-        connect_sender: tokio::sync::mpsc::Sender<NetCommand>,
+        network_sender: NetCommandSender,
     ) -> Self {
         Self::setup(&cc.egui_ctx);
 
@@ -40,13 +38,8 @@ impl Clash {
         Self {
             error_receiver,
             state: state.clone(),
-            game_screen: Game::new(
-                state.clone(),
-                gui_receiver,
-                network_sender.clone(),
-                connect_sender.clone(),
-            ),
-            main_menu: MainMenu::new(state, network_sender, connect_sender),
+            game_screen: Game::new(state.clone(), gui_receiver, network_sender.clone()),
+            main_menu: MainMenu::new(state, network_sender),
             error_queue: Vec::new(),
         }
     }
