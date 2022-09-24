@@ -21,16 +21,23 @@ pub async fn run(
     logic_sender: Sender<Message>,
     error_sender: Sender<Box<dyn Error + Send>>,
 ) {
-    while let Some(NetCommand::Connect) = connect_recv.recv().await {
-        TokioScope::scope_and_block(|s| {
-            s.spawn(main_task(
-                &mut connect_recv,
-                &mut receiver,
-                logic_sender.clone(),
-                error_sender.clone(),
-            ));
-        });
-        log::info!("Disconnected from server.");
+    while let Some(comm) = connect_recv.recv().await {
+        match comm {
+            NetCommand::Connect => {
+                TokioScope::scope_and_block(|s| {
+                    s.spawn(main_task(
+                        &mut connect_recv,
+                        &mut receiver,
+                        logic_sender.clone(),
+                        error_sender.clone(),
+                    ));
+                });
+                log::info!("Disconnected from server.");
+            }
+            // We may receieve a disconnect command here if the server connection is lost and the client
+            // then clicks the "Leave Lobby" button.
+            NetCommand::Disconnect => continue,
+        }
     }
 }
 
@@ -52,24 +59,23 @@ async fn main_task(
         .await
         .unwrap();
 
-    // TODO: This disconection scheme is very fragile and relies on the server dropping the connection,
-    // causing our recv_task to complete and then break from the send loop
-    let mut handle = tokio::spawn(recv_task(conn_rx, error_sender.clone(), logic_sender));
+    let mut recv_task = tokio::spawn(recv_task(conn_rx, error_sender.clone(), logic_sender));
     loop {
-        let m = tokio::select! {
-            _ = &mut handle => break,
+        // If recv_task finishes (server connection lost), or We receieve a Disconnect command, disconnect.
+        let msg = tokio::select! {
+            _ = &mut recv_task => break,
             Some(NetCommand::Disconnect) = connect_recv.recv() => break,
             m = receiver.recv() => m,
         };
-        log::debug!("Sending message {m:#?}");
-        if let Err(e) = conn_tx.write_frame(m.unwrap()).await {
+        log::debug!("Sending message {msg:#?}");
+        if let Err(e) = conn_tx.write_frame(msg.unwrap()).await {
             log::error!("Error sending message to server. Disconnecting. {e:#?}");
             error_sender
                 .send(Box::new(e))
                 .expect("GUI has crashed and so will we.");
         }
     }
-    handle.abort();
+    recv_task.abort();
 }
 
 async fn recv_task(
