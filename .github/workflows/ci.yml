@@ -1,18 +1,13 @@
 on: pull_request
 
-name: Continuous Integration
+name: CI
 
 jobs:
-  ci-matrix:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-
-    name: Continuous Integration - ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  ci:
+    name: Clash
+    runs-on: ubuntu-latest
     steps:
       - name: Install C build-dependencies
-        if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt update -qq
           sudo apt install -y libxcb-shape0-dev libxcb-xfixes0-dev
