@@ -30,7 +30,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --profile=ci --no-run
+          args: --profile=ci --no-run --locked
       - name: Test
         uses: actions-rs/cargo@v1
         with:
