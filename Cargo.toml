@@ -22,7 +22,7 @@ tokio = { version = "1", features = [
     "time",
 ] }
 
-# Remove unneeded debug info from linux binaries
+# Remove unneeded debug info from linux release binaries
 [profile.release]
 strip = true
 
@@ -30,9 +30,10 @@ strip = true
 [profile.dev.package."*"]
 opt-level = 3
 
-# Don't optimize on CI though
+# Optimize CI for build-times
 [profile.ci]
 inherits = "dev"
+debug = 0
 
 [profile.ci.package."*"]
 opt-level = 0
