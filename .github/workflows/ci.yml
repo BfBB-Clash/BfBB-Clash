@@ -5,6 +5,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  RUSTFLAGS: -D warnings
+
 jobs:
   ci:
     name: Clash
@@ -37,7 +40,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --tests --profile ci -- -D warnings
+          args: --profile=ci --tests
       - name: Verify formatting
         uses: actions-rs/cargo@v1
         with:
