@@ -34,7 +34,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --tests -- -D warnings
+          args: --tests --profile ci -- -D warnings
       - name: Verify formatting
         uses: actions-rs/cargo@v1
         with:
