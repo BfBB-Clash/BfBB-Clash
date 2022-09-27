@@ -23,11 +23,16 @@ jobs:
       - run: rustup component add rustfmt
       - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Run Tests
+      - name: Build
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --profile ci
+          args: --profile=ci --no-run
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --profile=ci
       - name: Deny Clippy warnings
         uses: actions-rs/cargo@v1
         with:
