@@ -18,6 +18,12 @@ pub enum ProtocolError {
     Message(String),
 }
 
+impl From<FrameError> for ProtocolError {
+    fn from(e: FrameError) -> Self {
+        Self::Message(e.to_string())
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum FrameError {
     #[error("Frame exceeded max length")]

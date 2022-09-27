@@ -102,7 +102,7 @@ async fn recv_task(
             Err(e) => {
                 log::error!("Error reading message from server. Disconnecting.\n{e}");
                 error_sender
-                    .send(e.into())
+                    .send(Box::new(e))
                     .expect("GUI has crashed and so will we.");
                 break;
             }

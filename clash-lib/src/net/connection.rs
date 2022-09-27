@@ -1,4 +1,3 @@
-use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
 use std::io::Cursor;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -45,7 +44,7 @@ impl ConnectionTx {
 }
 
 impl ConnectionRx {
-    pub async fn read_frame(&mut self) -> Result<Option<Message>> {
+    pub async fn read_frame(&mut self) -> Result<Option<Message>, FrameError> {
         loop {
             if let Some(frame) = self.parse_frame()? {
                 return Ok(Some(frame));
@@ -57,13 +56,13 @@ impl ConnectionRx {
                     return Ok(None);
                 } else {
                     // Connection closed while still sending data
-                    return Err(FrameError::ConnectionReset.into());
+                    return Err(FrameError::ConnectionReset);
                 }
             }
         }
     }
 
-    fn parse_frame(&mut self) -> Result<Option<Message>, tokio::io::Error> {
+    fn parse_frame(&mut self) -> Result<Option<Message>, std::io::Error> {
         // Use a Cursor to avoid advancing the internal cursor of self.buffer
         let mut buf = Cursor::new(&self.buffer[..]);
 
