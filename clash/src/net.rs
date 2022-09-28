@@ -1,4 +1,4 @@
-use std::{error::Error, sync::mpsc::Sender};
+use std::sync::mpsc::Sender;
 
 use async_scoped::TokioScope;
 use clash_lib::net::{
@@ -9,6 +9,7 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
 pub type NetCommandSender = mpsc::Sender<NetCommand>;
+pub type ErrorReceiver = std::sync::mpsc::Receiver<anyhow::Error>;
 
 #[derive(Clone, Debug)]
 pub enum NetCommand {
@@ -21,7 +22,7 @@ pub enum NetCommand {
 pub async fn run(
     mut connect_recv: mpsc::Receiver<NetCommand>,
     logic_sender: Sender<Message>,
-    error_sender: Sender<Box<dyn Error + Send>>,
+    error_sender: Sender<anyhow::Error>,
 ) {
     while let Some(comm) = connect_recv.recv().await {
         match comm {
@@ -48,7 +49,7 @@ pub async fn run(
 async fn main_task(
     receiver: &mut mpsc::Receiver<NetCommand>,
     logic_sender: Sender<Message>,
-    error_sender: Sender<Box<dyn Error + Send>>,
+    error_sender: Sender<anyhow::Error>,
 ) {
     let ip = load_ip_address();
     log::info!("Connecting to server at '{ip}'");
@@ -77,8 +78,9 @@ async fn main_task(
         if let Err(e) = conn_tx.write_frame(msg).await {
             log::error!("Error sending message to server. Disconnecting. {e:#?}");
             error_sender
-                .send(Box::new(e))
+                .send(e.into())
                 .expect("GUI has crashed and so will we.");
+            break;
         }
     }
     recv_task.abort();
@@ -86,7 +88,7 @@ async fn main_task(
 
 async fn recv_task(
     mut conn_rx: ConnectionRx,
-    error_sender: Sender<Box<dyn Error + Send>>,
+    error_sender: Sender<anyhow::Error>,
     logic_sender: Sender<Message>,
 ) {
     loop {
@@ -102,7 +104,7 @@ async fn recv_task(
             Err(e) => {
                 log::error!("Error reading message from server. Disconnecting.\n{e}");
                 error_sender
-                    .send(Box::new(e))
+                    .send(e.into())
                     .expect("GUI has crashed and so will we.");
                 break;
             }
@@ -118,7 +120,7 @@ async fn recv_task(
             Message::Error { error } => {
                 log::error!("Error from server:\n{error}");
                 error_sender
-                    .send(Box::new(error))
+                    .send(error.into())
                     .expect("GUI has crashed and so will we.");
                 continue;
             }

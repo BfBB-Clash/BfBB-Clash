@@ -1,11 +1,10 @@
-use std::error::Error;
 use std::sync::mpsc::Receiver;
 
 use clash_lib::lobby::NetworkedLobby;
 use clash_lib::PlayerId;
 use eframe::{run_native, IconData, NativeOptions};
 
-use crate::net::NetCommandSender;
+use crate::net::{ErrorReceiver, NetCommandSender};
 
 use self::clash::Clash;
 
@@ -22,7 +21,7 @@ const PADDING: f32 = 8.;
 /// Doesn't return until the window is closed.
 pub fn run(
     gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
-    error_receiver: Receiver<Box<dyn Error + Send>>,
+    error_receiver: ErrorReceiver,
     network_sender: NetCommandSender,
 ) {
     let icon_bytes = include_bytes!("../../res/icon.ico");

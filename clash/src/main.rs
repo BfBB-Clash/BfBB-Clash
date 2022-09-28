@@ -3,7 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-use std::{error::Error, sync::mpsc::channel};
+use std::sync::mpsc::channel;
 
 use clash_lib::net::Message;
 use net::NetCommand;
@@ -27,7 +27,7 @@ fn main() {
 
     let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(100);
     let (logic_sender, logic_receiver) = channel::<Message>();
-    let (error_sender, error_receiver) = channel::<Box<dyn Error + Send>>();
+    let (error_sender, error_receiver) = channel::<anyhow::Error>();
     // Create a new thread and start a tokio runtime on it for talking to the server
     // TODO: Tokio may not be the best tool for the client. It might be better to
     //       simply use std's blocking networking in a new thread, since we should only ever
