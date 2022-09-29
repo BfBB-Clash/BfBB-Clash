@@ -127,7 +127,7 @@ impl Game {
                 .ng_plus = self.lobby.options.ng_plus;
         }
 
-        if ui
+        let lab_door_ui = ui
             .horizontal(|ui| {
                 if !self.lab_door_cost.is_valid() {
                     ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
@@ -135,9 +135,8 @@ impl Game {
                 ui.label("Lab Door Cost: ");
                 ui.text_edit_singleline(&mut self.lab_door_cost)
             })
-            .inner
-            .changed()
-        {
+            .inner;
+        if lab_door_ui.changed() {
             if let Some(&n) = self.lab_door_cost.get_val() {
                 updated_options
                     .get_or_insert_with(|| self.lobby.options.clone())
@@ -145,7 +144,7 @@ impl Game {
             }
         }
 
-        if ui
+        let tier_ui = ui
             .horizontal(|ui| {
                 if !self.tier_count.is_valid() {
                     ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
@@ -153,9 +152,8 @@ impl Game {
                 ui.label("Tier Count: ");
                 ui.text_edit_singleline(&mut self.tier_count)
             })
-            .inner
-            .changed()
-        {
+            .inner;
+        if tier_ui.changed() {
             if let Some(&n) = self.tier_count.get_val() {
                 updated_options
                     .get_or_insert_with(|| self.lobby.options.clone())

@@ -5,19 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::PlayerId;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct SpatulaState {
     pub collection_count: u8,
     pub collection_vec: Vec<PlayerId>,
-}
-
-impl Default for SpatulaState {
-    fn default() -> Self {
-        Self {
-            collection_count: 0,
-            collection_vec: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
