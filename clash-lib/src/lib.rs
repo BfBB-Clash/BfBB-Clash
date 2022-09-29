@@ -6,7 +6,7 @@ pub mod player;
 pub const MAX_PLAYERS: usize = 6;
 
 pub struct GameRuleConsts {
-    pub spat_scores: [u32; 6],
+    pub spat_scores: [u32; MAX_PLAYERS],
 }
 
 pub const GAME_CONSTS: GameRuleConsts = GameRuleConsts {
