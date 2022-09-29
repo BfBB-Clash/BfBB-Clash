@@ -8,15 +8,20 @@ use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
 use spin_sleep::LoopHelper;
 use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot::error::TryRecvError;
 
 use crate::net::{NetCommand, NetCommandSender};
 
 use self::{game_mode::GameMode, game_state::ClashGame};
 
+pub type ShutdownSender = tokio::sync::oneshot::Sender<()>;
+pub type ShutdownReceiver = tokio::sync::oneshot::Receiver<()>;
+
 pub fn start_game(
     mut gui_sender: Sender<(PlayerId, NetworkedLobby)>,
     mut network_sender: NetCommandSender,
     mut logic_receiver: Receiver<Message>,
+    mut shutdown_receiver: ShutdownReceiver,
 ) {
     let mut loop_helper = LoopHelper::builder()
         .report_interval_s(0.5)
@@ -33,7 +38,7 @@ pub fn start_game(
     // than searching to see if we've collected it.
     let mut local_spat_state = HashSet::<Spatula>::with_capacity(Spatula::COUNT);
 
-    loop {
+    while let Err(TryRecvError::Empty) = shutdown_receiver.try_recv() {
         loop_helper.loop_start();
         // You have to call this to avoid overflowing an integer within the loop helper
         let _ = loop_helper.report_rate();
@@ -90,7 +95,7 @@ fn update_from_network<T: GameInterface>(
     gui_sender: &mut Sender<(PlayerId, NetworkedLobby)>,
     local_spat_state: &mut HashSet<Spatula>,
 ) -> Result<(), InterfaceError> {
-    while let Ok(msg) = logic_receiver.try_recv() {
+    for msg in logic_receiver.try_iter() {
         let action = match msg {
             Message::ConnectionAccept { player_id: id } => {
                 *player_id = id;

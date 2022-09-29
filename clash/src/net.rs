@@ -1,6 +1,5 @@
 use std::sync::mpsc::Sender;
 
-use async_scoped::TokioScope;
 use clash_lib::net::{
     connection::{self, ConnectionRx},
     LobbyMessage, Message,
@@ -8,46 +7,18 @@ use clash_lib::net::{
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
+pub type NetCommandReceiver = mpsc::Receiver<NetCommand>;
 pub type NetCommandSender = mpsc::Sender<NetCommand>;
-pub type ErrorReceiver = std::sync::mpsc::Receiver<anyhow::Error>;
 
 #[derive(Clone, Debug)]
 pub enum NetCommand {
-    Connect,
     Disconnect,
     Send(Message),
 }
 
 #[tokio::main]
 pub async fn run(
-    mut connect_recv: mpsc::Receiver<NetCommand>,
-    logic_sender: Sender<Message>,
-    error_sender: Sender<anyhow::Error>,
-) {
-    while let Some(comm) = connect_recv.recv().await {
-        match comm {
-            NetCommand::Connect => {
-                TokioScope::scope_and_block(|s| {
-                    s.spawn(main_task(
-                        &mut connect_recv,
-                        logic_sender.clone(),
-                        error_sender.clone(),
-                    ));
-                });
-                log::info!("Disconnected from server.");
-            }
-            // We may receieve a disconnect command here if the server connection is lost and the client
-            // then clicks the "Leave Lobby" button.
-            NetCommand::Disconnect => continue,
-            NetCommand::Send(_) => {
-                log::error!("Attempted to send message while not connected to server.");
-            }
-        }
-    }
-}
-
-async fn main_task(
-    receiver: &mut mpsc::Receiver<NetCommand>,
+    mut receiver: NetCommandReceiver,
     logic_sender: Sender<Message>,
     error_sender: Sender<anyhow::Error>,
 ) {
@@ -67,10 +38,6 @@ async fn main_task(
     while let Some(command) = receiver.recv().await {
         // NetCommand should be a Disconnect or Send command
         let msg = match command {
-            NetCommand::Connect => {
-                log::error!("Attempted to connect to server while already connected");
-                continue;
-            }
             NetCommand::Disconnect => break,
             NetCommand::Send(m) => m,
         };
@@ -84,6 +51,7 @@ async fn main_task(
         }
     }
     recv_task.abort();
+    log::info!("Disconnected from server.")
 }
 
 async fn recv_task(

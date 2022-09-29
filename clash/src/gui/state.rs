@@ -1,14 +1,19 @@
-use std::cell::Cell;
+use std::cell::RefCell;
 
 use eframe::{
     egui::Context,
     epaint::{ColorImage, TextureHandle},
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+use super::lobby::LobbyData;
+
+pub type ErrorSender = std::sync::mpsc::Sender<anyhow::Error>;
+pub type ErrorReceiver = std::sync::mpsc::Receiver<anyhow::Error>;
+
+#[derive(Debug)]
 pub enum Screen {
     MainMenu(Submenu),
-    Lobby,
+    Lobby(LobbyData),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -19,8 +24,10 @@ pub enum Submenu {
 }
 
 pub struct State {
-    pub screen: Cell<Screen>,
+    pub screen: RefCell<Screen>,
     pub logo: TextureHandle,
+    pub error_sender: ErrorSender,
+    pub error_receiver: ErrorReceiver,
 }
 
 impl State {
@@ -30,9 +37,12 @@ impl State {
             load_image_from_memory(include_bytes!("../../res/logo.png")).unwrap(),
             eframe::egui::TextureFilter::Linear,
         );
+        let (error_sender, error_receiver) = std::sync::mpsc::channel();
         Self {
-            screen: Cell::new(Screen::MainMenu(Submenu::Root)),
+            screen: RefCell::new(Screen::MainMenu(Submenu::Root)),
             logo,
+            error_sender,
+            error_receiver,
         }
     }
 }

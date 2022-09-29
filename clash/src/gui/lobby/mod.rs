@@ -1,4 +1,6 @@
-use std::{rc::Rc, sync::mpsc::Receiver};
+use std::mem::ManuallyDrop;
+use std::rc::Rc;
+use std::thread::JoinHandle;
 
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{LobbyMessage, Message};
@@ -8,12 +10,10 @@ use eframe::epaint::Color32;
 use eframe::App;
 use itertools::intersperse;
 
+use crate::game::ShutdownSender;
+use crate::gui::state::{Screen, State, Submenu};
 use crate::gui::PADDING;
-use crate::net::NetCommandSender;
-use crate::{
-    gui::state::{Screen, State, Submenu},
-    net::NetCommand,
-};
+use crate::net::{NetCommand, NetCommandSender};
 use player_ui::PlayerUi;
 use tracker::Tracker;
 
@@ -22,10 +22,46 @@ use super::val_text::ValText;
 mod player_ui;
 mod tracker;
 
+pub type GuiReceiver = std::sync::mpsc::Receiver<(PlayerId, NetworkedLobby)>;
+
+#[derive(Debug)]
+pub struct LobbyData {
+    pub network_sender: NetCommandSender,
+    pub gui_receiver: GuiReceiver,
+    pub game_shutdown: ManuallyDrop<ShutdownSender>,
+    pub network_thread: ManuallyDrop<JoinHandle<()>>,
+    pub game_thread: ManuallyDrop<JoinHandle<()>>,
+}
+
+impl Drop for LobbyData {
+    fn drop(&mut self) {
+        // Shutdown game and network threads and wait for them to complete
+        self.network_sender
+            .blocking_send(NetCommand::Disconnect)
+            .expect("Failed to signal network thread to shutdown.");
+
+        // SAFETY: We are dropping ourselves now, so these fields will never be accessed again.
+        let (game_shutdown, network_thread, game_thread) = unsafe {
+            (
+                ManuallyDrop::take(&mut self.game_shutdown),
+                ManuallyDrop::take(&mut self.network_thread),
+                ManuallyDrop::take(&mut self.game_thread),
+            )
+        };
+        game_shutdown
+            .send(())
+            .expect("Failed to signal game-logic thread to shutdown");
+        network_thread
+            .join()
+            .expect("Network thread failed to join");
+        game_thread
+            .join()
+            .expect("Game logic thread failed to join");
+    }
+}
+
 pub struct Game {
     state: Rc<State>,
-    gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
-    network_sender: NetCommandSender,
     lobby: NetworkedLobby,
     local_player_id: PlayerId,
     lab_door_cost: ValText<u8>,
@@ -33,15 +69,9 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(
-        state: Rc<State>,
-        gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
-        network_sender: NetCommandSender,
-    ) -> Self {
+    pub fn new(state: Rc<State>) -> Self {
         Self {
             state,
-            gui_receiver,
-            network_sender,
             lobby: NetworkedLobby::new(0),
             local_player_id: 0,
             lab_door_cost: ValText::with_validator(|text| {
@@ -61,12 +91,20 @@ impl App for Game {
         // Continuously repaint
         ctx.request_repaint();
 
-        // Receive gamestate updates
-        while let Ok((local_player_id, new_lobby)) = self.gui_receiver.try_recv() {
-            self.local_player_id = local_player_id;
-            self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
-            self.tier_count.set_val(new_lobby.options.tier_count);
-            self.lobby = new_lobby;
+        {
+            let screen = self.state.screen.borrow();
+            let data = match &*screen {
+                Screen::Lobby(x) => x,
+                _ => unreachable!("Attempted to extract lobby state while not in a lobby."),
+            };
+
+            // Receive gamestate updates
+            while let Ok((local_player_id, new_lobby)) = data.gui_receiver.try_recv() {
+                self.local_player_id = local_player_id;
+                self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
+                self.tier_count.set_val(new_lobby.options.tier_count);
+                self.lobby = new_lobby;
+            }
         }
 
         SidePanel::left("Player List")
@@ -95,8 +133,7 @@ impl App for Game {
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {
-                    let _ = self.network_sender.try_send(NetCommand::Disconnect);
-                    self.state.screen.set(Screen::MainMenu(Submenu::Root));
+                    *self.state.screen.borrow_mut() = Screen::MainMenu(Submenu::Root);
                 }
             })
         });
@@ -166,7 +203,13 @@ impl Game {
         }
 
         if let Some(options) = updated_options {
-            self.network_sender
+            let screen = self.state.screen.borrow();
+            let network_sender = match &*screen {
+                Screen::Lobby(x) => &x.network_sender,
+                _ => unreachable!("Attempted to extract lobby state while not in a lobby."),
+            };
+
+            network_sender
                 .blocking_send(NetCommand::Send(Message::Lobby(
                     LobbyMessage::GameOptions { options },
                 )))
@@ -210,8 +253,12 @@ impl Game {
         }
 
         if start_game_response.clicked() {
-            // TODO: Send a message to the network thread to start the game.
-            self.network_sender
+            let screen = self.state.screen.borrow();
+            let network_sender = match &*screen {
+                Screen::Lobby(x) => &x.network_sender,
+                _ => unreachable!("Attempted to extract lobby state while not in a lobby."),
+            };
+            network_sender
                 .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin {})))
                 .unwrap();
         }

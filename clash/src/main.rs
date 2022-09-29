@@ -3,11 +3,6 @@
     windows_subsystem = "windows"
 )]
 
-use std::sync::mpsc::channel;
-
-use clash_lib::net::Message;
-use net::NetCommand;
-
 mod game;
 mod gui;
 mod net;
@@ -25,27 +20,6 @@ fn main() {
         .parse_env("CLASH_LOG")
         .init();
 
-    let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(100);
-    let (logic_sender, logic_receiver) = channel::<Message>();
-    let (error_sender, error_receiver) = channel::<anyhow::Error>();
-    // Create a new thread and start a tokio runtime on it for talking to the server
-    // TODO: Tokio may not be the best tool for the client. It might be better to
-    //       simply use std's blocking networking in a new thread, since we should only ever
-    //       have a single connection. Unfortunately for now we need to use it since the shared
-    //       library is async.
-    let _network_thread = std::thread::Builder::new()
-        .name("Network".into())
-        .spawn(move || net::run(network_receiver, logic_sender, error_sender));
-
-    // Start Game Thread
-    let (gui_sender, gui_receiver) = channel();
-    let _game_thread = {
-        let network_sender = network_sender.clone();
-        std::thread::Builder::new()
-            .name("Logic".into())
-            .spawn(move || game::start_game(gui_sender, network_sender, logic_receiver))
-    };
-
     // Start gui on the main thread
-    gui::run(gui_receiver, error_receiver, network_sender);
+    gui::run();
 }

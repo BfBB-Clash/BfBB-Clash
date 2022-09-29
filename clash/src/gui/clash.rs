@@ -1,8 +1,5 @@
 use std::rc::Rc;
-use std::sync::mpsc::Receiver;
 
-use clash_lib::lobby::NetworkedLobby;
-use clash_lib::PlayerId;
 use eframe::egui::{
     Area, Context, FontData, FontDefinitions, Label, RichText, Style, TextStyle, TopBottomPanel,
 };
@@ -13,32 +10,23 @@ use crate::gui::lobby::Game;
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::{Screen, State};
 use crate::gui::PADDING;
-use crate::net::{ErrorReceiver, NetCommandSender};
 
 pub struct Clash {
     state: Rc<State>,
     game_screen: Game,
     main_menu: MainMenu,
-
-    error_receiver: ErrorReceiver,
     error_queue: Vec<anyhow::Error>,
 }
 
 impl Clash {
-    pub fn new(
-        cc: &CreationContext<'_>,
-        gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
-        error_receiver: ErrorReceiver,
-        network_sender: NetCommandSender,
-    ) -> Self {
+    pub fn new(cc: &CreationContext<'_>) -> Self {
         Self::setup(&cc.egui_ctx);
 
         let state = Rc::new(State::new(&cc.egui_ctx));
         Self {
-            error_receiver,
-            state: state.clone(),
-            game_screen: Game::new(state.clone(), gui_receiver, network_sender.clone()),
-            main_menu: MainMenu::new(state, network_sender),
+            game_screen: Game::new(state.clone()),
+            main_menu: MainMenu::new(state.clone()),
+            state,
             error_queue: Vec::new(),
         }
     }
@@ -101,7 +89,7 @@ impl App for Clash {
             // TODO: Find how to not hardcode this
             .fixed_pos(Pos2::new(560., ctx.available_rect().height() - height));
 
-        while let Ok(e) = self.error_receiver.try_recv() {
+        while let Ok(e) = self.state.error_receiver.try_recv() {
             self.error_queue.push(e);
         }
         TopBottomPanel::bottom("errors").show(ctx, |ui| {
@@ -115,9 +103,16 @@ impl App for Clash {
             }
         });
 
-        match self.state.screen.get() {
-            Screen::MainMenu(_) => self.main_menu.update(ctx, frame),
-            Screen::Lobby => self.game_screen.update(ctx, frame),
+        let screen = self.state.screen.borrow();
+        match *screen {
+            Screen::MainMenu(_) => {
+                drop(screen);
+                self.main_menu.update(ctx, frame);
+            }
+            Screen::Lobby(_) => {
+                drop(screen);
+                self.game_screen.update(ctx, frame);
+            }
         }
 
         version_ui.show(ctx, |ui| {
