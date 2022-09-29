@@ -596,17 +596,13 @@ mod test {
             lobby.player_collected_item(3, Item::Spatula(Spatula::SpongebobsCloset)),
             Ok(())
         );
-        assert_eq!(
-            lobby
-                .shared
-                .game_state
-                .spatulas
-                .get(&Spatula::SpongebobsCloset)
-                .unwrap()
-                .collection_vec
-                .contains(&3),
-            false
-        );
+        let closet_state = lobby
+            .shared
+            .game_state
+            .spatulas
+            .get(&Spatula::SpongebobsCloset)
+            .unwrap();
+        assert!(!closet_state.collection_vec.contains(&3),);
         assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
 
         lobby.shared.options.tier_count = 1;
