@@ -85,7 +85,7 @@ impl App for Game {
                     }
                 }
                 GamePhase::Playing => {
-                    ui.add(Tracker::new(&self.lobby.game_state));
+                    ui.add(Tracker::new(&self.lobby, self.local_player_id));
                 }
                 GamePhase::Finished => todo!(),
             }
