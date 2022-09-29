@@ -75,10 +75,10 @@ struct Logic {
 
 impl Logic {
     fn update<G: GameMode>(&mut self, game: &mut G) {
-        if let Some(mut lobby) = self.lobby.as_mut() {
+        if let Some(lobby) = self.lobby.as_mut() {
             if let Err(InterfaceError::Unhooked) = game.update(
                 &self.interface,
-                &mut lobby,
+                lobby,
                 self.player_id,
                 &mut self.network_sender,
                 &mut self.local_spat_state,
