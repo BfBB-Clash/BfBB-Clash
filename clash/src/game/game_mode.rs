@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use bfbb::{game_interface::GameInterface, Spatula};
+use bfbb::{
+    game_interface::{GameInterface, InterfaceResult},
+    Spatula,
+};
 use clash_lib::{lobby::NetworkedLobby, PlayerId};
 
 use crate::net::NetCommandSender;
@@ -9,8 +12,6 @@ use crate::net::NetCommandSender;
 //  Idea is to allow game mode logic to be implemented by an arbitrary
 //  struct with a consistent interface.
 pub trait GameMode {
-    type Result;
-
     fn update<G: GameInterface>(
         &mut self,
         interface: &G,
@@ -18,5 +19,5 @@ pub trait GameMode {
         local_player: PlayerId,
         network_sender: &mut NetCommandSender,
         local_spat_state: &mut HashSet<Spatula>,
-    ) -> Self::Result;
+    ) -> InterfaceResult<()>;
 }

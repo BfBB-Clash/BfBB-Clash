@@ -75,7 +75,7 @@ impl App for MainMenu {
                     ui.add(TextEdit::singleline(&mut self.player_name).hint_text("Name"));
                     ui.add_enabled_ui(!self.player_name.is_empty(), |ui| {
                         if ui.button("Host Game").clicked() {
-                            let lobby_data = self.spawn_net();
+                            let lobby_data = self.spawn_net(ctx.clone());
                             lobby_data
                                 .network_sender
                                 .try_send(NetCommand::Send(Message::GameHost))
@@ -117,7 +117,7 @@ impl App for MainMenu {
                         .add_enabled(self.lobby_id.is_valid(), Button::new("Join Game"))
                         .on_disabled_hover_text("Lobby ID must be an 8 digit hexadecimal number");
                     if join_button.clicked() {
-                        let lobby_data = self.spawn_net();
+                        let lobby_data = self.spawn_net(ctx.clone());
                         lobby_data
                             .network_sender
                             .try_send(NetCommand::Send(Message::GameJoin {
@@ -149,7 +149,7 @@ impl App for MainMenu {
 }
 
 impl MainMenu {
-    fn spawn_net(&self) -> LobbyData {
+    fn spawn_net(&self, gui_ctx: eframe::egui::Context) -> LobbyData {
         let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(32);
         let (logic_sender, logic_receiver) = std::sync::mpsc::channel::<Message>();
         // Create a new thread and start a tokio runtime on it for talking to the server
@@ -169,6 +169,7 @@ impl MainMenu {
                 .spawn(move || {
                     game::start_game(
                         gui_sender,
+                        gui_ctx,
                         network_sender,
                         logic_receiver,
                         shutdown_receiver,

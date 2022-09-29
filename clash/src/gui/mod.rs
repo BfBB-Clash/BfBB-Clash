@@ -1,3 +1,4 @@
+use clash_lib::{lobby::NetworkedLobby, PlayerId};
 use eframe::{run_native, IconData, NativeOptions};
 
 use self::clash::Clash;
@@ -7,6 +8,9 @@ mod lobby;
 mod main_menu;
 mod state;
 mod val_text;
+
+pub type GuiReceiver = std::sync::mpsc::Receiver<(PlayerId, NetworkedLobby)>;
+pub type GuiSender = std::sync::mpsc::Sender<(PlayerId, NetworkedLobby)>;
 
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;

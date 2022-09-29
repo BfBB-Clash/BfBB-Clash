@@ -18,11 +18,10 @@ use player_ui::PlayerUi;
 use tracker::Tracker;
 
 use super::val_text::ValText;
+use super::GuiReceiver;
 
 mod player_ui;
 mod tracker;
-
-pub type GuiReceiver = std::sync::mpsc::Receiver<(PlayerId, NetworkedLobby)>;
 
 #[derive(Debug)]
 pub struct LobbyData {
@@ -88,9 +87,6 @@ impl Game {
 
 impl App for Game {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
-        // Continuously repaint
-        ctx.request_repaint();
-
         {
             let screen = self.state.screen.borrow();
             let data = match &*screen {

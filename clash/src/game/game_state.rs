@@ -16,8 +16,6 @@ pub struct ClashGame;
 
 impl GameMode for ClashGame {
     /// Process state updates from the server and report back any actions of the local player
-    type Result = InterfaceResult<()>;
-
     fn update<G: GameInterface>(
         &mut self,
         interface: &G,
@@ -25,7 +23,7 @@ impl GameMode for ClashGame {
         local_player: PlayerId,
         network_sender: &mut NetCommandSender,
         local_spat_state: &mut HashSet<Spatula>,
-    ) -> Self::Result {
+    ) -> InterfaceResult<()> {
         if interface.is_loading()? {
             return Ok(());
         }

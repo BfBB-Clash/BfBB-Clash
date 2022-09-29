@@ -5,11 +5,13 @@ use bfbb::game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceEr
 use bfbb::{EnumCount, Spatula};
 use clash_lib::net::LobbyMessage;
 use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
+use eframe::egui::Context;
 use spin_sleep::LoopHelper;
 use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::TryRecvError;
 
+use crate::gui::GuiSender;
 use crate::net::{NetCommand, NetCommandSender};
 
 use self::{game_mode::GameMode, game_state::ClashGame};
@@ -18,9 +20,10 @@ pub type ShutdownSender = tokio::sync::oneshot::Sender<()>;
 pub type ShutdownReceiver = tokio::sync::oneshot::Receiver<()>;
 
 pub fn start_game(
-    mut gui_sender: Sender<(PlayerId, NetworkedLobby)>,
-    mut network_sender: NetCommandSender,
-    mut logic_receiver: Receiver<Message>,
+    gui_sender: Sender<(PlayerId, NetworkedLobby)>,
+    gui_ctx: eframe::egui::Context,
+    network_sender: NetCommandSender,
+    logic_receiver: Receiver<Message>,
     mut shutdown_receiver: ShutdownReceiver,
 ) {
     let mut loop_helper = LoopHelper::builder()
@@ -31,47 +34,65 @@ pub fn start_game(
     let mut interface = DolphinInterface::default();
     let _ = interface.hook();
     let mut game = ClashGame;
-    let mut player_id = 0;
-    let mut lobby = None;
+    let player_id = 0;
+    let lobby = None;
     // Not sure if this is the best approach, the idea is that it would be faster
     // to store a local state of what we as a client have collected rather
     // than searching to see if we've collected it.
-    let mut local_spat_state = HashSet::<Spatula>::with_capacity(Spatula::COUNT);
+    let local_spat_state = HashSet::<Spatula>::with_capacity(Spatula::COUNT);
+
+    let mut logic = Logic {
+        gui_ctx,
+        gui_sender,
+        interface,
+        network_sender,
+        logic_receiver,
+        lobby,
+        player_id,
+        local_spat_state,
+    };
 
     while let Err(TryRecvError::Empty) = shutdown_receiver.try_recv() {
         loop_helper.loop_start();
-        // You have to call this to avoid overflowing an integer within the loop helper
-        let _ = loop_helper.report_rate();
 
-        // Receive network updates
-        update_from_network(
-            &interface,
-            &mut player_id,
-            &mut lobby,
-            &mut logic_receiver,
-            &mut gui_sender,
-            &mut local_spat_state,
-        )
-        .unwrap();
+        logic.update_from_network().unwrap();
+        logic.update(&mut game);
 
-        if let Some(lobby) = lobby.as_mut() {
+        loop_helper.loop_start_s();
+    }
+}
+
+struct Logic {
+    gui_ctx: Context,
+    gui_sender: GuiSender,
+    interface: DolphinInterface,
+    network_sender: NetCommandSender,
+    logic_receiver: Receiver<Message>,
+    lobby: Option<NetworkedLobby>,
+    player_id: PlayerId,
+    local_spat_state: HashSet<Spatula>,
+}
+
+impl Logic {
+    fn update<G: GameMode>(&mut self, game: &mut G) {
+        if let Some(mut lobby) = self.lobby.as_mut() {
             if let Err(InterfaceError::Unhooked) = game.update(
-                &interface,
-                lobby,
-                player_id,
-                &mut network_sender,
-                &mut local_spat_state,
+                &self.interface,
+                &mut lobby,
+                self.player_id,
+                &mut self.network_sender,
+                &mut self.local_spat_state,
             ) {
                 // We lost dolphin
-                if let Some(local_player) = lobby.players.get_mut(&player_id) {
+                if let Some(local_player) = lobby.players.get_mut(&self.player_id) {
                     if local_player.current_level != None {
                         local_player.current_level = None;
-                        network_sender
+                        self.network_sender
                             .try_send(NetCommand::Send(Message::Lobby(
                                 LobbyMessage::GameCurrentLevel { level: None },
                             )))
                             .unwrap();
-                        network_sender
+                        self.network_sender
                             .blocking_send(NetCommand::Send(Message::Lobby(
                                 LobbyMessage::PlayerCanStart(false),
                             )))
@@ -80,63 +101,61 @@ pub fn start_game(
                 }
 
                 // TODO: Maybe don't re-attempt this every frame
-                let _ = interface.hook();
+                let _ = self.interface.hook();
             }
         }
-        loop_helper.loop_start_s();
     }
-}
 
-fn update_from_network<T: GameInterface>(
-    game: &T,
-    player_id: &mut PlayerId,
-    lobby: &mut Option<NetworkedLobby>,
-    logic_receiver: &mut Receiver<Message>,
-    gui_sender: &mut Sender<(PlayerId, NetworkedLobby)>,
-    local_spat_state: &mut HashSet<Spatula>,
-) -> Result<(), InterfaceError> {
-    for msg in logic_receiver.try_iter() {
-        let action = match msg {
-            Message::ConnectionAccept { player_id: id } => {
-                *player_id = id;
-                continue;
-            }
-            Message::Lobby(m) => m,
-            _ => continue,
-        };
-
-        match action {
-            LobbyMessage::GameBegin => {
-                local_spat_state.clear();
-                let _ = game.start_new_game();
-                let lobby = lobby
-                    .as_mut()
-                    .expect("Tried to begin game without being in a lobby");
-
-                if lobby.options.ng_plus {
-                    let _ = game.unlock_powers();
+    fn update_from_network(&mut self) -> Result<(), InterfaceError> {
+        for msg in self.logic_receiver.try_iter() {
+            let action = match msg {
+                Message::ConnectionAccept { player_id: id } => {
+                    self.player_id = id;
+                    continue;
                 }
-                gui_sender
-                    .send((*player_id, lobby.clone()))
-                    .expect("GUI has crashed and so will we");
+                Message::Lobby(m) => m,
+                _ => continue,
+            };
+
+            match action {
+                LobbyMessage::GameBegin => {
+                    self.local_spat_state.clear();
+                    let _ = self.interface.start_new_game();
+                    let lobby = self
+                        .lobby
+                        .as_mut()
+                        .expect("Tried to begin game without being in a lobby");
+
+                    if lobby.options.ng_plus {
+                        let _ = self.interface.unlock_powers();
+                    }
+                    self.gui_sender
+                        .send((self.player_id, lobby.clone()))
+                        .expect("GUI has crashed and so will we");
+                }
+                LobbyMessage::GameLobbyInfo { lobby: new_lobby } => {
+                    // This could fail if the user is restarting dolphin, but that will desync a lot of other things as well
+                    // so it's fine to just wait for a future lobby update to correct the issue
+                    let _ = self
+                        .interface
+                        .set_spatula_count(new_lobby.game_state.spatulas.len() as u32);
+                    self.lobby = Some(new_lobby.clone());
+                    self.gui_sender
+                        .send((self.player_id, new_lobby))
+                        .expect("GUI has crashed and so will we");
+                }
+                // We're not yet doing partial updates
+                LobbyMessage::PlayerOptions { options: _ } => todo!(),
+                LobbyMessage::GameOptions { options: _ } => todo!(),
+                LobbyMessage::GameEnd => todo!(),
+                LobbyMessage::PlayerCanStart(_) => todo!(),
+                LobbyMessage::GameCurrentLevel { level: _ } => todo!(),
+                LobbyMessage::GameItemCollected { item: _ } => todo!(),
             }
-            LobbyMessage::GameLobbyInfo { lobby: new_lobby } => {
-                // This could fail if the user is restarting dolphin, but that will desync a lot of other things as well
-                // so it's fine to just wait for a future lobby update to correct the issue
-                let _ = game.set_spatula_count(new_lobby.game_state.spatulas.len() as u32);
-                *lobby = Some(new_lobby.clone());
-                gui_sender
-                    .send((*player_id, new_lobby))
-                    .expect("GUI has crashed and so will we");
-            }
-            // We're not yet doing partial updates
-            LobbyMessage::PlayerOptions { options: _ } => todo!(),
-            LobbyMessage::GameOptions { options: _ } => todo!(),
-            LobbyMessage::GameEnd => todo!(),
-            LobbyMessage::PlayerCanStart(_) => todo!(),
-            LobbyMessage::GameCurrentLevel { level: _ } => todo!(),
-            LobbyMessage::GameItemCollected { item: _ } => todo!(),
+
+            // Signal the UI to update
+            self.gui_ctx.request_repaint();
         }
+        Ok(())
     }
-    Ok(())
 }
