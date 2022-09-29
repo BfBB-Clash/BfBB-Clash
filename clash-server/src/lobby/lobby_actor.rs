@@ -313,9 +313,16 @@ impl LobbyActor {
                     .entry(spat)
                     .or_insert_with(SpatulaState::default);
 
-                if state.collection_count == self.shared.options.tier_count
-                    || state.collection_vec.contains(&player_id)
-                {
+                // This can happen in rare situations where the player colllected an exhausted spatula
+                // before receiving the lobby update that exhausted it. We should just ignore this case
+                if state.collection_count == self.shared.options.tier_count {
+                    log::info!(
+                        "Player {player_id:#X} tried to collect exhausted spatula {spat:?}.",
+                    );
+                    return Ok(());
+                }
+
+                if state.collection_vec.contains(&player_id) {
                     return Err(LobbyError::InvalidAction(player_id));
                 }
 
@@ -325,8 +332,7 @@ impl LobbyActor {
                     .collection_vec
                     .insert(state.collection_count as usize, player_id);
                 log::info!(
-                    "Player {:#X} collected {spat:?} with tier {:?}",
-                    player_id,
+                    "Player {player_id:#X} collected {spat:?} with tier {:?}",
                     state.collection_count
                 );
 
@@ -584,10 +590,24 @@ mod test {
                 .player_collected_item(i, Item::Spatula(Spatula::SpongebobsCloset))
                 .is_ok());
         }
+
+        // A new player collecting an exhausted spatula will simply be ignored
         assert_eq!(
             lobby.player_collected_item(3, Item::Spatula(Spatula::SpongebobsCloset)),
-            Err(LobbyError::InvalidAction(3))
+            Ok(())
         );
+        assert_eq!(
+            lobby
+                .shared
+                .game_state
+                .spatulas
+                .get(&Spatula::SpongebobsCloset)
+                .unwrap()
+                .collection_vec
+                .contains(&3),
+            false
+        );
+        assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
 
         lobby.shared.options.tier_count = 1;
         assert!(lobby
@@ -595,7 +615,7 @@ mod test {
             .is_ok());
         assert_eq!(
             lobby.player_collected_item(1, Item::Spatula(Spatula::OnTopOfThePineapple)),
-            Err(LobbyError::InvalidAction(1))
+            Ok(())
         );
     }
 
