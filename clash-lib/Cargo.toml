@@ -15,5 +15,3 @@ bincode = "1"
 bytes = "1"
 epaint = "0.19"
 serde = { version = "1", features = ["derive"] }
-strum = "0.24.1"
-strum_macros = "0.24.1"

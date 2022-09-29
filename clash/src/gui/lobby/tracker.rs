@@ -1,17 +1,25 @@
 use bfbb::{IntoEnumIterator, Spatula};
-use clash_lib::game_state::{GameState, SpatulaState};
+use clash_lib::{game_state::SpatulaState, lobby::NetworkedLobby, PlayerId};
 use eframe::{
     egui::{Color32, Response, Sense, Ui, Widget},
     epaint::Vec2,
 };
 
+const GOLD: Color32 = Color32::from_rgb(0xd4, 0xaf, 0x37);
+const SILVER: Color32 = Color32::from_rgb(0xe0, 0xe0, 0xe0);
+const DISABLED: Color32 = Color32::from_rgb(0x3c, 0x3c, 0x3c);
+
 pub struct Tracker<'a> {
-    game: &'a GameState,
+    lobby: &'a NetworkedLobby,
+    local_player: PlayerId,
 }
 
 impl<'a> Tracker<'a> {
-    pub fn new(game: &'a GameState) -> Self {
-        Self { game }
+    pub fn new(lobby: &'a NetworkedLobby, local_player: PlayerId) -> Self {
+        Self {
+            lobby,
+            local_player,
+        }
     }
 }
 impl<'a> Widget for Tracker<'a> {
@@ -28,14 +36,21 @@ impl<'a> Widget for Tracker<'a> {
             ui.allocate_exact_size(desired_size, Sense::focusable_noninteractive());
 
         for spat in Spatula::iter() {
-            let mut spat_state = self
-                .game
+            let spat_state = self
+                .lobby
+                .game_state
                 .spatulas
                 .get(&spat)
                 .unwrap_or(&SpatulaState::default())
                 .clone();
-            let color = spat_state.tier.get_color();
-            let color = Color32::from_rgb(color.0, color.1, color.2);
+            // TODO: issue #57, Make spatula gold if locally collected and grayed out if unavailable
+            let color = if spat_state.collection_vec.contains(&self.local_player) {
+                GOLD
+            } else if spat_state.collection_count == self.lobby.options.tier_count {
+                DISABLED
+            } else {
+                SILVER
+            };
             let (y, x) = spat.into();
             ui.painter().circle_filled(
                 (

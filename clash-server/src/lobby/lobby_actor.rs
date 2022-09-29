@@ -1,5 +1,5 @@
 use bfbb::{Level, Spatula};
-use clash_lib::game_state::{SpatulaState, SpatulaTier};
+use clash_lib::game_state::SpatulaState;
 use clash_lib::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash_lib::net::{Item, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
@@ -303,7 +303,6 @@ impl LobbyActor {
             .players
             .get_mut(&player_id)
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
-        let tier_count = 3;
 
         match item {
             Item::Spatula(spat) => {
@@ -314,26 +313,30 @@ impl LobbyActor {
                     .entry(spat)
                     .or_insert_with(SpatulaState::default);
 
-                if state.tier == SpatulaTier::None || state.collection_vec.contains(&player_id) {
+                // This can happen in rare situations where the player colllected an exhausted spatula
+                // before receiving the lobby update that exhausted it. We should just ignore this case
+                if state.collection_count == self.shared.options.tier_count {
+                    log::info!(
+                        "Player {player_id:#X} tried to collect exhausted spatula {spat:?}.",
+                    );
+                    return Ok(());
+                }
+
+                if state.collection_vec.contains(&player_id) {
                     return Err(LobbyError::InvalidAction(player_id));
                 }
 
-                player.score += GAME_CONSTS.spat_scores[state.tier.clone() as usize];
+                player.score += GAME_CONSTS.spat_scores[state.collection_count as usize];
 
                 state
                     .collection_vec
-                    .insert(state.tier.clone() as usize, player_id);
+                    .insert(state.collection_count as usize, player_id);
                 log::info!(
-                    "Player {:#X} collected {spat:?} with tier {:?}",
-                    player_id,
-                    state.tier
+                    "Player {player_id:#X} collected {spat:?} with tier {:?}",
+                    state.collection_count
                 );
 
-                //This probably could be better.
-                state.tier = SpatulaTier::from(state.tier.clone() as i32 + 1);
-                if state.tier.clone() as i32 >= tier_count {
-                    state.tier = SpatulaTier::None
-                }
+                state.collection_count += 1;
 
                 if spat == Spatula::TheSmallShallRuleOrNot {
                     self.stop_game();
@@ -368,7 +371,7 @@ mod test {
     use std::time::Duration;
 
     use bfbb::{Level, Spatula};
-    use clash_lib::{game_state::SpatulaTier, lobby::GamePhase, net::Item, player::PlayerOptions};
+    use clash_lib::{lobby::GamePhase, net::Item, player::PlayerOptions};
     use tokio::{sync::mpsc, time::timeout};
 
     use crate::lobby::{lobby_handle::LobbyHandle, LobbyError};
@@ -502,6 +505,36 @@ mod test {
     }
 
     #[test]
+    fn player_collected_item_state() {
+        let mut lobby = setup();
+        lobby.add_player(0).unwrap();
+        lobby.add_player(1).unwrap();
+
+        assert!(lobby
+            .player_collected_item(0, Item::Spatula(Spatula::SpongebobsCloset))
+            .is_ok());
+        assert!(lobby
+            .player_collected_item(1, Item::Spatula(Spatula::SpongebobsCloset))
+            .is_ok());
+        assert!(lobby
+            .player_collected_item(1, Item::Spatula(Spatula::OnTopOfThePineapple))
+            .is_ok());
+
+        // Only two unique spatulas were collected
+        assert_eq!(lobby.shared.game_state.spatulas.len(), 2);
+        assert!(lobby
+            .shared
+            .game_state
+            .spatulas
+            .contains_key(&Spatula::SpongebobsCloset));
+        assert!(lobby
+            .shared
+            .game_state
+            .spatulas
+            .contains_key(&Spatula::OnTopOfThePineapple));
+    }
+
+    #[test]
     fn player_collected_item_score() {
         let mut lobby = setup();
         lobby.add_player(0).unwrap();
@@ -534,30 +567,6 @@ mod test {
             .player_collected_item(2, Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
 
-        // Spatula can only be collected 3 times
-        assert_eq!(
-            lobby.player_collected_item(3, Item::Spatula(Spatula::SpongebobsCloset)),
-            Err(LobbyError::InvalidAction(3))
-        );
-
-        // Only three unique spatulas were collected
-        assert_eq!(lobby.shared.game_state.spatulas.len(), 3);
-        assert!(lobby
-            .shared
-            .game_state
-            .spatulas
-            .contains_key(&Spatula::SpongebobsCloset));
-        assert!(lobby
-            .shared
-            .game_state
-            .spatulas
-            .contains_key(&Spatula::OnTopOfThePineapple));
-        assert!(lobby
-            .shared
-            .game_state
-            .spatulas
-            .contains_key(&Spatula::CowaBungee));
-
         let points = &clash_lib::GAME_CONSTS.spat_scores;
         assert_eq!(lobby.shared.players.get(&0).unwrap().score, points[0] * 2);
         assert_eq!(
@@ -566,6 +575,44 @@ mod test {
         );
         assert_eq!(lobby.shared.players.get(&2).unwrap().score, points[2]);
         assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
+    }
+
+    #[test]
+    fn player_collected_item_max() {
+        let mut lobby = setup();
+        lobby.add_player(0).unwrap();
+        lobby.add_player(1).unwrap();
+        lobby.add_player(2).unwrap();
+        lobby.add_player(3).unwrap();
+
+        for i in 0..=2 {
+            assert!(lobby
+                .player_collected_item(i, Item::Spatula(Spatula::SpongebobsCloset))
+                .is_ok());
+        }
+
+        // A new player collecting an exhausted spatula will simply be ignored
+        assert_eq!(
+            lobby.player_collected_item(3, Item::Spatula(Spatula::SpongebobsCloset)),
+            Ok(())
+        );
+        let closet_state = lobby
+            .shared
+            .game_state
+            .spatulas
+            .get(&Spatula::SpongebobsCloset)
+            .unwrap();
+        assert!(!closet_state.collection_vec.contains(&3),);
+        assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
+
+        lobby.shared.options.tier_count = 1;
+        assert!(lobby
+            .player_collected_item(0, Item::Spatula(Spatula::OnTopOfThePineapple))
+            .is_ok());
+        assert_eq!(
+            lobby.player_collected_item(1, Item::Spatula(Spatula::OnTopOfThePineapple)),
+            Ok(())
+        );
     }
 
     #[test]
@@ -588,8 +635,8 @@ mod test {
                 .spatulas
                 .get(&Spatula::CowaBungee)
                 .unwrap()
-                .tier,
-            SpatulaTier::Silver
+                .collection_count,
+            1
         );
 
         let first_points = clash_lib::GAME_CONSTS.spat_scores[0];
