@@ -110,7 +110,7 @@ fn load_ip_address() -> String {
         exe_path.pop();
         exe_path.push("ipaddress");
         if let Ok(ip) = std::fs::read_to_string(exe_path) {
-            return ip;
+            return ip.trim().to_string();
         }
     }
 
