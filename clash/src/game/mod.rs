@@ -1,5 +1,5 @@
+mod clash_game;
 mod game_mode;
-mod game_state;
 
 use bfbb::game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError};
 use bfbb::{EnumCount, Spatula};
@@ -14,7 +14,7 @@ use tokio::sync::oneshot::error::TryRecvError;
 use crate::gui::GuiSender;
 use crate::net::{NetCommand, NetCommandSender};
 
-use self::{game_mode::GameMode, game_state::ClashGame};
+use self::{clash_game::ClashGame, game_mode::GameMode};
 
 pub type ShutdownSender = tokio::sync::oneshot::Sender<()>;
 pub type ShutdownReceiver = tokio::sync::oneshot::Receiver<()>;
