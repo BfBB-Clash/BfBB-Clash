@@ -15,7 +15,7 @@ pub struct Clash {
     state: Rc<State>,
     game_screen: Game,
     main_menu: MainMenu,
-    error_queue: Vec<anyhow::Error>,
+    displayed_error: Option<anyhow::Error>,
 }
 
 impl Clash {
@@ -27,7 +27,7 @@ impl Clash {
             game_screen: Game::new(state.clone()),
             main_menu: MainMenu::new(state.clone()),
             state,
-            error_queue: Vec::new(),
+            displayed_error: None,
         }
     }
 
@@ -89,16 +89,18 @@ impl App for Clash {
             // TODO: Find how to not hardcode this
             .fixed_pos(Pos2::new(560., ctx.available_rect().height() - height));
 
-        while let Ok(e) = self.state.error_receiver.try_recv() {
-            self.error_queue.push(e);
+        if self.displayed_error.is_none() {
+            if let Ok(e) = self.state.error_receiver.try_recv() {
+                self.displayed_error = Some(e);
+            }
         }
         TopBottomPanel::bottom("errors").show(ctx, |ui| {
-            if let Some(e) = self.error_queue.get(0) {
+            if let Some(e) = &self.displayed_error {
                 ui.add(Label::new(
                     RichText::new(format!("Error!: {e}")).color(Color32::DARK_RED),
                 ));
                 if ui.button("OK").clicked() {
-                    self.error_queue.remove(0);
+                    self.displayed_error = None;
                 }
             }
         });

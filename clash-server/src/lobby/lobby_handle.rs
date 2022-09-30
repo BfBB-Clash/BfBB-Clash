@@ -17,7 +17,6 @@ pub struct LobbyHandleProvider {
 }
 
 impl LobbyHandleProvider {
-    /// Adds a new player to this lobby. If there is currently no host, they will become it.
     pub fn get_handle(&self, player_id: PlayerId) -> LobbyHandle {
         LobbyHandle {
             sender: self.sender.clone(),
@@ -27,7 +26,6 @@ impl LobbyHandleProvider {
     }
 }
 
-/// Automatically removes player from lobby when dropped.
 #[derive(Clone, Debug)]
 pub struct LobbyHandle {
     sender: mpsc::Sender<LobbyAction>,

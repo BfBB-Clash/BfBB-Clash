@@ -185,7 +185,7 @@ impl LobbyActor {
             .is_err()
         {
             log::warn!(
-                "Lobby {:#X} started with no players in lobby.",
+                "Lobby {:#X} finished with no players in lobby.",
                 self.shared.lobby_id
             )
         }
