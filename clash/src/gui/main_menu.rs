@@ -12,22 +12,34 @@ use eframe::{
 use crate::gui::BORDER;
 use crate::{
     game,
-    gui::state::{Screen, State, Submenu},
+    gui::state::State,
     net::{self, NetCommand},
 };
 
-use super::{lobby::LobbyData, val_text::ValText};
+use super::{
+    lobby::{Game, LobbyData},
+    val_text::ValText,
+};
 
 pub struct MainMenu {
     state: Rc<State>,
+    submenu: Submenu,
     player_name: String,
     lobby_id: ValText<u32>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Submenu {
+    Root,
+    Host,
+    Join,
 }
 
 impl MainMenu {
     pub fn new(state: Rc<State>) -> Self {
         Self {
             state,
+            submenu: Submenu::Root,
             player_name: Default::default(),
             // TODO: atm it is not strictly true that the lobby_id must be 8 digits,
             //  since it's just a random u32. When this is resolved on the server-side,
@@ -39,15 +51,7 @@ impl MainMenu {
 
 impl App for MainMenu {
     fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
-        let submenu = {
-            let screen = self.state.screen.borrow();
-            match *screen {
-                Screen::MainMenu(submenu) => submenu,
-                _ => unreachable!("Attempted to extract Main Menu submenu while not on Main Menu"),
-            }
-        };
-
-        match submenu {
+        match self.submenu {
             Submenu::Root => {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
@@ -59,10 +63,10 @@ impl App for MainMenu {
                             frame.close();
                         }
                         if ui.button("Join Game").clicked() {
-                            *self.state.screen.borrow_mut() = Screen::MainMenu(Submenu::Join);
+                            self.submenu = Submenu::Join;
                         }
                         if ui.button("Host Game").clicked() {
-                            *self.state.screen.borrow_mut() = Screen::MainMenu(Submenu::Host);
+                            self.submenu = Submenu::Host;
                         }
                     });
                 });
@@ -92,11 +96,12 @@ impl App for MainMenu {
                                 )))
                                 .unwrap();
 
-                            *self.state.screen.borrow_mut() = Screen::Lobby(lobby_data);
+                            self.state
+                                .change_app(Game::new(self.state.clone(), lobby_data));
                         }
                     });
                     if ui.button("Back").clicked() {
-                        *self.state.screen.borrow_mut() = Screen::MainMenu(Submenu::Root);
+                        self.submenu = Submenu::Root;
                     }
                     ui.add_space(BORDER);
                 });
@@ -135,11 +140,12 @@ impl App for MainMenu {
                                 },
                             )))
                             .unwrap();
-                        *self.state.screen.borrow_mut() = Screen::Lobby(lobby_data);
+                        self.state
+                            .change_app(Game::new(self.state.clone(), lobby_data));
                     }
 
                     if ui.button("Back").clicked() {
-                        *self.state.screen.borrow_mut() = Screen::MainMenu(Submenu::Root);
+                        self.submenu = Submenu::Root;
                     }
                     ui.add_space(BORDER);
                 });

@@ -11,12 +11,13 @@ use eframe::App;
 use itertools::intersperse;
 
 use crate::game::ShutdownSender;
-use crate::gui::state::{Screen, State, Submenu};
+use crate::gui::state::State;
 use crate::gui::PADDING;
 use crate::net::{NetCommand, NetCommandSender};
 use player_ui::PlayerUi;
 use tracker::Tracker;
 
+use super::main_menu::MainMenu;
 use super::val_text::ValText;
 use super::GuiReceiver;
 
@@ -61,6 +62,7 @@ impl Drop for LobbyData {
 
 pub struct Game {
     state: Rc<State>,
+    lobby_data: LobbyData,
     lobby: NetworkedLobby,
     local_player_id: PlayerId,
     lab_door_cost: ValText<u8>,
@@ -68,9 +70,10 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(state: Rc<State>) -> Self {
+    pub fn new(state: Rc<State>, lobby_data: LobbyData) -> Self {
         Self {
             state,
+            lobby_data,
             lobby: NetworkedLobby::new(0),
             local_player_id: 0,
             lab_door_cost: ValText::with_validator(|text| {
@@ -87,20 +90,12 @@ impl Game {
 
 impl App for Game {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
-        {
-            let screen = self.state.screen.borrow();
-            let data = match &*screen {
-                Screen::Lobby(x) => x,
-                _ => unreachable!("Attempted to extract lobby state while not in a lobby."),
-            };
-
-            // Receive gamestate updates
-            while let Ok((local_player_id, new_lobby)) = data.gui_receiver.try_recv() {
-                self.local_player_id = local_player_id;
-                self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
-                self.tier_count.set_val(new_lobby.options.tier_count);
-                self.lobby = new_lobby;
-            }
+        // Receive gamestate updates
+        while let Ok((local_player_id, new_lobby)) = self.lobby_data.gui_receiver.try_recv() {
+            self.local_player_id = local_player_id;
+            self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
+            self.tier_count.set_val(new_lobby.options.tier_count);
+            self.lobby = new_lobby;
         }
 
         SidePanel::left("Player List")
@@ -129,7 +124,7 @@ impl App for Game {
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 if ui.button("Leave").clicked() {
-                    *self.state.screen.borrow_mut() = Screen::MainMenu(Submenu::Root);
+                    self.state.change_app(MainMenu::new(self.state.clone()));
                 }
             })
         });
@@ -199,13 +194,8 @@ impl Game {
         }
 
         if let Some(options) = updated_options {
-            let screen = self.state.screen.borrow();
-            let network_sender = match &*screen {
-                Screen::Lobby(x) => &x.network_sender,
-                _ => unreachable!("Attempted to extract lobby state while not in a lobby."),
-            };
-
-            network_sender
+            self.lobby_data
+                .network_sender
                 .blocking_send(NetCommand::Send(Message::Lobby(
                     LobbyMessage::GameOptions { options },
                 )))
@@ -249,12 +239,8 @@ impl Game {
         }
 
         if start_game_response.clicked() {
-            let screen = self.state.screen.borrow();
-            let network_sender = match &*screen {
-                Screen::Lobby(x) => &x.network_sender,
-                _ => unreachable!("Attempted to extract lobby state while not in a lobby."),
-            };
-            network_sender
+            self.lobby_data
+                .network_sender
                 .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin {})))
                 .unwrap();
         }

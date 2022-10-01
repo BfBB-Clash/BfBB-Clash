@@ -6,15 +6,13 @@ use eframe::egui::{
 use eframe::epaint::{Color32, FontFamily, FontId, Pos2};
 use eframe::{App, CreationContext, Frame};
 
-use crate::gui::lobby::Game;
 use crate::gui::main_menu::MainMenu;
-use crate::gui::state::{Screen, State};
+use crate::gui::state::State;
 use crate::gui::PADDING;
 
 pub struct Clash {
     state: Rc<State>,
-    game_screen: Game,
-    main_menu: MainMenu,
+    curr_app: Box<dyn App>,
     displayed_error: Option<anyhow::Error>,
 }
 
@@ -24,8 +22,7 @@ impl Clash {
 
         let state = Rc::new(State::new(&cc.egui_ctx));
         Self {
-            game_screen: Game::new(state.clone()),
-            main_menu: MainMenu::new(state.clone()),
+            curr_app: Box::new(MainMenu::new(state.clone())),
             state,
             displayed_error: None,
         }
@@ -105,17 +102,10 @@ impl App for Clash {
             }
         });
 
-        let screen = self.state.screen.borrow();
-        match *screen {
-            Screen::MainMenu(_) => {
-                drop(screen);
-                self.main_menu.update(ctx, frame);
-            }
-            Screen::Lobby(_) => {
-                drop(screen);
-                self.game_screen.update(ctx, frame);
-            }
+        if let Some(app) = self.state.get_new_app() {
+            self.curr_app = app
         }
+        self.curr_app.update(ctx, frame);
 
         version_ui.show(ctx, |ui| {
             ui.small(crate::VERSION);
