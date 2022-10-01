@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use crate::state::ServerState;
 
-use self::{lobby_actor::LobbyActor, lobby_handle::LobbyHandle};
+use self::{lobby_actor::LobbyActor, lobby_handle::LobbyHandleProvider};
 
 mod lobby_actor;
 pub mod lobby_handle;
@@ -25,12 +25,12 @@ pub enum LobbyError {
 
 pub type LobbyResult<T> = Result<T, LobbyError>;
 
-pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandle {
+pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandleProvider {
     let (sender, receiver) = mpsc::channel(64);
     let actor = LobbyActor::new(state, receiver, id);
     tokio::spawn(actor.run());
 
-    LobbyHandle {
+    LobbyHandleProvider {
         sender,
         lobby_id: id,
     }

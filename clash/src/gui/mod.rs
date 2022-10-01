@@ -1,9 +1,4 @@
-use std::error::Error;
-use std::sync::mpsc::Receiver;
-
-use clash_lib::lobby::NetworkedLobby;
-use clash_lib::net::Message;
-use clash_lib::PlayerId;
+use clash_lib::{lobby::NetworkedLobby, PlayerId};
 use eframe::{run_native, IconData, NativeOptions};
 
 use self::clash::Clash;
@@ -14,16 +9,15 @@ mod main_menu;
 mod state;
 mod val_text;
 
+pub type GuiReceiver = std::sync::mpsc::Receiver<(PlayerId, NetworkedLobby)>;
+pub type GuiSender = std::sync::mpsc::Sender<(PlayerId, NetworkedLobby)>;
+
 const BORDER: f32 = 32.;
 const PADDING: f32 = 8.;
 
 /// Entry point for the gui. Intended to run on the main thread.
 /// Doesn't return until the window is closed.
-pub fn run(
-    gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
-    error_receiver: Receiver<Box<dyn Error + Send>>,
-    network_sender: tokio::sync::mpsc::Sender<Message>,
-) {
+pub fn run() {
     let icon_bytes = include_bytes!("../../res/icon.ico");
     let icon = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
     let (width, height) = icon.dimensions();
@@ -42,6 +36,6 @@ pub fn run(
     run_native(
         "BfBB Clash",
         window_options,
-        Box::new(|cc| Box::new(Clash::new(cc, gui_receiver, error_receiver, network_sender))),
+        Box::new(|cc| Box::new(Clash::new(cc))),
     );
 }

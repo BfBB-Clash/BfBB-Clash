@@ -1,7 +1,7 @@
 use bfbb::{Level, Spatula};
 use clash_lib::game_state::SpatulaState;
 use clash_lib::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
-use clash_lib::net::{Item, Message};
+use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
 use clash_lib::{LobbyId, PlayerId, GAME_CONSTS, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -12,14 +12,14 @@ use super::{LobbyError, LobbyResult};
 
 pub struct LobbyActor {
     state: ServerState,
-    receiver: mpsc::Receiver<LobbyMessage>,
+    receiver: mpsc::Receiver<LobbyAction>,
     shared: NetworkedLobby,
     sender: broadcast::Sender<Message>,
     next_menu_order: u8,
 }
 
 #[derive(Debug)]
-pub enum LobbyMessage {
+pub enum LobbyAction {
     StartGame {
         respond_to: oneshot::Sender<LobbyResult<()>>,
         id: PlayerId,
@@ -61,7 +61,7 @@ pub enum LobbyMessage {
 impl LobbyActor {
     pub fn new(
         state: ServerState,
-        receiver: mpsc::Receiver<LobbyMessage>,
+        receiver: mpsc::Receiver<LobbyAction>,
         lobby_id: LobbyId,
     ) -> Self {
         let (sender, _) = broadcast::channel(100);
@@ -78,42 +78,42 @@ impl LobbyActor {
     pub async fn run(mut self) {
         while let Some(msg) = self.receiver.recv().await {
             match msg {
-                LobbyMessage::StartGame { respond_to, id } => {
+                LobbyAction::StartGame { respond_to, id } => {
                     let _ = respond_to.send(self.start_game(id));
                 }
-                LobbyMessage::AddPlayer { respond_to, id } => {
+                LobbyAction::AddPlayer { respond_to, id } => {
                     let _ = respond_to.send(self.add_player(id));
                 }
-                LobbyMessage::RemovePlayer { id } => self.rem_player(id),
-                LobbyMessage::SetPlayerOptions {
+                LobbyAction::RemovePlayer { id } => self.rem_player(id),
+                LobbyAction::SetPlayerOptions {
                     respond_to,
                     id,
                     options,
                 } => {
                     let _ = respond_to.send(self.set_player_options(id, options));
                 }
-                LobbyMessage::SetPlayerCanStart {
+                LobbyAction::SetPlayerCanStart {
                     respond_to,
                     id,
                     can_start,
                 } => {
                     let _ = respond_to.send(self.set_player_can_start(id, can_start));
                 }
-                LobbyMessage::SetPlayerLevel {
+                LobbyAction::SetPlayerLevel {
                     respond_to,
                     id,
                     level,
                 } => {
                     let _ = respond_to.send(self.set_player_level(id, level));
                 }
-                LobbyMessage::PlayerCollectedItem {
+                LobbyAction::PlayerCollectedItem {
                     respond_to,
                     id,
                     item,
                 } => {
                     let _ = respond_to.send(self.player_collected_item(id, item));
                 }
-                LobbyMessage::SetGameOptions {
+                LobbyAction::SetGameOptions {
                     respond_to,
                     id,
                     options,
@@ -153,10 +153,16 @@ impl LobbyActor {
 
         self.reset_game();
         self.shared.game_phase = GamePhase::Playing;
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
-        if self.sender.send(Message::GameBegin).is_err() {
+        let _ = self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
+                lobby: self.shared.clone(),
+            }));
+        if self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameBegin))
+            .is_err()
+        {
             log::warn!(
                 "Lobby {:#X} started with no players in lobby.",
                 self.shared.lobby_id
@@ -168,12 +174,18 @@ impl LobbyActor {
 
     fn stop_game(&mut self) {
         self.shared.game_phase = GamePhase::Setup;
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
-        if self.sender.send(Message::GameEnd).is_err() {
+        let _ = self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
+                lobby: self.shared.clone(),
+            }));
+        if self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameEnd))
+            .is_err()
+        {
             log::warn!(
-                "Lobby {:#X} started with no players in lobby.",
+                "Lobby {:#X} finished with no players in lobby.",
                 self.shared.lobby_id
             )
         }
@@ -207,9 +219,11 @@ impl LobbyActor {
         // Subscribe early so that this player will receive the lobby update that adds them
         let recv = self.sender.subscribe();
 
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
+        let _ = self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
+                lobby: self.shared.clone(),
+            }));
 
         Ok(recv)
     }
@@ -231,9 +245,11 @@ impl LobbyActor {
         }
 
         // Update remaining clients of the change
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
+        let _ = self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
+                lobby: self.shared.clone(),
+            }));
 
         // Close the lobby after the last player leaves by closing our receiver.
         // This will cause the run loop to consume all remaining messages,
@@ -258,9 +274,9 @@ impl LobbyActor {
         options.color = player.options.color;
         player.options = options;
 
-        let message = Message::GameLobbyInfo {
+        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
             lobby: self.shared.clone(),
-        };
+        });
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -273,9 +289,9 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.ready_to_start = can_start;
-        let message = Message::GameLobbyInfo {
+        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
             lobby: self.shared.clone(),
-        };
+        });
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -290,9 +306,9 @@ impl LobbyActor {
         player.current_level = level;
         log::info!("Player {:#X} entered {level:?}", player_id);
 
-        let message = Message::GameLobbyInfo {
+        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
             lobby: self.shared.clone(),
-        };
+        });
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -342,9 +358,9 @@ impl LobbyActor {
                     self.stop_game();
                 }
 
-                let message = Message::GameLobbyInfo {
+                let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
                     lobby: self.shared.clone(),
-                };
+                });
                 let _ = self.sender.send(message);
             }
         }
@@ -357,9 +373,9 @@ impl LobbyActor {
         }
         self.shared.options = options;
 
-        let message = Message::GameLobbyInfo {
+        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
             lobby: self.shared.clone(),
-        };
+        });
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -374,7 +390,7 @@ mod test {
     use clash_lib::{lobby::GamePhase, net::Item, player::PlayerOptions};
     use tokio::{sync::mpsc, time::timeout};
 
-    use crate::lobby::{lobby_handle::LobbyHandle, LobbyError};
+    use crate::lobby::{lobby_handle::LobbyHandleProvider, LobbyError};
 
     use super::LobbyActor;
 
@@ -648,10 +664,11 @@ mod test {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
             let mut actor = LobbyActor::new(Default::default(), rx, 0);
-            let handle = LobbyHandle {
+            let handle = LobbyHandleProvider {
                 sender: tx,
                 lobby_id: 0,
-            };
+            }
+            .get_handle(0);
             actor.add_player(0).unwrap();
             (actor, handle)
         };
@@ -685,7 +702,7 @@ mod test {
                 .await
                 .expect("Lobby failed to close");
             // Explicitly drop handle to ensure it's not dropped early
-            assert_eq!(handle.start_game(1).await, Err(LobbyError::HandleInvalid));
+            assert_eq!(handle.start_game().await, Err(LobbyError::HandleInvalid));
         }
     }
 }

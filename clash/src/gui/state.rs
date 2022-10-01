@@ -3,24 +3,17 @@ use std::cell::Cell;
 use eframe::{
     egui::Context,
     epaint::{ColorImage, TextureHandle},
+    App,
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Screen {
-    MainMenu(Submenu),
-    Lobby,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Submenu {
-    Root,
-    Host,
-    Join,
-}
+pub type ErrorSender = std::sync::mpsc::Sender<anyhow::Error>;
+pub type ErrorReceiver = std::sync::mpsc::Receiver<anyhow::Error>;
 
 pub struct State {
-    pub screen: Cell<Screen>,
+    next_app: Cell<Option<Box<dyn App>>>,
     pub logo: TextureHandle,
+    pub error_sender: ErrorSender,
+    pub error_receiver: ErrorReceiver,
 }
 
 impl State {
@@ -30,10 +23,21 @@ impl State {
             load_image_from_memory(include_bytes!("../../res/logo.png")).unwrap(),
             eframe::egui::TextureFilter::Linear,
         );
+        let (error_sender, error_receiver) = std::sync::mpsc::channel();
         Self {
-            screen: Cell::new(Screen::MainMenu(Submenu::Root)),
+            next_app: Cell::new(None),
             logo,
+            error_sender,
+            error_receiver,
         }
+    }
+
+    pub fn change_app(&self, new_app: impl App + 'static) {
+        self.next_app.set(Some(Box::new(new_app)));
+    }
+
+    pub fn get_new_app(&self) -> Option<Box<dyn App>> {
+        self.next_app.take()
     }
 }
 

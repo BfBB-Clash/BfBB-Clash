@@ -4,9 +4,11 @@ use bfbb::game_interface::{GameInterface, InterfaceError, InterfaceResult};
 use bfbb::game_state::{GameMode as BfBBGameMode, GameOstrich};
 use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
-use clash_lib::net::{Item, Message};
+use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::PlayerId;
 use log::info;
+
+use crate::net::{NetCommand, NetCommandSender};
 
 use super::game_mode::GameMode;
 
@@ -14,16 +16,14 @@ pub struct ClashGame;
 
 impl GameMode for ClashGame {
     /// Process state updates from the server and report back any actions of the local player
-    type Result = InterfaceResult<()>;
-
     fn update<G: GameInterface>(
         &mut self,
         interface: &G,
         lobby: &mut NetworkedLobby,
         local_player: PlayerId,
-        network_sender: &mut tokio::sync::mpsc::Sender<Message>,
+        network_sender: &mut NetCommandSender,
         local_spat_state: &mut HashSet<Spatula>,
-    ) -> Self::Result {
+    ) -> InterfaceResult<()> {
         if interface.is_loading()? {
             return Ok(());
         }
@@ -40,7 +40,9 @@ impl GameMode for ClashGame {
         if local_player.current_level != level {
             local_player.current_level = level;
             network_sender
-                .blocking_send(Message::GameCurrentLevel { level })
+                .try_send(NetCommand::Send(Message::Lobby(
+                    LobbyMessage::GameCurrentLevel { level },
+                )))
                 .unwrap();
         }
 
@@ -51,7 +53,9 @@ impl GameMode for ClashGame {
         if local_player.ready_to_start != can_start {
             local_player.ready_to_start = can_start;
             network_sender
-                .blocking_send(Message::PlayerCanStart(can_start))
+                .try_send(NetCommand::Send(Message::Lobby(
+                    LobbyMessage::PlayerCanStart(can_start),
+                )))
                 .unwrap();
         }
 
@@ -91,9 +95,11 @@ impl GameMode for ClashGame {
             if interface.is_task_complete(spat)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .blocking_send(Message::GameItemCollected {
-                        item: Item::Spatula(spat),
-                    })
+                    .try_send(NetCommand::Send(Message::Lobby(
+                        LobbyMessage::GameItemCollected {
+                            item: Item::Spatula(spat),
+                        },
+                    )))
                     .unwrap();
                 info!("Collected (from menu) {spat:?}");
             }
@@ -102,9 +108,11 @@ impl GameMode for ClashGame {
             if interface.is_spatula_being_collected(spat, local_player.current_level)? {
                 local_spat_state.insert(spat);
                 network_sender
-                    .blocking_send(Message::GameItemCollected {
-                        item: Item::Spatula(spat),
-                    })
+                    .try_send(NetCommand::Send(Message::Lobby(
+                        LobbyMessage::GameItemCollected {
+                            item: Item::Spatula(spat),
+                        },
+                    )))
                     .unwrap();
                 info!("Collected {spat:?}");
             }

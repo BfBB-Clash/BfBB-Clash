@@ -1,46 +1,30 @@
-use std::error::Error;
 use std::rc::Rc;
-use std::sync::mpsc::Receiver;
 
-use clash_lib::lobby::NetworkedLobby;
-use clash_lib::net::Message;
-use clash_lib::PlayerId;
 use eframe::egui::{
     Area, Context, FontData, FontDefinitions, Label, RichText, Style, TextStyle, TopBottomPanel,
 };
 use eframe::epaint::{Color32, FontFamily, FontId, Pos2};
 use eframe::{App, CreationContext, Frame};
 
-use crate::gui::lobby::Game;
 use crate::gui::main_menu::MainMenu;
-use crate::gui::state::{Screen, State};
+use crate::gui::state::State;
 use crate::gui::PADDING;
 
 pub struct Clash {
     state: Rc<State>,
-    game_screen: Game,
-    main_menu: MainMenu,
-
-    error_receiver: Receiver<Box<dyn Error + Send>>,
-    error_queue: Vec<Box<dyn Error>>,
+    curr_app: Box<dyn App>,
+    displayed_error: Option<anyhow::Error>,
 }
 
 impl Clash {
-    pub fn new(
-        cc: &CreationContext<'_>,
-        gui_receiver: Receiver<(PlayerId, NetworkedLobby)>,
-        error_receiver: Receiver<Box<dyn Error + Send>>,
-        network_sender: tokio::sync::mpsc::Sender<Message>,
-    ) -> Self {
+    pub fn new(cc: &CreationContext<'_>) -> Self {
         Self::setup(&cc.egui_ctx);
 
         let state = Rc::new(State::new(&cc.egui_ctx));
         Self {
-            error_receiver,
-            state: state.clone(),
-            game_screen: Game::new(state.clone(), gui_receiver, network_sender.clone()),
-            main_menu: MainMenu::new(state, network_sender),
-            error_queue: Vec::new(),
+            curr_app: Box::new(MainMenu::new(state.clone())),
+            state,
+            displayed_error: None,
         }
     }
 
@@ -102,24 +86,26 @@ impl App for Clash {
             // TODO: Find how to not hardcode this
             .fixed_pos(Pos2::new(560., ctx.available_rect().height() - height));
 
-        while let Ok(e) = self.error_receiver.try_recv() {
-            self.error_queue.push(e);
+        if self.displayed_error.is_none() {
+            if let Ok(e) = self.state.error_receiver.try_recv() {
+                self.displayed_error = Some(e);
+            }
         }
         TopBottomPanel::bottom("errors").show(ctx, |ui| {
-            if let Some(e) = self.error_queue.get(0) {
+            if let Some(e) = &self.displayed_error {
                 ui.add(Label::new(
                     RichText::new(format!("Error!: {e}")).color(Color32::DARK_RED),
                 ));
                 if ui.button("OK").clicked() {
-                    self.error_queue.remove(0);
+                    self.displayed_error = None;
                 }
             }
         });
 
-        match self.state.screen.get() {
-            Screen::MainMenu(_) => self.main_menu.update(ctx, frame),
-            Screen::Lobby => self.game_screen.update(ctx, frame),
+        if let Some(app) = self.state.get_new_app() {
+            self.curr_app = app
         }
+        self.curr_app.update(ctx, frame);
 
         version_ui.show(ctx, |ui| {
             ui.small(crate::VERSION);

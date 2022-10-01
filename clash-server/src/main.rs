@@ -31,7 +31,6 @@ async fn main() {
     loop {
         let (socket, _) = listener.accept().await.unwrap();
 
-        let state = state.clone();
-        client::handle_new_connection(state, socket).await;
+        tokio::spawn(client::handle_new_connection(state.clone(), socket));
     }
 }

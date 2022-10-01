@@ -1,5 +1,5 @@
 pub use error::{FrameError, ProtocolError};
-pub use message::{Item, Message};
+pub use message::{Item, LobbyMessage, Message};
 
 pub mod connection;
 mod error;

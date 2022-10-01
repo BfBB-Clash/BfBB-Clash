@@ -1,17 +1,18 @@
 use clash_lib::{LobbyId, PlayerId};
+use hash_map::Entry;
 use rand::{thread_rng, Rng};
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use crate::lobby;
-use crate::lobby::lobby_handle::LobbyHandle;
+use crate::lobby::lobby_handle::LobbyHandleProvider;
 
 pub type ServerState = Arc<Mutex<State>>;
 
 #[derive(Debug, Default)]
 pub struct State {
     pub players: HashSet<PlayerId>,
-    pub lobbies: HashMap<LobbyId, LobbyHandle>,
+    pub lobbies: HashMap<LobbyId, LobbyHandleProvider>,
 }
 
 impl State {
@@ -22,11 +23,14 @@ impl State {
     }
 
     // TODO: Would be nice to not have to pass in a clone of ServerState here
-    pub fn add_lobby(&mut self, state: ServerState) -> LobbyHandle {
+    pub fn add_lobby(&mut self, state: ServerState) -> &mut LobbyHandleProvider {
         let lobby_id = self.gen_lobby_id();
         let handle = lobby::start_new_lobby(state, lobby_id);
-        self.lobbies.insert(lobby_id, handle.clone());
-        handle
+        log::info!("Lobby {lobby_id:#X} opened");
+        if let Entry::Vacant(e) = self.lobbies.entry(lobby_id) {
+            return e.insert(handle);
+        }
+        unreachable!();
     }
 
     // TODO: dedupe this.
