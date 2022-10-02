@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - New games should no longer sometimes start with a previous unfinished game's state.
+- Clients no longer receive updates from lobbies after leaving them.
 
 ## [0.1.0] - 2022-03-27
 
