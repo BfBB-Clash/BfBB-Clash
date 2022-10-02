@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{game_state::GameState, player::NetworkedPlayer, LobbyId, PlayerId};
+use crate::{game_state::GameState, player::NetworkedPlayer, LobbyId, PlayerId, MAX_PLAYERS};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -8,6 +8,7 @@ pub struct LobbyOptions {
     pub ng_plus: bool,
     pub lab_door_cost: u8,
     pub tier_count: u8,
+    pub spat_scores: [u32; MAX_PLAYERS],
 }
 
 impl Default for LobbyOptions {
@@ -16,6 +17,7 @@ impl Default for LobbyOptions {
             lab_door_cost: 75,
             ng_plus: false,
             tier_count: 3,
+            spat_scores: [100, 75, 50, 30, 20, 10],
         }
     }
 }

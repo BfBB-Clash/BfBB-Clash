@@ -3,7 +3,7 @@ use clash_lib::game_state::SpatulaState;
 use clash_lib::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
-use clash_lib::{LobbyId, PlayerId, GAME_CONSTS, MAX_PLAYERS};
+use clash_lib::{LobbyId, PlayerId, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::state::ServerState;
@@ -342,7 +342,12 @@ impl LobbyActor {
                     return Err(LobbyError::InvalidAction(player_id));
                 }
 
-                player.score += GAME_CONSTS.spat_scores[state.collection_count as usize];
+                player.score += self
+                    .shared
+                    .options
+                    .spat_scores
+                    .get(state.collection_count as usize)
+                    .unwrap_or(&0);
 
                 state
                     .collection_vec
@@ -583,7 +588,7 @@ mod test {
             .player_collected_item(2, Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
 
-        let points = &clash_lib::GAME_CONSTS.spat_scores;
+        let points = &lobby.shared.options.spat_scores;
         assert_eq!(lobby.shared.players.get(&0).unwrap().score, points[0] * 2);
         assert_eq!(
             lobby.shared.players.get(&1).unwrap().score,
@@ -655,7 +660,7 @@ mod test {
             1
         );
 
-        let first_points = clash_lib::GAME_CONSTS.spat_scores[0];
+        let first_points = lobby.shared.options.spat_scores[0];
         assert_eq!(lobby.shared.players.get(&0).unwrap().score, first_points);
     }
 

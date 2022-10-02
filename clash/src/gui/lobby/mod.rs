@@ -5,7 +5,9 @@ use std::thread::JoinHandle;
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{LobbyMessage, Message};
 use clash_lib::PlayerId;
-use eframe::egui::{Align, Button, CentralPanel, Checkbox, Layout, SidePanel, Ui};
+use eframe::egui::{
+    Align, Button, CentralPanel, Layout, Response, SidePanel, Ui, Widget, WidgetText,
+};
 use eframe::epaint::Color32;
 use eframe::App;
 use itertools::intersperse;
@@ -67,6 +69,7 @@ pub struct Game {
     local_player_id: PlayerId,
     lab_door_cost: ValText<u8>,
     tier_count: ValText<u8>,
+    scores: Vec<ValText<u32>>,
 }
 
 impl Game {
@@ -84,6 +87,7 @@ impl Game {
                     .ok()
                     .filter(|&n| n > 0 && n <= clash_lib::MAX_PLAYERS as u8)
             }),
+            scores: Default::default(),
         }
     }
 }
@@ -95,6 +99,12 @@ impl App for Game {
             self.local_player_id = local_player_id;
             self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
             self.tier_count.set_val(new_lobby.options.tier_count);
+            self.scores
+                .resize_with(new_lobby.options.tier_count as usize, ValText::default);
+            for (i, buf) in self.scores.iter_mut().enumerate() {
+                buf.set_val(new_lobby.options.spat_scores[i]);
+            }
+
             self.lobby = new_lobby;
         }
 
@@ -147,51 +157,37 @@ impl Game {
     fn options_controls(&mut self, ui: &mut Ui) {
         let mut updated_options = None;
 
-        if ui
-            .add(Checkbox::new(&mut self.lobby.options.ng_plus, "New Game+"))
-            .on_hover_text(
-                "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
-            )
-            .changed()
-        {
+        let mut ng_plus = self.lobby.options.ng_plus;
+        ui.add_option("New Game+", &mut ng_plus, |&x| {
             updated_options
                 .get_or_insert_with(|| self.lobby.options.clone())
-                .ng_plus = self.lobby.options.ng_plus;
-        }
+                .ng_plus = x;
+        })
+        .on_hover_text(
+            "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
+        );
 
-        let lab_door_ui = ui
-            .horizontal(|ui| {
-                if !self.lab_door_cost.is_valid() {
-                    ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
-                }
-                ui.label("Lab Door Cost: ");
-                ui.text_edit_singleline(&mut self.lab_door_cost)
-            })
-            .inner;
-        if lab_door_ui.changed() {
-            if let Some(&n) = self.lab_door_cost.get_val() {
-                updated_options
-                    .get_or_insert_with(|| self.lobby.options.clone())
-                    .lab_door_cost = n;
-            }
-        }
+        ui.add_option("Lab Door Cost", &mut self.lab_door_cost, |&n| {
+            updated_options
+                .get_or_insert_with(|| self.lobby.options.clone())
+                .lab_door_cost = n;
+        })
+        .on_hover_text("Spatulas required to enter Chum Bucket Labs");
 
-        let tier_ui = ui
-            .horizontal(|ui| {
-                if !self.tier_count.is_valid() {
-                    ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
-                }
-                ui.label("Tier Count: ");
-                ui.text_edit_singleline(&mut self.tier_count)
-            })
-            .inner;
-        if tier_ui.changed() {
-            if let Some(&n) = self.tier_count.get_val() {
+        ui.collapsing("Debug Options", |ui| {
+            ui.add_option("Tier Count", &mut self.tier_count, |&n| {
                 updated_options
                     .get_or_insert_with(|| self.lobby.options.clone())
                     .tier_count = n;
-            }
-        }
+            })
+            .on_hover_text("Number of times a spatula can be collectd before it's disabled");
+
+            ui.add_option("Scores", self.scores.as_mut_slice(), |&(i, x)| {
+                updated_options
+                    .get_or_insert_with(|| self.lobby.options.clone())
+                    .spat_scores[i] = x;
+            });
+        });
 
         if let Some(options) = updated_options {
             self.lobby_data
@@ -244,5 +240,88 @@ impl Game {
                 .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin {})))
                 .unwrap();
         }
+    }
+}
+
+trait UiExt<'a, I: ?Sized, V> {
+    fn add_option(
+        &mut self,
+        label: impl Into<WidgetText>,
+        input: &'a mut I,
+        on_changed: impl FnMut(&V) + 'a,
+    ) -> Response;
+}
+
+impl<'a, I, V> UiExt<'a, I, V> for Ui
+where
+    I: 'a + ?Sized,
+    V: 'a,
+    OptionEditor<'a, I, V>: Widget,
+{
+    fn add_option(
+        &mut self,
+        text: impl Into<WidgetText>,
+        val: &'a mut I,
+        on_changed: impl FnMut(&V) + 'a,
+    ) -> Response {
+        let editor = OptionEditor::new(text, val, on_changed);
+        self.add(editor)
+    }
+}
+
+struct OptionEditor<'a, I: ?Sized, V> {
+    label: WidgetText,
+    input: &'a mut I,
+    changed: Box<dyn FnMut(&V) + 'a>,
+}
+
+impl<'a, I: ?Sized, V> OptionEditor<'a, I, V> {
+    fn new(text: impl Into<WidgetText>, input: &'a mut I, changed: impl FnMut(&V) + 'a) -> Self {
+        Self {
+            label: text.into(),
+            input,
+            changed: Box::new(changed),
+        }
+    }
+}
+
+impl<'a, V> Widget for OptionEditor<'a, ValText<V>, V> {
+    fn ui(mut self, ui: &mut Ui) -> eframe::egui::Response {
+        ui.horizontal(|ui| {
+            if !self.input.is_valid() {
+                ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
+            }
+            ui.label(self.label);
+            if ui.text_edit_singleline(self.input).changed() && self.input.is_valid() {
+                if let Some(x) = self.input.get_val() {
+                    (self.changed)(x);
+                }
+            }
+        })
+        .response
+    }
+}
+
+impl<'a> Widget for OptionEditor<'a, bool, bool> {
+    fn ui(mut self, ui: &mut Ui) -> Response {
+        ui.horizontal(|ui| {
+            if ui.checkbox(self.input, self.label).changed() {
+                (self.changed)(self.input);
+            }
+        })
+        .response
+    }
+}
+
+impl<'a, T: Copy> Widget for OptionEditor<'a, [ValText<T>], (usize, T)> {
+    fn ui(mut self, ui: &mut Ui) -> Response {
+        ui.collapsing(self.label, |ui| {
+            for (i, input) in self.input.iter_mut().enumerate() {
+                ui.add_option(format!("Tier {}", i + 1), input, |&x| {
+                    (self.changed)(&(i, x))
+                });
+            }
+        })
+        .header_response
     }
 }
