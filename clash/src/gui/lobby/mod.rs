@@ -243,49 +243,49 @@ impl Game {
     }
 }
 
-trait UiExt<'a, I: ?Sized, V> {
+trait UiExt<'a, In: ?Sized, Out> {
     fn add_option(
         &mut self,
         label: impl Into<WidgetText>,
-        input: &'a mut I,
-        on_changed: impl FnMut(&V) + 'a,
+        input: &'a mut In,
+        on_changed: impl FnMut(&Out) + 'a,
     ) -> Response;
 }
 
-impl<'a, I, V> UiExt<'a, I, V> for Ui
+impl<'a, In, Out> UiExt<'a, In, Out> for Ui
 where
-    I: 'a + ?Sized,
-    V: 'a,
-    OptionEditor<'a, I, V>: Widget,
+    In: 'a + ?Sized,
+    Out: 'a,
+    OptionEditor<'a, In, Out>: Widget,
 {
     fn add_option(
         &mut self,
         text: impl Into<WidgetText>,
-        val: &'a mut I,
-        on_changed: impl FnMut(&V) + 'a,
+        input: &'a mut In,
+        on_changed: impl FnMut(&Out) + 'a,
     ) -> Response {
-        let editor = OptionEditor::new(text, val, on_changed);
+        let editor = OptionEditor::new(text, input, on_changed);
         self.add(editor)
     }
 }
 
-struct OptionEditor<'a, I: ?Sized, V> {
+struct OptionEditor<'a, In: ?Sized, Out> {
     label: WidgetText,
-    input: &'a mut I,
-    changed: Box<dyn FnMut(&V) + 'a>,
+    input: &'a mut In,
+    on_changed: Box<dyn FnMut(&Out) + 'a>,
 }
 
-impl<'a, I: ?Sized, V> OptionEditor<'a, I, V> {
-    fn new(text: impl Into<WidgetText>, input: &'a mut I, changed: impl FnMut(&V) + 'a) -> Self {
+impl<'a, In: ?Sized, Out> OptionEditor<'a, In, Out> {
+    fn new(text: impl Into<WidgetText>, input: &'a mut In, changed: impl FnMut(&Out) + 'a) -> Self {
         Self {
             label: text.into(),
             input,
-            changed: Box::new(changed),
+            on_changed: Box::new(changed),
         }
     }
 }
 
-impl<'a, V> Widget for OptionEditor<'a, ValText<V>, V> {
+impl<'a, T> Widget for OptionEditor<'a, ValText<T>, T> {
     fn ui(mut self, ui: &mut Ui) -> eframe::egui::Response {
         ui.horizontal(|ui| {
             if !self.input.is_valid() {
@@ -294,7 +294,7 @@ impl<'a, V> Widget for OptionEditor<'a, ValText<V>, V> {
             ui.label(self.label);
             if ui.text_edit_singleline(self.input).changed() && self.input.is_valid() {
                 if let Some(x) = self.input.get_val() {
-                    (self.changed)(x);
+                    (self.on_changed)(x);
                 }
             }
         })
@@ -306,7 +306,7 @@ impl<'a> Widget for OptionEditor<'a, bool, bool> {
     fn ui(mut self, ui: &mut Ui) -> Response {
         ui.horizontal(|ui| {
             if ui.checkbox(self.input, self.label).changed() {
-                (self.changed)(self.input);
+                (self.on_changed)(self.input);
             }
         })
         .response
@@ -318,7 +318,7 @@ impl<'a, T: Copy> Widget for OptionEditor<'a, [ValText<T>], (usize, T)> {
         ui.collapsing(self.label, |ui| {
             for (i, input) in self.input.iter_mut().enumerate() {
                 ui.add_option(format!("Tier {}", i + 1), input, |&x| {
-                    (self.changed)(&(i, x))
+                    (self.on_changed)(&(i, x))
                 });
             }
         })
