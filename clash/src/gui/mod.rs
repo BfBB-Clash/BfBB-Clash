@@ -3,6 +3,7 @@ use eframe::{run_native, IconData, NativeOptions};
 
 use self::clash::Clash;
 
+mod arc;
 mod clash;
 mod lobby;
 mod main_menu;
