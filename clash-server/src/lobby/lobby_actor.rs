@@ -1,5 +1,4 @@
 use bfbb::{Level, Spatula};
-use clash_lib::game_state::SpatulaState;
 use clash_lib::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
@@ -352,7 +351,7 @@ impl LobbyActor {
                         .shared
                         .options
                         .spat_scores
-                        .get(state.collection_vec.len() - 1 as usize)
+                        .get(state.collection_vec.len() - 1)
                         .unwrap_or(&0);
                 }
 
