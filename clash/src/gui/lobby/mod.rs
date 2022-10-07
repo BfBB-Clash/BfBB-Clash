@@ -154,8 +154,7 @@ impl Game {
     fn options_controls(&mut self, ui: &mut Ui) {
         let mut updated_options = None;
 
-        let mut ng_plus = self.lobby.options.ng_plus;
-        ui.add_option("New Game+", &mut ng_plus, |&x| {
+        ui.add_option("New Game+", self.lobby.options.ng_plus, |x| {
             updated_options
                 .get_or_insert_with(|| self.lobby.options.clone())
                 .ng_plus = x;
@@ -164,7 +163,7 @@ impl Game {
             "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
         );
 
-        ui.add_option("Lab Door Cost", &mut self.lab_door_cost, |&n| {
+        ui.add_option("Lab Door Cost", &mut self.lab_door_cost, |n| {
             updated_options
                 .get_or_insert_with(|| self.lobby.options.clone())
                 .lab_door_cost = n;
@@ -172,14 +171,14 @@ impl Game {
         .on_hover_text("Spatulas required to enter Chum Bucket Labs");
 
         ui.collapsing("Debug Options", |ui| {
-            ui.add_option("Tier Count", &mut self.tier_count, |&n| {
+            ui.add_option("Tier Count", &mut self.tier_count, |n| {
                 updated_options
                     .get_or_insert_with(|| self.lobby.options.clone())
                     .tier_count = n;
             })
             .on_hover_text("Number of times a spatula can be collectd before it's disabled");
 
-            ui.add_option("Scores", self.scores.as_mut_slice(), |&(i, x)| {
+            ui.add_option("Scores", self.scores.as_mut_slice(), |(i, x)| {
                 updated_options
                     .get_or_insert_with(|| self.lobby.options.clone())
                     .spat_scores[i] = x;

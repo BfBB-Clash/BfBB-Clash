@@ -126,7 +126,7 @@ impl App for MainMenu {
                         lobby_data
                             .network_sender
                             .try_send(NetCommand::Send(Message::GameJoin {
-                                lobby_id: *self.lobby_id.get_val().unwrap(),
+                                lobby_id: self.lobby_id.get_val().unwrap(),
                             }))
                             .unwrap();
                         lobby_data

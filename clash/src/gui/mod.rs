@@ -48,22 +48,22 @@ pub trait UiExt<'a, In: ?Sized, Out> {
     fn add_option(
         &mut self,
         label: impl Into<WidgetText>,
-        input: &'a mut In,
-        on_changed: impl FnMut(&Out) + 'a,
+        input: In,
+        on_changed: impl FnMut(Out) + 'a,
     ) -> Response;
 }
 
 impl<'a, In, Out> UiExt<'a, In, Out> for Ui
 where
-    In: 'a + ?Sized,
+    In: 'a,
     Out: 'a,
     OptionEditor<'a, In, Out>: Widget,
 {
     fn add_option(
         &mut self,
         text: impl Into<WidgetText>,
-        input: &'a mut In,
-        on_changed: impl FnMut(&Out) + 'a,
+        input: In,
+        on_changed: impl FnMut(Out) + 'a,
     ) -> Response {
         let editor = OptionEditor::new(text, input, on_changed);
         self.add(editor)

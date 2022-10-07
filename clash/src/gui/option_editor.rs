@@ -5,18 +5,14 @@ use eframe::{
 
 use super::{val_text::ValText, UiExt};
 
-pub struct OptionEditor<'a, In: ?Sized, Out> {
+pub struct OptionEditor<'a, In, Out> {
     label: WidgetText,
-    input: &'a mut In,
-    on_changed: Box<dyn FnMut(&Out) + 'a>,
+    input: In,
+    on_changed: Box<dyn FnMut(Out) + 'a>,
 }
 
-impl<'a, In: ?Sized, Out> OptionEditor<'a, In, Out> {
-    pub fn new(
-        text: impl Into<WidgetText>,
-        input: &'a mut In,
-        changed: impl FnMut(&Out) + 'a,
-    ) -> Self {
+impl<'a, In, Out> OptionEditor<'a, In, Out> {
+    pub fn new(text: impl Into<WidgetText>, input: In, changed: impl FnMut(Out) + 'a) -> Self {
         Self {
             label: text.into(),
             input,
@@ -25,7 +21,7 @@ impl<'a, In: ?Sized, Out> OptionEditor<'a, In, Out> {
     }
 }
 
-impl<'a, T> Widget for OptionEditor<'a, ValText<T>, T> {
+impl<'a, T: Copy> Widget for OptionEditor<'a, &'a mut ValText<T>, T> {
     fn ui(mut self, ui: &mut Ui) -> eframe::egui::Response {
         ui.horizontal(|ui| {
             if !self.input.is_valid() {
@@ -45,7 +41,7 @@ impl<'a, T> Widget for OptionEditor<'a, ValText<T>, T> {
 impl<'a> Widget for OptionEditor<'a, bool, bool> {
     fn ui(mut self, ui: &mut Ui) -> Response {
         ui.horizontal(|ui| {
-            if ui.checkbox(self.input, self.label).changed() {
+            if ui.checkbox(&mut self.input, self.label).changed() {
                 (self.on_changed)(self.input);
             }
         })
@@ -53,12 +49,12 @@ impl<'a> Widget for OptionEditor<'a, bool, bool> {
     }
 }
 
-impl<'a, T: Copy> Widget for OptionEditor<'a, [ValText<T>], (usize, T)> {
+impl<'a, T: Copy> Widget for OptionEditor<'a, &'a mut [ValText<T>], (usize, T)> {
     fn ui(mut self, ui: &mut Ui) -> Response {
         ui.collapsing(self.label, |ui| {
             for (i, input) in self.input.iter_mut().enumerate() {
-                ui.add_option(format!("Tier {}", i + 1), input, |&x| {
-                    (self.on_changed)(&(i, x))
+                ui.add_option(format!("Tier {}", i + 1), input, |x| {
+                    (self.on_changed)((i, x))
                 });
             }
         })

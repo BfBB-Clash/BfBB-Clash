@@ -145,11 +145,10 @@ impl App for Clash {
 
 impl Clash {
     fn app_settings(&mut self, ui: &mut Ui) {
-        let mut use_icons = self.state.use_icons.get();
         ui.add_option(
             "Use icons for spatula tracker",
-            &mut use_icons,
-            |&use_icons| {
+            self.state.use_icons.get(),
+            |use_icons| {
                 self.state.use_icons.set(use_icons);
             },
         );
