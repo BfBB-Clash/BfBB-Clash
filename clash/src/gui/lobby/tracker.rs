@@ -11,7 +11,6 @@ use crate::gui::{arc::ArcShape, state::State};
 
 const GOLD: Color32 = Color32::from_rgb(0xd4, 0xaf, 0x37);
 const SILVER: Color32 = Color32::from_rgb(0xe0, 0xe0, 0xe0);
-const DISABLED: Color32 = Color32::from_rgb(0x3c, 0x3c, 0x3c);
 
 pub struct Tracker<'a> {
     state: &'a State,
@@ -86,19 +85,30 @@ impl Widget for SpatulaStatus<'_> {
         let (rect, response) =
             ui.allocate_exact_size(vec2(radius * 2., radius * 2.), Sense::hover());
 
-        let texture = if state.collection_vec.contains(&local_player)
-            || state.collection_vec.len() == lobby.options.tier_count.into()
-        {
-            &app_state.golden_spatula
+        if app_state.use_icons.get() {
+            let texture = if state.collection_vec.contains(&local_player)
+                || state.collection_vec.len() == lobby.options.tier_count.into()
+            {
+                &app_state.golden_spatula
+            } else {
+                &app_state.silver_spatula
+            };
+            ui.painter().add(Shape::image(
+                texture.id(),
+                rect,
+                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                Color32::WHITE,
+            ));
         } else {
-            &app_state.silver_spatula
-        };
-        ui.painter().add(Shape::image(
-            texture.id(),
-            rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        ));
+            let color = if state.collection_vec.contains(&local_player)
+                || state.collection_vec.len() == lobby.options.tier_count.into()
+            {
+                GOLD
+            } else {
+                SILVER
+            };
+            ui.painter().circle_filled(rect.center(), radius, color);
+        }
 
         match lobby.options.tier_count {
             1 => {

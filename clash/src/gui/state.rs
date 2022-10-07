@@ -14,6 +14,7 @@ pub struct State {
     pub logo: TextureHandle,
     pub golden_spatula: TextureHandle,
     pub silver_spatula: TextureHandle,
+    pub use_icons: Cell<bool>,
     pub error_sender: ErrorSender,
     pub error_receiver: ErrorReceiver,
 }
@@ -44,6 +45,7 @@ impl State {
             logo,
             golden_spatula,
             silver_spatula,
+            use_icons: Cell::new(true),
             error_sender,
             error_receiver,
         }

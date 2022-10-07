@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use eframe::egui::{
-    self, Button, Context, FontData, FontDefinitions, Label, Layout, RichText, Style, TextStyle,
-    TopBottomPanel,
+    self, Button, CentralPanel, Context, FontData, FontDefinitions, Label, Layout, RichText, Style,
+    TextStyle, TopBottomPanel, Ui,
 };
 use eframe::emath::Align;
 use eframe::epaint::{Color32, FontFamily, FontId, Vec2};
@@ -14,6 +14,7 @@ use crate::gui::PADDING;
 
 pub struct Clash {
     state: Rc<State>,
+    settings_open: bool,
     curr_app: Box<dyn App>,
     displayed_error: Option<anyhow::Error>,
 }
@@ -25,6 +26,7 @@ impl Clash {
         let state = Rc::new(State::new(&cc.egui_ctx));
         Self {
             curr_app: Box::new(MainMenu::new(state.clone())),
+            settings_open: false,
             state,
             displayed_error: None,
         }
@@ -97,7 +99,7 @@ impl App for Clash {
                             .frame(false)
                             .small();
                     if ui.add(settings_button).clicked() {
-                        println!("Settings");
+                        self.settings_open = !self.settings_open;
                     }
 
                     ui.small(crate::VERSION);
@@ -131,6 +133,21 @@ impl App for Clash {
         if let Some(app) = self.state.get_new_app() {
             self.curr_app = app
         }
-        self.curr_app.update(ctx, frame);
+        if self.settings_open {
+            CentralPanel::default().show(ctx, |ui| self.app_settings(ui));
+        } else {
+            self.curr_app.update(ctx, frame);
+        }
+    }
+}
+
+impl Clash {
+    fn app_settings(&mut self, ui: &mut Ui) {
+        let mut use_icons = self.state.use_icons.get();
+        ui.checkbox(&mut use_icons, "Use icons for spatula tracker");
+        self.state.use_icons.set(use_icons);
+        if ui.button("Close").clicked() {
+            self.settings_open = false;
+        }
     }
 }
