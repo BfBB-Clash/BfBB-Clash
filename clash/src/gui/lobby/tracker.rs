@@ -130,8 +130,7 @@ impl Widget for SpatulaStatus<'_> {
                     ui.painter().add(ArcShape::new(
                         rect.center(),
                         radius + 2.,
-                        start,
-                        start + ang - pad,
+                        start..start + ang - pad,
                         (1., color),
                     ));
                 }
