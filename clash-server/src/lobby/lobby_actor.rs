@@ -1,5 +1,4 @@
 use bfbb::{Level, Spatula};
-use clash_lib::game_state::SpatulaState;
 use clash_lib::lobby::{GamePhase, LobbyOptions, NetworkedLobby};
 use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
@@ -322,16 +321,11 @@ impl LobbyActor {
 
         match item {
             Item::Spatula(spat) => {
-                let state = self
-                    .shared
-                    .game_state
-                    .spatulas
-                    .entry(spat)
-                    .or_insert_with(SpatulaState::default);
+                let state = self.shared.game_state.spatulas.entry(spat).or_default();
 
                 // This can happen in rare situations where the player colllected an exhausted spatula
                 // before receiving the lobby update that exhausted it. We should just ignore this case
-                if state.collection_count == self.shared.options.tier_count {
+                if state.collection_vec.len() == self.shared.options.tier_count.into() {
                     log::info!(
                         "Player {player_id:#X} tried to collect exhausted spatula {spat:?}.",
                     );
@@ -342,25 +336,23 @@ impl LobbyActor {
                     return Err(LobbyError::InvalidAction(player_id));
                 }
 
-                player.score += self
-                    .shared
-                    .options
-                    .spat_scores
-                    .get(state.collection_count as usize)
-                    .unwrap_or(&0);
-
-                state
-                    .collection_vec
-                    .insert(state.collection_count as usize, player_id);
+                state.collection_vec.push(player_id);
                 log::info!(
                     "Player {player_id:#X} collected {spat:?} with tier {:?}",
-                    state.collection_count
+                    state.collection_vec.len()
                 );
-
-                state.collection_count += 1;
 
                 if spat == Spatula::TheSmallShallRuleOrNot {
                     self.stop_game();
+                    return Ok(());
+                }
+                if spat != Spatula::KahRahTae {
+                    player.score += self
+                        .shared
+                        .options
+                        .spat_scores
+                        .get(state.collection_vec.len() - 1)
+                        .unwrap_or(&0);
                 }
 
                 let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
@@ -569,6 +561,15 @@ mod test {
             Err(LobbyError::PlayerInvalid(1337))
         );
 
+        // CBL Spats are worth 0 points
+        assert!(lobby
+            .player_collected_item(0, Item::Spatula(Spatula::KahRahTae))
+            .is_ok());
+        assert!(lobby
+            .player_collected_item(0, Item::Spatula(Spatula::TheSmallShallRuleOrNot))
+            .is_ok());
+        assert_eq!(lobby.shared.players.get(&0).unwrap().score, 0);
+
         // Collecting a spatula first grants highest score
         assert!(lobby
             .player_collected_item(0, Item::Spatula(Spatula::SpongebobsCloset))
@@ -656,7 +657,8 @@ mod test {
                 .spatulas
                 .get(&Spatula::CowaBungee)
                 .unwrap()
-                .collection_count,
+                .collection_vec
+                .len(),
             1
         );
 

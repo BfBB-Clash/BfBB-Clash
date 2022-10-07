@@ -46,7 +46,7 @@ impl<'a> Widget for Tracker<'a> {
             // TODO: issue #57, Make spatula gold if locally collected and grayed out if unavailable
             let color = if spat_state.collection_vec.contains(&self.local_player) {
                 GOLD
-            } else if spat_state.collection_count == self.lobby.options.tier_count {
+            } else if spat_state.collection_vec.len() == self.lobby.options.tier_count.into() {
                 DISABLED
             } else {
                 SILVER

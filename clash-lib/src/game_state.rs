@@ -7,7 +7,6 @@ use crate::PlayerId;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct SpatulaState {
-    pub collection_count: u8,
     pub collection_vec: Vec<PlayerId>,
 }
 
