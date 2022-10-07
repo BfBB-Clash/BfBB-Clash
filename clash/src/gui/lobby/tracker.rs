@@ -85,14 +85,14 @@ impl Widget for SpatulaStatus<'_> {
         let (rect, response) =
             ui.allocate_exact_size(vec2(radius * 2., radius * 2.), Sense::hover());
 
+        let (texture, color) = if state.collection_vec.contains(&local_player)
+            || state.collection_vec.len() == lobby.options.tier_count.into()
+        {
+            (&app_state.golden_spatula, GOLD)
+        } else {
+            (&app_state.silver_spatula, SILVER)
+        };
         if app_state.use_icons.get() {
-            let texture = if state.collection_vec.contains(&local_player)
-                || state.collection_vec.len() == lobby.options.tier_count.into()
-            {
-                &app_state.golden_spatula
-            } else {
-                &app_state.silver_spatula
-            };
             ui.painter().add(Shape::image(
                 texture.id(),
                 rect,
@@ -100,13 +100,6 @@ impl Widget for SpatulaStatus<'_> {
                 Color32::WHITE,
             ));
         } else {
-            let color = if state.collection_vec.contains(&local_player)
-                || state.collection_vec.len() == lobby.options.tier_count.into()
-            {
-                GOLD
-            } else {
-                SILVER
-            };
             ui.painter().circle_filled(rect.center(), radius, color);
         }
 
