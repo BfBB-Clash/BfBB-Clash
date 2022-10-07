@@ -5,10 +5,7 @@ use std::thread::JoinHandle;
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{LobbyMessage, Message};
 use clash_lib::PlayerId;
-use eframe::egui::{
-    Align, Button, CentralPanel, Layout, Response, SidePanel, Ui, Widget, WidgetText,
-};
-use eframe::epaint::Color32;
+use eframe::egui::{Align, Button, CentralPanel, Layout, SidePanel, Ui};
 use eframe::App;
 use itertools::intersperse;
 
@@ -21,7 +18,7 @@ use tracker::Tracker;
 
 use super::main_menu::MainMenu;
 use super::val_text::ValText;
-use super::GuiReceiver;
+use super::{GuiReceiver, UiExt};
 
 mod player_ui;
 mod tracker;
@@ -240,88 +237,5 @@ impl Game {
                 .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin {})))
                 .unwrap();
         }
-    }
-}
-
-trait UiExt<'a, In: ?Sized, Out> {
-    fn add_option(
-        &mut self,
-        label: impl Into<WidgetText>,
-        input: &'a mut In,
-        on_changed: impl FnMut(&Out) + 'a,
-    ) -> Response;
-}
-
-impl<'a, In, Out> UiExt<'a, In, Out> for Ui
-where
-    In: 'a + ?Sized,
-    Out: 'a,
-    OptionEditor<'a, In, Out>: Widget,
-{
-    fn add_option(
-        &mut self,
-        text: impl Into<WidgetText>,
-        input: &'a mut In,
-        on_changed: impl FnMut(&Out) + 'a,
-    ) -> Response {
-        let editor = OptionEditor::new(text, input, on_changed);
-        self.add(editor)
-    }
-}
-
-struct OptionEditor<'a, In: ?Sized, Out> {
-    label: WidgetText,
-    input: &'a mut In,
-    on_changed: Box<dyn FnMut(&Out) + 'a>,
-}
-
-impl<'a, In: ?Sized, Out> OptionEditor<'a, In, Out> {
-    fn new(text: impl Into<WidgetText>, input: &'a mut In, changed: impl FnMut(&Out) + 'a) -> Self {
-        Self {
-            label: text.into(),
-            input,
-            on_changed: Box::new(changed),
-        }
-    }
-}
-
-impl<'a, T> Widget for OptionEditor<'a, ValText<T>, T> {
-    fn ui(mut self, ui: &mut Ui) -> eframe::egui::Response {
-        ui.horizontal(|ui| {
-            if !self.input.is_valid() {
-                ui.style_mut().visuals.override_text_color = Some(Color32::DARK_RED);
-            }
-            ui.label(self.label);
-            if ui.text_edit_singleline(self.input).changed() && self.input.is_valid() {
-                if let Some(x) = self.input.get_val() {
-                    (self.on_changed)(x);
-                }
-            }
-        })
-        .response
-    }
-}
-
-impl<'a> Widget for OptionEditor<'a, bool, bool> {
-    fn ui(mut self, ui: &mut Ui) -> Response {
-        ui.horizontal(|ui| {
-            if ui.checkbox(self.input, self.label).changed() {
-                (self.on_changed)(self.input);
-            }
-        })
-        .response
-    }
-}
-
-impl<'a, T: Copy> Widget for OptionEditor<'a, [ValText<T>], (usize, T)> {
-    fn ui(mut self, ui: &mut Ui) -> Response {
-        ui.collapsing(self.label, |ui| {
-            for (i, input) in self.input.iter_mut().enumerate() {
-                ui.add_option(format!("Tier {}", i + 1), input, |&x| {
-                    (self.on_changed)(&(i, x))
-                });
-            }
-        })
-        .header_response
     }
 }

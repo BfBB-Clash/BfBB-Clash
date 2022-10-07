@@ -12,6 +12,8 @@ use crate::gui::main_menu::MainMenu;
 use crate::gui::state::State;
 use crate::gui::PADDING;
 
+use super::UiExt;
+
 pub struct Clash {
     state: Rc<State>,
     settings_open: bool,
@@ -144,8 +146,13 @@ impl App for Clash {
 impl Clash {
     fn app_settings(&mut self, ui: &mut Ui) {
         let mut use_icons = self.state.use_icons.get();
-        ui.checkbox(&mut use_icons, "Use icons for spatula tracker");
-        self.state.use_icons.set(use_icons);
+        ui.add_option(
+            "Use icons for spatula tracker",
+            &mut use_icons,
+            |&use_icons| {
+                self.state.use_icons.set(use_icons);
+            },
+        );
         if ui.button("Close").clicked() {
             self.settings_open = false;
         }
