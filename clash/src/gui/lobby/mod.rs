@@ -206,7 +206,11 @@ impl Game {
                 .on_disabled_hover_text(format!(
                     "Waiting on: {}",
                     intersperse(
-                        self.lobby.players.values().map(|p| p.options.name.as_str()),
+                        self.lobby
+                            .players
+                            .values()
+                            .filter(|p| !p.ready_to_start)
+                            .map(|p| p.options.name.as_str()),
                         ", "
                     )
                     .collect::<String>()
