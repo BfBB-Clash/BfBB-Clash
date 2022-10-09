@@ -176,7 +176,7 @@ impl Game {
                     .get_or_insert_with(|| self.lobby.options.clone())
                     .tier_count = n;
             })
-            .on_hover_text("Number of times a spatula can be collectd before it's disabled");
+            .on_hover_text("Number of times a spatula can be collected before it's disabled");
 
             ui.add_option("Scores", self.scores.as_mut_slice(), |(i, x)| {
                 updated_options
