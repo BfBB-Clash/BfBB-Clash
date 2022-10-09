@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::thread::JoinHandle;
@@ -152,40 +153,32 @@ impl Game {
     }
 
     fn options_controls(&mut self, ui: &mut Ui) {
-        let mut updated_options = None;
+        let mut updated_options = Cow::Borrowed(&self.lobby.options);
 
-        ui.add_option("New Game+", self.lobby.options.ng_plus, |x| {
-            updated_options
-                .get_or_insert_with(|| self.lobby.options.clone())
-                .ng_plus = x;
+        ui.add_option("New Game+", updated_options.ng_plus, |x| {
+            updated_options.to_mut().ng_plus = x;
         })
         .on_hover_text(
             "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
         );
 
         ui.add_option("Lab Door Cost", &mut self.lab_door_cost, |n| {
-            updated_options
-                .get_or_insert_with(|| self.lobby.options.clone())
-                .lab_door_cost = n;
+            updated_options.to_mut().lab_door_cost = n;
         })
         .on_hover_text("Spatulas required to enter Chum Bucket Labs");
 
         ui.collapsing("Debug Options", |ui| {
             ui.add_option("Tier Count", &mut self.tier_count, |n| {
-                updated_options
-                    .get_or_insert_with(|| self.lobby.options.clone())
-                    .tier_count = n;
+                updated_options.to_mut().tier_count = n;
             })
             .on_hover_text("Number of times a spatula can be collected before it's disabled");
 
             ui.add_option("Scores", self.scores.as_mut_slice(), |(i, x)| {
-                updated_options
-                    .get_or_insert_with(|| self.lobby.options.clone())
-                    .spat_scores[i] = x;
+                updated_options.to_mut().spat_scores[i] = x;
             });
         });
 
-        if let Some(options) = updated_options {
+        if let Cow::Owned(options) = updated_options {
             self.lobby_data
                 .network_sender
                 .blocking_send(NetCommand::Send(Message::Lobby(
