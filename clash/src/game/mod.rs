@@ -1,7 +1,8 @@
 mod clash_game;
 mod game_mode;
 
-use bfbb::game_interface::{dolphin::DolphinInterface, GameInterface, InterfaceError};
+use bfbb::game_interface::game_var::GameVarMut;
+use bfbb::game_interface::{dolphin::Dolphin, InterfaceError};
 use bfbb::{EnumCount, Spatula};
 use clash_lib::net::LobbyMessage;
 use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
@@ -31,9 +32,10 @@ pub fn start_game(
         .build_with_target_rate(126);
 
     // TODO: Report hooking errors to user/stdout
-    let mut interface = DolphinInterface::default();
-    let _ = interface.hook();
+    let interface = Dolphin::default();
     let mut game = ClashGame;
+    // TODO: Avoid starting this thread until we have our player_id, then change our receiver to
+    // take `LobbyMessage`s
     let player_id = 0;
     let lobby = None;
     // Not sure if this is the best approach, the idea is that it would be faster
@@ -44,7 +46,7 @@ pub fn start_game(
     let mut logic = Logic {
         gui_ctx,
         gui_sender,
-        interface,
+        dol: interface,
         network_sender,
         logic_receiver,
         lobby,
@@ -65,7 +67,8 @@ pub fn start_game(
 struct Logic {
     gui_ctx: Context,
     gui_sender: GuiSender,
-    interface: DolphinInterface,
+    // TODO: probably be generic over a new `GameInterfaceProvider`
+    dol: Dolphin,
     network_sender: NetCommandSender,
     logic_receiver: Receiver<Message>,
     lobby: Option<NetworkedLobby>,
@@ -75,33 +78,36 @@ struct Logic {
 
 impl Logic {
     fn update<G: GameMode>(&mut self, game: &mut G) {
-        if let Some(lobby) = self.lobby.as_mut() {
-            if let Err(InterfaceError::Unhooked) = game.update(
-                &self.interface,
+        let lobby = match self.lobby.as_mut() {
+            Some(it) => it,
+            _ => return,
+        };
+
+        let res = self.dol.with_interface(|i| {
+            game.update(
+                i,
                 lobby,
                 self.player_id,
                 &mut self.network_sender,
                 &mut self.local_spat_state,
-            ) {
-                // We lost dolphin
-                if let Some(local_player) = lobby.players.get_mut(&self.player_id) {
-                    if local_player.current_level != None {
-                        local_player.current_level = None;
-                        self.network_sender
-                            .try_send(NetCommand::Send(Message::Lobby(
-                                LobbyMessage::GameCurrentLevel { level: None },
-                            )))
-                            .unwrap();
-                        self.network_sender
-                            .blocking_send(NetCommand::Send(Message::Lobby(
-                                LobbyMessage::PlayerCanStart(false),
-                            )))
-                            .unwrap();
-                    }
+            )
+        });
+        if let Err(InterfaceError::Unhooked) = res {
+            // We lost dolphin
+            if let Some(local_player) = lobby.players.get_mut(&self.player_id) {
+                if local_player.current_level != None {
+                    local_player.current_level = None;
+                    self.network_sender
+                        .try_send(NetCommand::Send(Message::Lobby(
+                            LobbyMessage::GameCurrentLevel { level: None },
+                        )))
+                        .unwrap();
+                    self.network_sender
+                        .try_send(NetCommand::Send(Message::Lobby(
+                            LobbyMessage::PlayerCanStart(false),
+                        )))
+                        .unwrap();
                 }
-
-                // TODO: Maybe don't re-attempt this every frame
-                let _ = self.interface.hook();
             }
         }
     }
@@ -120,15 +126,15 @@ impl Logic {
             match action {
                 LobbyMessage::GameBegin => {
                     self.local_spat_state.clear();
-                    let _ = self.interface.start_new_game();
+                    let _ = self.dol.with_interface(|i| i.start_new_game());
                     let lobby = self
                         .lobby
                         .as_mut()
                         .expect("Tried to begin game without being in a lobby");
 
-                    if lobby.options.ng_plus {
-                        let _ = self.interface.unlock_powers();
-                    }
+                    let _ = self
+                        .dol
+                        .with_interface(|i| i.powers.start_with_powers(lobby.options.ng_plus));
                     self.gui_sender
                         .send((self.player_id, lobby.clone()))
                         .expect("GUI has crashed and so will we");
@@ -136,9 +142,10 @@ impl Logic {
                 LobbyMessage::GameLobbyInfo { lobby: new_lobby } => {
                     // This could fail if the user is restarting dolphin, but that will desync a lot of other things as well
                     // so it's fine to just wait for a future lobby update to correct the issue
-                    let _ = self
-                        .interface
-                        .set_spatula_count(new_lobby.game_state.spatulas.len() as u32);
+                    let _ = self.dol.with_interface(|i| {
+                        i.spatula_count
+                            .set(new_lobby.game_state.spatulas.len() as u32)
+                    });
                     self.lobby = Some(new_lobby.clone());
                     self.gui_sender
                         .send((self.player_id, new_lobby))

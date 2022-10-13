@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use bfbb::{
-    game_interface::{GameInterface, InterfaceResult},
+    game_interface::{game_var::InterfaceBackend, GameInterface, InterfaceResult},
     Spatula,
 };
 use clash_lib::{lobby::NetworkedLobby, PlayerId};
@@ -12,9 +12,9 @@ use crate::net::NetCommandSender;
 //  Idea is to allow game mode logic to be implemented by an arbitrary
 //  struct with a consistent interface.
 pub trait GameMode {
-    fn update<G: GameInterface>(
+    fn update<F: InterfaceBackend>(
         &mut self,
-        interface: &G,
+        interface: &mut GameInterface<F>,
         lobby: &mut NetworkedLobby,
         local_player: PlayerId,
         network_sender: &mut NetCommandSender,

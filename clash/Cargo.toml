@@ -11,7 +11,7 @@ console = []
 
 [dependencies]
 anyhow.workspace = true
-bfbb = { version = "0.2.1", features = ["game-interface"] }
+bfbb = { workspace = true, features = ["game-interface"] }
 clash_lib.workspace = true
 env_logger.workspace = true
 log.workspace = true

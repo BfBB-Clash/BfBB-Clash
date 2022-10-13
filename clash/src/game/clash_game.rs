@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use bfbb::game_interface::game_var::{GameVar, InterfaceBackend};
 use bfbb::game_interface::{GameInterface, InterfaceError, InterfaceResult};
 use bfbb::game_state::{GameMode as BfBBGameMode, GameOstrich};
 use bfbb::{IntoEnumIterator, Level, Spatula};
@@ -16,15 +17,15 @@ pub struct ClashGame;
 
 impl GameMode for ClashGame {
     /// Process state updates from the server and report back any actions of the local player
-    fn update<G: GameInterface>(
+    fn update<F: InterfaceBackend>(
         &mut self,
-        interface: &G,
+        interface: &mut GameInterface<F>,
         lobby: &mut NetworkedLobby,
         local_player: PlayerId,
         network_sender: &mut NetCommandSender,
         local_spat_state: &mut HashSet<Spatula>,
     ) -> InterfaceResult<()> {
-        if interface.is_loading()? {
+        if interface.is_loading.get()? {
             return Ok(());
         }
 
@@ -48,8 +49,8 @@ impl GameMode for ClashGame {
 
         // We need to be on the title screen to start a new game
         // but we can't if the Demo FMV is active, so we also check that we're currently in a scene.
-        let can_start = interface.get_current_game_mode()? == BfBBGameMode::Title
-            && interface.get_current_game_ostrich()? == GameOstrich::InScene;
+        let can_start = interface.game_mode.get()? == BfBBGameMode::Title
+            && interface.game_ostrich.get()? == GameOstrich::InScene;
         if local_player.ready_to_start != can_start {
             local_player.ready_to_start = can_start;
             network_sender

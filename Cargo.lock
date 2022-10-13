@@ -115,8 +115,7 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "bfbb"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f056eae80bdd9ad82ac1fc6d0b226dd5d969c6bcea634550d403417e8ab3b9b1"
+source = "git+https://github.com/bfbbmoddingtools/bfbb?branch=fix-unlock#3b056a95d8ffa0fa7baf7af6fc44052f133e44b6"
 dependencies = [
  "bytemuck",
  "log",
@@ -126,6 +125,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "sysinfo",
+ "tap",
  "thiserror",
  "winapi",
 ]
@@ -1673,9 +1673,9 @@ dependencies = [
 
 [[package]]
 name = "process-memory"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61d7c67e1d5e7e8e100ce1240b08e3a7249fe7d02b04232f006f8f60f27791fe"
+checksum = "ae9599c34fcc8067c3105dc746c0ce85e3ea61784568b8234179fad490b1dcc1"
 dependencies = [
  "libc",
  "mach",
@@ -2041,6 +2041,12 @@ dependencies = [
  "rayon",
  "winapi",
 ]
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "termcolor"
