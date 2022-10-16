@@ -7,7 +7,7 @@ edition = "2021"
 
 [workspace.dependencies]
 anyhow = "1"
-bfbb = { git = "https://github.com/bfbbmoddingtools/bfbb", branch = "fix-unlock" }
+bfbb = { git = "https://github.com/bfbbmoddingtools/bfbb", branch = "main" }
 clash_lib = { path = "clash-lib" }
 env_logger = "0.9"
 log = "0.4"
