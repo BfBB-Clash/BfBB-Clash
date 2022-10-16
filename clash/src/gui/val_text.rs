@@ -13,7 +13,7 @@ pub struct ValText<T> {
     validator: Box<dyn Fn(&str) -> Option<T>>,
 }
 
-impl<T> ValText<T> {
+impl<T: Copy> ValText<T> {
     pub fn with_validator(validator: impl Fn(&str) -> Option<T> + 'static) -> Self {
         Self {
             text: Default::default(),
@@ -22,8 +22,8 @@ impl<T> ValText<T> {
         }
     }
 
-    pub fn get_val(&self) -> Option<&T> {
-        self.val.as_ref()
+    pub fn get_val(&self) -> Option<T> {
+        self.val
     }
 
     pub fn is_valid(&self) -> bool {

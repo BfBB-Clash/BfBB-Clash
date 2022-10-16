@@ -1,11 +1,15 @@
 use clash_lib::{lobby::NetworkedLobby, PlayerId};
+use eframe::egui::{Response, Ui, Widget, WidgetText};
 use eframe::{run_native, IconData, NativeOptions};
 
 use self::clash::Clash;
+use self::option_editor::OptionEditor;
 
+mod arc;
 mod clash;
 mod lobby;
 mod main_menu;
+mod option_editor;
 mod state;
 mod val_text;
 
@@ -38,4 +42,30 @@ pub fn run() {
         window_options,
         Box::new(|cc| Box::new(Clash::new(cc))),
     );
+}
+
+pub trait UiExt<'a, In: ?Sized, Out> {
+    fn add_option(
+        &mut self,
+        label: impl Into<WidgetText>,
+        input: In,
+        on_changed: impl FnMut(Out) + 'a,
+    ) -> Response;
+}
+
+impl<'a, In, Out> UiExt<'a, In, Out> for Ui
+where
+    In: 'a,
+    Out: 'a,
+    OptionEditor<'a, In, Out>: Widget,
+{
+    fn add_option(
+        &mut self,
+        text: impl Into<WidgetText>,
+        input: In,
+        on_changed: impl FnMut(Out) + 'a,
+    ) -> Response {
+        let editor = OptionEditor::new(text, input, on_changed);
+        self.add(editor)
+    }
 }

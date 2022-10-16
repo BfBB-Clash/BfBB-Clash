@@ -1,17 +1,22 @@
 use std::rc::Rc;
 
 use eframe::egui::{
-    Area, Context, FontData, FontDefinitions, Label, RichText, Style, TextStyle, TopBottomPanel,
+    self, Button, CentralPanel, Context, FontData, FontDefinitions, Label, Layout, RichText, Style,
+    TextStyle, TopBottomPanel, Ui,
 };
-use eframe::epaint::{Color32, FontFamily, FontId, Pos2};
+use eframe::emath::Align;
+use eframe::epaint::{Color32, FontFamily, FontId, Vec2};
 use eframe::{App, CreationContext, Frame};
 
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::State;
 use crate::gui::PADDING;
 
+use super::UiExt;
+
 pub struct Clash {
     state: Rc<State>,
+    settings_open: bool,
     curr_app: Box<dyn App>,
     displayed_error: Option<anyhow::Error>,
 }
@@ -23,6 +28,7 @@ impl Clash {
         let state = Rc::new(State::new(&cc.egui_ctx));
         Self {
             curr_app: Box::new(MainMenu::new(state.clone())),
+            settings_open: false,
             state,
             displayed_error: None,
         }
@@ -34,9 +40,13 @@ impl Clash {
             "spongebob".into(),
             FontData::from_static(include_bytes!("../../fonts/Some.Time.Later.otf")),
         );
+
+        // Prepend our font but leave default fonts intact as fallbacks.
         font_def
             .families
-            .insert(FontFamily::Proportional, vec!["spongebob".into()]);
+            .entry(FontFamily::Proportional)
+            .or_default()
+            .splice(0..0, ["spongebob".into()]);
 
         ctx.set_fonts(font_def);
 
@@ -78,37 +88,72 @@ impl Clash {
 
 impl App for Clash {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        let style = ctx.style();
-        let height = ctx.fonts().row_height(&TextStyle::Small.resolve(&style));
+        TopBottomPanel::bottom("toolbar")
+            // Margins look better with a "group" frame
+            .frame(egui::Frame::group(&ctx.style()).fill(ctx.style().visuals.window_fill()))
+            .show(ctx, |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    // Override interior padding of button.
+                    ui.style_mut().spacing.button_padding = Vec2::ZERO;
 
-        // Paint this at the end so it stays on top
-        let version_ui = Area::new("Version")
-            // TODO: Find how to not hardcode this
-            .fixed_pos(Pos2::new(560., ctx.available_rect().height() - height));
+                    let settings_button =
+                        Button::new(RichText::new("⛭").font(TextStyle::Small.resolve(ui.style())))
+                            .frame(false)
+                            .small();
+                    if ui.add(settings_button).clicked() {
+                        self.settings_open = !self.settings_open;
+                    }
+
+                    ui.small(crate::VERSION);
+                    ui.small("Version");
+                });
+            });
 
         if self.displayed_error.is_none() {
             if let Ok(e) = self.state.error_receiver.try_recv() {
                 self.displayed_error = Some(e);
             }
         }
-        TopBottomPanel::bottom("errors").show(ctx, |ui| {
-            if let Some(e) = &self.displayed_error {
+
+        // Note: Closure provided to TopBottomPanel::show needs mutable access to displayed_error so we can't
+        // use an if let here that binds a reference to the error here.
+        if self.displayed_error.is_some() {
+            TopBottomPanel::bottom("errors").show(ctx, |ui| {
+                let e = self
+                    .displayed_error
+                    .as_ref()
+                    .expect("We checked for is_some already");
                 ui.add(Label::new(
                     RichText::new(format!("Error!: {e}")).color(Color32::DARK_RED),
                 ));
                 if ui.button("OK").clicked() {
                     self.displayed_error = None;
                 }
-            }
-        });
+            });
+        }
 
         if let Some(app) = self.state.get_new_app() {
             self.curr_app = app
         }
-        self.curr_app.update(ctx, frame);
+        if self.settings_open {
+            CentralPanel::default().show(ctx, |ui| self.app_settings(ui));
+        } else {
+            self.curr_app.update(ctx, frame);
+        }
+    }
+}
 
-        version_ui.show(ctx, |ui| {
-            ui.small(crate::VERSION);
-        });
+impl Clash {
+    fn app_settings(&mut self, ui: &mut Ui) {
+        ui.add_option(
+            "Use icons for spatula tracker",
+            self.state.use_icons.get(),
+            |use_icons| {
+                self.state.use_icons.set(use_icons);
+            },
+        );
+        if ui.button("Close").clicked() {
+            self.settings_open = false;
+        }
     }
 }

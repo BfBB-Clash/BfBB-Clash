@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full Linux support
 - Networking Improvements
 - "Tiered Spatula" Gameplay update. Points awarded for a spatula depends on how many times it was collected previously.
+- Added local App Settings menu.
+- Added spatula icons to the tracker. These can be toggled on/off in the App Settings menu.
 
 ### Fixed
 

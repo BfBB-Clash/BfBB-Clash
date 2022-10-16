@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use eframe::{
-    egui::Context,
+    egui::{Context, TextureFilter},
     epaint::{ColorImage, TextureHandle},
     App,
 };
@@ -12,6 +12,9 @@ pub type ErrorReceiver = std::sync::mpsc::Receiver<anyhow::Error>;
 pub struct State {
     next_app: Cell<Option<Box<dyn App>>>,
     pub logo: TextureHandle,
+    pub golden_spatula: TextureHandle,
+    pub silver_spatula: TextureHandle,
+    pub use_icons: Cell<bool>,
     pub error_sender: ErrorSender,
     pub error_receiver: ErrorReceiver,
 }
@@ -20,13 +23,29 @@ impl State {
     pub fn new(ctx: &Context) -> Self {
         let logo = ctx.load_texture(
             "logo",
-            load_image_from_memory(include_bytes!("../../res/logo.png")).unwrap(),
-            eframe::egui::TextureFilter::Linear,
+            load_image_from_memory(include_bytes!("../../res/logo.png"))
+                .expect("The image is in the binary."),
+            TextureFilter::Linear,
+        );
+        let golden_spatula = ctx.load_texture(
+            "golden spatula",
+            load_image_from_memory(include_bytes!("../../res/golden_spatula_60.gif"))
+                .expect("The image is in the binary"),
+            TextureFilter::Linear,
+        );
+        let silver_spatula = ctx.load_texture(
+            "silver spatula",
+            load_image_from_memory(include_bytes!("../../res/silver_spatula_60.gif"))
+                .expect("The image is in the binary."),
+            TextureFilter::Linear,
         );
         let (error_sender, error_receiver) = std::sync::mpsc::channel();
         Self {
             next_app: Cell::new(None),
             logo,
+            golden_spatula,
+            silver_spatula,
+            use_icons: Cell::new(true),
             error_sender,
             error_receiver,
         }
