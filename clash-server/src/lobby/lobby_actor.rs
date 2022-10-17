@@ -211,7 +211,7 @@ impl LobbyActor {
         // TODO: When the last player in a lobby leaves, it is closed, therefore this should just be
         //  done once when the lobby is first created. (This will also allow us to get rid of the Option
         //  for the lobby's host_id)
-        if self.shared.host_id == None {
+        if self.shared.host_id.is_none() {
             self.shared.host_id = Some(player_id);
         }
 
