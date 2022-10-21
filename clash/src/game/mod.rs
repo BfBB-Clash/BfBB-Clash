@@ -42,7 +42,7 @@ pub fn start_game(
         logic.update_from_network().unwrap();
         logic.update();
 
-        loop_helper.loop_start_s();
+        loop_helper.loop_sleep();
     }
 }
 
