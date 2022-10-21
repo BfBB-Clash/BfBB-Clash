@@ -65,7 +65,7 @@ where
         input: In,
         on_changed: impl FnMut(Out) + 'a,
     ) -> Response {
-        let editor = OptionEditor::new(text, input, on_changed);
+        let editor = OptionEditor::new(text, input, on_changed).enabled(true);
         self.add(editor)
     }
 }

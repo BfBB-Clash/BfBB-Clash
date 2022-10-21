@@ -18,8 +18,9 @@ use player_ui::PlayerUi;
 use tracker::Tracker;
 
 use super::main_menu::MainMenu;
+use super::option_editor::OptionEditor;
 use super::val_text::ValText;
-use super::{GuiReceiver, UiExt};
+use super::GuiReceiver;
 
 mod player_ui;
 mod tracker;
@@ -65,6 +66,7 @@ pub struct Game {
     lobby_data: LobbyData,
     lobby: NetworkedLobby,
     local_player_id: PlayerId,
+    is_host: bool,
     lab_door_cost: ValText<u8>,
     tier_count: ValText<u8>,
     scores: Vec<ValText<u32>>,
@@ -77,6 +79,7 @@ impl Game {
             lobby_data,
             lobby: NetworkedLobby::new(0),
             local_player_id: 0,
+            is_host: false,
             lab_door_cost: ValText::with_validator(|text| {
                 text.parse::<u8>().ok().filter(|&n| n > 0 && n <= 82)
             }),
@@ -95,6 +98,7 @@ impl App for Game {
         // Receive gamestate updates
         while let Ok((local_player_id, new_lobby)) = self.lobby_data.gui_receiver.try_recv() {
             self.local_player_id = local_player_id;
+            self.is_host = new_lobby.host_id == Some(local_player_id);
             self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
             self.tier_count.set_val(new_lobby.options.tier_count);
             self.scores
@@ -121,9 +125,6 @@ impl App for Game {
             match self.lobby.game_phase {
                 GamePhase::Setup => {
                     self.paint_options(ui);
-                    if ui.button("Copy Lobby ID").clicked() {
-                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
-                    }
                 }
                 GamePhase::Playing => {
                     Tracker::new(&self.state, &self.lobby, self.local_player_id).ui(ui);
@@ -131,10 +132,19 @@ impl App for Game {
                 GamePhase::Finished => todo!(),
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-                if ui.button("Leave").clicked() {
-                    self.state.change_app(MainMenu::new(self.state.clone()));
-                }
-            })
+                ui.with_layout(Layout::right_to_left(Align::BOTTOM), |ui| {
+                    if ui
+                        .button("Lobby ID")
+                        .on_hover_text("Copy Lobby ID to Clipboard")
+                        .clicked()
+                    {
+                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                    }
+                    if ui.button("Leave").clicked() {
+                        self.state.change_app(MainMenu::new(self.state.clone()));
+                    }
+                });
+            });
         });
     }
 }
@@ -144,38 +154,48 @@ impl Game {
         ui.heading("Lobby Options");
         ui.separator();
 
-        ui.add_enabled_ui(self.lobby.host_id == Some(self.local_player_id), |ui| {
-            self.options_controls(ui);
-            if ui.is_enabled() {
-                self.host_controls(ui);
-            }
-        });
+        self.options_controls(ui);
+        if self.is_host {
+            self.host_controls(ui);
+        }
     }
 
     fn options_controls(&mut self, ui: &mut Ui) {
         let mut updated_options = Cow::Borrowed(&self.lobby.options);
 
-        ui.add_option("New Game+", updated_options.ng_plus, |x| {
-            updated_options.to_mut().ng_plus = x;
-        })
+        ui.add(
+            OptionEditor::new("New Game+", updated_options.ng_plus, |x| {
+                updated_options.to_mut().ng_plus = x;
+            })
+            .enabled(self.is_host),
+        )
         .on_hover_text(
             "All players start the game with the Bubble Bowl and Cruise Missile unlocked.",
         );
 
-        ui.add_option("Lab Door Cost", &mut self.lab_door_cost, |n| {
-            updated_options.to_mut().lab_door_cost = n;
-        })
+        ui.add(
+            OptionEditor::new("Lab Door Cost", &mut self.lab_door_cost, |n| {
+                updated_options.to_mut().lab_door_cost = n;
+            })
+            .enabled(self.is_host),
+        )
         .on_hover_text("Spatulas required to enter Chum Bucket Labs");
 
         ui.collapsing("Debug Options", |ui| {
-            ui.add_option("Tier Count", &mut self.tier_count, |n| {
-                updated_options.to_mut().tier_count = n;
-            })
+            ui.add(
+                OptionEditor::new("Tier Count", &mut self.tier_count, |n| {
+                    updated_options.to_mut().tier_count = n;
+                })
+                .enabled(self.is_host),
+            )
             .on_hover_text("Number of times a spatula can be collected before it's disabled");
 
-            ui.add_option("Scores", self.scores.as_mut_slice(), |(i, x)| {
-                updated_options.to_mut().spat_scores[i] = x;
-            });
+            ui.add(
+                OptionEditor::new("Scores", self.scores.as_mut_slice(), |(i, x)| {
+                    updated_options.to_mut().spat_scores[i] = x;
+                })
+                .enabled(self.is_host),
+            );
         });
 
         if let Cow::Owned(options) = updated_options {
