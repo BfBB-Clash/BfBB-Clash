@@ -1,4 +1,6 @@
-fn main() -> std::io::Result<()> {
+use version_gen::gen_clash_version;
+
+fn main() -> anyhow::Result<()> {
     #[cfg(windows)]
     {
         use winres::WindowsResource;
@@ -8,5 +10,6 @@ fn main() -> std::io::Result<()> {
             WindowsResource::new().set_icon("res/icon.ico").compile()?;
         }
     }
-    Ok(())
+
+    gen_clash_version(env!("CARGO_MANIFEST_DIR"))
 }

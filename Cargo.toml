@@ -1,5 +1,5 @@
 [workspace]
-members = ["clash", "clash-lib", "clash-server"]
+members = ["clash", "clash-lib", "clash-server", "version-gen"]
 
 [workspace.package]
 version = "0.1.0"
@@ -21,6 +21,7 @@ tokio = { version = "1", features = [
     "sync",
     "time",
 ] }
+version_gen = { path = "version-gen" }
 
 # Remove unneeded debug info from linux release binaries
 [profile.release]

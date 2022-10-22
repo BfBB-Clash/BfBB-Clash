@@ -23,5 +23,9 @@ image = "0.24"
 itertools = "0.10.5"
 spin_sleep = "1"
 
+[build-dependencies]
+anyhow.workspace = true
+version_gen.workspace = true
+
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"

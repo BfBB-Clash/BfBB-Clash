@@ -16,3 +16,7 @@ env_logger.workspace = true
 log.workspace = true
 
 rand = "0.8"
+
+[build-dependencies]
+anyhow.workspace = true
+version_gen.workspace = true

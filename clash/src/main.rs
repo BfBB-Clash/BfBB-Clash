@@ -7,7 +7,7 @@ mod game;
 mod gui;
 mod net;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CLASH_VERSION");
 
 fn main() {
     env_logger::Builder::new()
