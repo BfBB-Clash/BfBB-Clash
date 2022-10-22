@@ -36,6 +36,8 @@ pub struct NetworkedLobby {
     pub options: LobbyOptions,
     pub players: HashMap<PlayerId, NetworkedPlayer>,
     pub game_phase: GamePhase,
+    // TODO: Refactor this option out, we don't create a lobby until a player has connected to the server
+    //       so we should be able to specify them as the host. When the last player leaves we close the lobby.
     pub host_id: Option<PlayerId>,
 }
 
