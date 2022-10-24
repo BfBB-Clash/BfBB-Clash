@@ -1,0 +1,9 @@
+[package]
+name = "version_gen"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+git2 = "0.15"

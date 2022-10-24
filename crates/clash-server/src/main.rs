@@ -5,7 +5,7 @@ mod state;
 use state::ServerState;
 use tokio::net::TcpListener;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CLASH_VERSION");
 const DEFAULT_PORT: u16 = 42932;
 
 #[tokio::main]
@@ -19,6 +19,8 @@ async fn main() {
         .filter_level(log::LevelFilter::Debug)
         .parse_env("CLASH_LOG")
         .init();
+
+    log::info!("Server Version: {}", crate::VERSION);
 
     let port = std::env::var("PORT")
         .ok()

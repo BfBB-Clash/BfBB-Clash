@@ -1,5 +1,10 @@
 [workspace]
-members = ["clash", "clash-lib", "clash-server"]
+members = [
+    "crates/clash",
+    "crates/clash-lib",
+    "crates/clash-server",
+    "crates/version-gen",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -8,7 +13,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1"
 bfbb = "0.3.0-beta.0"
-clash_lib = { path = "clash-lib" }
+clash_lib = { path = "crates/clash-lib" }
 env_logger = "0.9"
 log = "0.4"
 thiserror = "1"
@@ -21,6 +26,7 @@ tokio = { version = "1", features = [
     "sync",
     "time",
 ] }
+version_gen = { path = "crates/version-gen" }
 
 # Remove unneeded debug info from linux release binaries
 [profile.release]
