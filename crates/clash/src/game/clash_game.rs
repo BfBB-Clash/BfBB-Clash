@@ -328,12 +328,12 @@ mod tests {
 
         let (mut dummy_sender, _r) = std::sync::mpsc::channel();
         game.message(LobbyMessage::GameBegin, &mut dummy_sender);
-        assert_eq!(game.provider.powers.initial_bubble_bowl.value, true);
-        assert_eq!(game.provider.powers.initial_cruise_bubble.value, true);
+        assert!(game.provider.powers.initial_bubble_bowl.value);
+        assert!(game.provider.powers.initial_cruise_bubble.value);
 
         game.lobby.options.ng_plus = false;
         game.message(LobbyMessage::GameBegin, &mut dummy_sender);
-        assert_eq!(game.provider.powers.initial_bubble_bowl.value, false);
-        assert_eq!(game.provider.powers.initial_cruise_bubble.value, false);
+        assert!(!game.provider.powers.initial_bubble_bowl.value);
+        assert!(!game.provider.powers.initial_cruise_bubble.value);
     }
 }
