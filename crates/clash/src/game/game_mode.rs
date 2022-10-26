@@ -1,5 +1,5 @@
 use bfbb::game_interface::InterfaceResult;
-use clash_lib::net::LobbyMessage;
+use clash_lib::{lobby::NetworkedLobby, net::LobbyMessage};
 
 use crate::{gui::GuiSender, net::NetCommandSender};
 
@@ -10,4 +10,6 @@ pub trait GameMode {
     fn update(&mut self, network_sender: &NetCommandSender) -> InterfaceResult<()>;
 
     fn message(&mut self, message: LobbyMessage, gui_sender: &mut GuiSender);
+
+    fn update_lobby(&mut self, new_lobby: NetworkedLobby, gui_sender: &mut GuiSender);
 }

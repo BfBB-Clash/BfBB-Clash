@@ -152,11 +152,9 @@ impl LobbyActor {
 
         self.reset_game();
         self.shared.game_phase = GamePhase::Playing;
-        let _ = self
-            .sender
-            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
-                lobby: self.shared.clone(),
-            }));
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
         if self
             .sender
             .send(Message::Lobby(LobbyMessage::GameBegin))
@@ -173,11 +171,9 @@ impl LobbyActor {
 
     fn stop_game(&mut self) {
         self.shared.game_phase = GamePhase::Setup;
-        let _ = self
-            .sender
-            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
-                lobby: self.shared.clone(),
-            }));
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
         if self
             .sender
             .send(Message::Lobby(LobbyMessage::GameEnd))
@@ -218,11 +214,9 @@ impl LobbyActor {
         // Subscribe early so that this player will receive the lobby update that adds them
         let recv = self.sender.subscribe();
 
-        let _ = self
-            .sender
-            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
-                lobby: self.shared.clone(),
-            }));
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
 
         Ok(recv)
     }
@@ -244,11 +238,9 @@ impl LobbyActor {
         }
 
         // Update remaining clients of the change
-        let _ = self
-            .sender
-            .send(Message::Lobby(LobbyMessage::GameLobbyInfo {
-                lobby: self.shared.clone(),
-            }));
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
 
         // Close the lobby after the last player leaves by closing our receiver.
         // This will cause the run loop to consume all remaining messages,
@@ -273,9 +265,9 @@ impl LobbyActor {
         options.color = player.options.color;
         player.options = options;
 
-        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
+        let message = Message::GameLobbyInfo {
             lobby: self.shared.clone(),
-        });
+        };
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -288,9 +280,9 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.ready_to_start = can_start;
-        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
+        let message = Message::GameLobbyInfo {
             lobby: self.shared.clone(),
-        });
+        };
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -305,9 +297,9 @@ impl LobbyActor {
         player.current_level = level;
         log::info!("Player {:#X} entered {level:?}", player_id);
 
-        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
+        let message = Message::GameLobbyInfo {
             lobby: self.shared.clone(),
-        });
+        };
         let _ = self.sender.send(message);
         Ok(())
     }
@@ -355,9 +347,9 @@ impl LobbyActor {
                         .unwrap_or(&0);
                 }
 
-                let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
+                let message = Message::GameLobbyInfo {
                     lobby: self.shared.clone(),
-                });
+                };
                 let _ = self.sender.send(message);
             }
         }
@@ -370,9 +362,9 @@ impl LobbyActor {
         }
         self.shared.options = options;
 
-        let message = Message::Lobby(LobbyMessage::GameLobbyInfo {
+        let message = Message::GameLobbyInfo {
             lobby: self.shared.clone(),
-        });
+        };
         let _ = self.sender.send(message);
         Ok(())
     }

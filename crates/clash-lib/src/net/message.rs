@@ -14,21 +14,33 @@ pub enum Message {
     GameHost,
     GameJoin { lobby_id: u32 },
     Lobby(LobbyMessage),
+    GameLobbyInfo { lobby: NetworkedLobby },
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+impl From<LobbyMessage> for Message {
+    fn from(msg: LobbyMessage) -> Self {
+        Self::Lobby(msg)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum LobbyMessage {
     PlayerOptions { options: PlayerOptions },
     PlayerCanStart(bool),
     GameBegin,
     GameEnd,
     GameOptions { options: LobbyOptions },
-    GameLobbyInfo { lobby: NetworkedLobby },
     GameCurrentLevel { level: Option<Level> },
     GameItemCollected { item: Item },
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum Item {
     Spatula(Spatula),
+}
+
+impl From<Spatula> for Item {
+    fn from(spat: Spatula) -> Self {
+        Self::Spatula(spat)
+    }
 }
