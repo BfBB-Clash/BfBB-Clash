@@ -16,6 +16,12 @@ pub enum NetCommand {
     Send(Message),
 }
 
+impl From<Message> for NetCommand {
+    fn from(msg: Message) -> Self {
+        Self::Send(msg)
+    }
+}
+
 #[tokio::main]
 pub async fn run(
     mut receiver: NetCommandReceiver,
@@ -85,6 +91,10 @@ async fn recv_task(
                 logic_sender.send(m).unwrap();
                 continue;
             }
+            m @ Message::GameLobbyInfo { lobby: _ } => {
+                logic_sender.send(m).unwrap();
+                continue;
+            }
             Message::Error { error } => {
                 log::error!("Error from server:\n{error}");
                 error_sender
@@ -102,9 +112,6 @@ async fn recv_task(
 
 fn process_action(action: LobbyMessage, logic_sender: &Sender<Message>) {
     match action {
-        m @ LobbyMessage::GameLobbyInfo { lobby: _ } => {
-            logic_sender.send(Message::Lobby(m)).unwrap();
-        }
         m @ LobbyMessage::GameBegin => {
             logic_sender.send(Message::Lobby(m)).unwrap();
         }

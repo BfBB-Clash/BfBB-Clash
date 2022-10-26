@@ -234,7 +234,6 @@ impl Client {
                 self.lobby_handle.player_collected_item(item).await?;
             }
             LobbyMessage::GameEnd => todo!(),
-            LobbyMessage::GameLobbyInfo { lobby: _ } => todo!(),
         }
 
         Ok(())

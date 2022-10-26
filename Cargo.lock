@@ -105,9 +105,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "bfbb"
-version = "0.3.0-beta.0"
+version = "0.3.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "743c7ce48bd28d46157dd85fb56b59822c479bb49f01a688ab02913ba23d3706"
+checksum = "a903c7f199ffe0bad672291b8749e8ac12a90556a8ab0d0f1008430a91141f97"
 dependencies = [
  "bytemuck",
  "log",

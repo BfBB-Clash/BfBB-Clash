@@ -1,7 +1,8 @@
 mod clash_game;
 mod game_mode;
 
-use bfbb::game_interface::InterfaceError;
+use bfbb::game_interface::dolphin::DolphinInterface;
+use bfbb::game_interface::{InterfaceError, InterfaceProvider};
 use clash_lib::net::LobbyMessage;
 use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
 use eframe::egui::Context;
@@ -28,7 +29,7 @@ pub fn start_game(
         .report_interval_s(0.5)
         .build_with_target_rate(126);
 
-    let mut logic = Logic {
+    let mut logic: Logic<DolphinInterface> = Logic {
         gui_ctx,
         gui_sender,
         network_sender,
@@ -46,15 +47,15 @@ pub fn start_game(
     }
 }
 
-struct Logic {
+struct Logic<I> {
     gui_ctx: Context,
     gui_sender: GuiSender,
     network_sender: NetCommandSender,
     logic_receiver: Receiver<Message>,
-    game: Option<ClashGame>,
+    game: Option<ClashGame<I>>,
 }
 
-impl Logic {
+impl<I: InterfaceProvider> Logic<I> {
     fn update(&mut self) {
         let game = match self.game.as_mut() {
             Some(it) => it,
@@ -81,7 +82,13 @@ impl Logic {
         for msg in self.logic_receiver.try_iter() {
             let action = match msg {
                 Message::ConnectionAccept { player_id } => {
-                    self.game = Some(ClashGame::new(player_id));
+                    self.game = Some(ClashGame::new(I::default(), player_id));
+                    continue;
+                }
+                Message::GameLobbyInfo { lobby } => {
+                    if let Some(g) = self.game.as_mut() {
+                        g.update_lobby(lobby, &mut self.gui_sender);
+                    }
                     continue;
                 }
                 Message::Lobby(m) => m,
