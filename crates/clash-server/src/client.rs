@@ -76,9 +76,12 @@ impl ConnectingClient {
         let lobby_recv = match lobby_handle.join_lobby().await {
             Ok(it) => it,
             Err(error) => {
-                let _ = self.conn_tx.write_frame(Message::Error {
-                    error: ProtocolError::Message(error.to_string()),
-                });
+                let _ = self
+                    .conn_tx
+                    .write_frame(Message::Error {
+                        error: ProtocolError::Message(error.to_string()),
+                    })
+                    .await;
                 return None;
             }
         };
