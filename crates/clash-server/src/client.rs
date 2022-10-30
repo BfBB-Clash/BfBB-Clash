@@ -65,23 +65,26 @@ impl ConnectingClient {
     }
 
     async fn handshake(mut self) -> Option<Client> {
-        let lobby_handle = self.try_handshake().await.map_or_else(
-            |error| {
-                let _ = self.conn_tx.write_frame(Message::Error { error });
-                None
-            },
-            Some,
-        )?;
+        let lobby_handle = match self.try_handshake().await {
+            Ok(it) => it,
+            Err(error) => {
+                let _ = self.conn_tx.write_frame(Message::Error { error }).await;
+                return None;
+            }
+        };
 
-        let lobby_recv = lobby_handle.join_lobby().await.map_or_else(
-            |error| {
-                let _ = self.conn_tx.write_frame(Message::Error {
-                    error: ProtocolError::Message(error.to_string()),
-                });
-                None
-            },
-            Some,
-        )?;
+        let lobby_recv = match lobby_handle.join_lobby().await {
+            Ok(it) => it,
+            Err(error) => {
+                let _ = self
+                    .conn_tx
+                    .write_frame(Message::Error {
+                        error: ProtocolError::Message(error.to_string()),
+                    })
+                    .await;
+                return None;
+            }
+        };
         Some(Client::from_connecting(self, lobby_handle, lobby_recv))
     }
 
