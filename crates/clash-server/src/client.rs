@@ -108,7 +108,7 @@ impl ConnectingClient {
                 player_id: self.player_id,
             })
             .await?;
-        log::info!("New connection for player id {:#X} opened", self.player_id);
+        tracing::info!("New connection for player id {:#X} opened", self.player_id);
 
         let lobby_handle = match self.conn_rx.read_frame().await? {
             Some(Message::GameHost) => {
@@ -172,7 +172,7 @@ impl Client {
             let incoming = match self.conn_rx.read_frame().await {
                 Ok(Some(Message::Lobby(x))) => x,
                 Ok(Some(m)) => {
-                    log::error!(
+                    tracing::error!(
                         "Invalid message received from Player {:#X}: \n{m:?}",
                         self.player_id
                     );
@@ -188,7 +188,7 @@ impl Client {
                     break;
                 }
                 Err(e) => {
-                    log::error!(
+                    tracing::error!(
                         "Error reading message from player id {:#X}. Closing connection\n{e:?}",
                         self.player_id
                     );
@@ -196,14 +196,14 @@ impl Client {
                 }
             };
 
-            log::debug!(
+            tracing::debug!(
                 "Received message from player id {:#X} \nMessage: {incoming:#X?}",
                 self.player_id,
             );
             match self.process(incoming).await {
                 Ok(()) => (),
                 Err(e) => {
-                    log::error!("Player {:#X} encountered error {e:?}", self.player_id);
+                    tracing::error!("Player {:#X} encountered error {e:?}", self.player_id);
                     let _ = self
                         .local_tx
                         .send(Message::Error {
@@ -213,7 +213,7 @@ impl Client {
                 }
             }
         }
-        log::info!("Player {:#X} disconnected", self.player_id);
+        tracing::info!("Player {:#X} disconnected", self.player_id);
     }
 
     async fn process(&mut self, msg: LobbyMessage) -> Result<(), LobbyError> {

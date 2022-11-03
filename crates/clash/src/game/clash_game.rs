@@ -7,7 +7,6 @@ use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::PlayerId;
-use log::info;
 
 use crate::gui::handle::GuiHandle;
 use crate::net::{NetCommand, NetCommandSender};
@@ -119,7 +118,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                             },
                         )))
                         .unwrap();
-                    info!("Collected (from menu) {spat:?}");
+                    tracing::info!("Collected (from menu) {spat:?}");
                 }
 
                 // Detect spatula collection events
@@ -132,7 +131,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                             },
                         )))
                         .unwrap();
-                    info!("Collected {spat:?}");
+                    tracing::info!("Collected {spat:?}");
                 }
             }
 

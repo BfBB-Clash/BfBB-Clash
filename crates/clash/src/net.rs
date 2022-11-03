@@ -32,7 +32,7 @@ pub async fn run(
     error_sender: Sender<anyhow::Error>,
 ) {
     let ip = load_ip_address();
-    log::info!("Connecting to server at '{ip}'");
+    tracing::info!("Connecting to server at '{ip}'");
 
     let sock = TcpStream::connect(&ip).await.unwrap();
     let (mut conn_tx, conn_rx) = connection::from_socket(sock);
@@ -50,9 +50,9 @@ pub async fn run(
             NetCommand::Disconnect => break,
             NetCommand::Send(m) => m,
         };
-        log::debug!("Sending message {msg:#?}");
+        tracing::debug!("Sending message {msg:#?}");
         if let Err(e) = conn_tx.write_frame(msg).await {
-            log::error!("Error sending message to server. Disconnecting. {e:#?}");
+            tracing::error!("Error sending message to server. Disconnecting. {e:#?}");
             error_sender
                 .send(e.into())
                 .expect("GUI has crashed and so will we.");
@@ -60,7 +60,7 @@ pub async fn run(
         }
     }
     recv_task.abort();
-    log::info!("Disconnected from server.")
+    tracing::info!("Disconnected from server.")
 }
 
 async fn recv_task(
@@ -71,15 +71,15 @@ async fn recv_task(
     loop {
         let incoming = match conn_rx.read_frame().await {
             Ok(Some(x)) => {
-                log::debug!("Received message {x:#?}.");
+                tracing::debug!("Received message {x:#?}.");
                 x
             }
             Ok(None) => {
-                log::info!("Server closed connection. Disconnecting.");
+                tracing::info!("Server closed connection. Disconnecting.");
                 break;
             }
             Err(e) => {
-                log::error!("Error reading message from server. Disconnecting.\n{e}");
+                tracing::error!("Error reading message from server. Disconnecting.\n{e}");
                 error_sender
                     .send(e.into())
                     .expect("GUI has crashed and so will we.");
@@ -90,7 +90,7 @@ async fn recv_task(
         match incoming {
             Message::Lobby(act) => process_action(act, &logic_sender),
             m @ Message::ConnectionAccept { player_id: _ } => {
-                log::debug!("ConnectionAccept message got :)");
+                tracing::debug!("ConnectionAccept message got :)");
                 logic_sender.send(m).unwrap();
                 continue;
             }
@@ -99,14 +99,14 @@ async fn recv_task(
                 continue;
             }
             Message::Error { error } => {
-                log::error!("Error from server:\n{error}");
+                tracing::error!("Error from server:\n{error}");
                 error_sender
                     .send(error.into())
                     .expect("GUI has crashed and so will we.");
                 continue;
             }
             _ => {
-                log::error!("Invalid message received from server");
+                tracing::error!("Invalid message received from server");
                 continue;
             }
         }

@@ -132,7 +132,7 @@ impl LobbyActor {
         // Remove this lobby from the server
         let state = &mut *self.state.lock().unwrap();
         state.lobbies.remove(&self.shared.lobby_id);
-        log::info!("Closing lobby {:#X}", self.shared.lobby_id);
+        tracing::info!("Closing lobby {:#X}", self.shared.lobby_id);
     }
 
     fn send_lobby(&mut self) {
@@ -162,7 +162,7 @@ impl LobbyActor {
         }
 
         if !self.shared.can_start() {
-            log::warn!(
+            tracing::warn!(
                 "Lobby {:#X} attempted to start when some players aren't able to start.",
                 self.shared.lobby_id
             );
@@ -178,7 +178,7 @@ impl LobbyActor {
             .send(Message::Lobby(LobbyMessage::GameBegin))
             .is_err()
         {
-            log::warn!(
+            tracing::warn!(
                 "Lobby {:#X} started with no players in lobby.",
                 self.shared.lobby_id
             )
@@ -223,7 +223,7 @@ impl LobbyActor {
     /// Removes a player from the lobby. If the host is removed, a new host is assigned randomly.
     fn rem_player(&mut self, player_id: PlayerId) {
         if self.shared.players.remove(&player_id).is_none() {
-            log::warn!(
+            tracing::warn!(
                 "Attempted to remove player {:#} from lobby {:#} who isn't in it",
                 player_id,
                 self.shared.lobby_id
@@ -286,7 +286,7 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.current_level = level;
-        log::info!("Player {:#X} entered {level:?}", player_id);
+        tracing::info!("Player {:#X} entered {level:?}", player_id);
 
         self.send_lobby();
         Ok(())
@@ -306,7 +306,7 @@ impl LobbyActor {
                 // This can happen in rare situations where the player colllected an exhausted spatula
                 // before receiving the lobby update that exhausted it. We should just ignore this case
                 if state.collection_vec.len() == self.shared.options.tier_count.into() {
-                    log::info!(
+                    tracing::info!(
                         "Player {player_id:#X} tried to collect exhausted spatula {spat:?}.",
                     );
                     return Ok(());
@@ -317,7 +317,7 @@ impl LobbyActor {
                 }
 
                 state.collection_vec.push(player_id);
-                log::info!(
+                tracing::info!(
                     "Player {player_id:#X} collected {spat:?} with tier {:?}",
                     state.collection_vec.len()
                 );
@@ -329,7 +329,7 @@ impl LobbyActor {
                         .send(Message::Lobby(LobbyMessage::GameEnd))
                         .is_err()
                     {
-                        log::warn!(
+                        tracing::warn!(
                             "Lobby {:#X} finished with no players in lobby.",
                             self.shared.lobby_id
                         )

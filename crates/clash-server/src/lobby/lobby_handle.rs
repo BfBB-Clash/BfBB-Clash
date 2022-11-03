@@ -75,7 +75,7 @@ impl LobbyHandle {
             id: self.player_id,
         };
         self.execute(msg, rx).await.map(|recv| {
-            log::info!(
+            tracing::info!(
                 "Player {:#X} has joined lobby {:#X}",
                 self.player_id,
                 self.lobby_id,

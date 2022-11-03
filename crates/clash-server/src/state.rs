@@ -26,7 +26,7 @@ impl State {
     pub fn add_lobby(&mut self, state: ServerState) -> &mut LobbyHandleProvider {
         let lobby_id = self.gen_lobby_id();
         let handle = lobby::start_new_lobby(state, lobby_id);
-        log::info!("Lobby {lobby_id:#X} opened");
+        tracing::info!("Lobby {lobby_id:#X} opened");
         if let Entry::Vacant(e) = self.lobbies.entry(lobby_id) {
             return e.insert(handle);
         }

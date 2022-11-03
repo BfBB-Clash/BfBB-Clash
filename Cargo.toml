@@ -14,8 +14,6 @@ edition = "2021"
 anyhow = "1"
 bfbb = "0.3.0-beta.1"
 clash_lib = { path = "crates/clash-lib" }
-env_logger = "0.9"
-log = "0.4"
 thiserror = "1"
 tokio = { version = "1", features = [
     "rt",
@@ -26,6 +24,8 @@ tokio = { version = "1", features = [
     "sync",
     "time",
 ] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
 version_gen = { path = "crates/version-gen" }
 
 # Remove unneeded debug info from linux release binaries
