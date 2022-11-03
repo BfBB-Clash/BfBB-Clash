@@ -78,7 +78,7 @@ impl Game {
             state,
             lobby_data,
             lobby: NetworkedLobby::new(0),
-            local_player_id: 0,
+            local_player_id: 0.into(),
             is_host: false,
             lab_door_cost: ValText::with_validator(|text| {
                 text.parse::<u8>().ok().filter(|&n| n > 0 && n <= 82)
@@ -152,7 +152,7 @@ impl App for Game {
                         .on_hover_text("Copy Lobby ID to Clipboard")
                         .clicked()
                     {
-                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id.0);
                     }
                     if ui.button("Leave").clicked() {
                         self.state.change_app(MainMenu::new(self.state.clone()));

@@ -3,6 +3,7 @@ use std::{mem::ManuallyDrop, rc::Rc};
 use clash_lib::{
     net::{LobbyMessage, Message},
     player::PlayerOptions,
+    LobbyId,
 };
 use eframe::{
     egui::{Align, Button, CentralPanel, Layout, TextEdit, TopBottomPanel},
@@ -26,7 +27,7 @@ pub struct MainMenu {
     state: Rc<State>,
     submenu: Submenu,
     player_name: String,
-    lobby_id: ValText<u32>,
+    lobby_id: ValText<LobbyId>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -45,7 +46,11 @@ impl MainMenu {
             // TODO: atm it is not strictly true that the lobby_id must be 8 digits,
             //  since it's just a random u32. When this is resolved on the server-side,
             //  we need to validate it here as well.
-            lobby_id: ValText::with_validator(|text| u32::from_str_radix(text, 16).ok()),
+            lobby_id: ValText::with_validator(|text| {
+                u32::from_str_radix(text.strip_prefix("0x").unwrap_or(text), 16)
+                    .map(|v| v.into())
+                    .ok()
+            }),
         }
     }
 }

@@ -206,12 +206,12 @@ mod tests {
         let mut lobby = NetworkedLobby::new(0);
         let mut player = NetworkedPlayer::new(PlayerOptions::default(), 0);
         player.current_level = Some(Level::SpongebobHouse);
-        lobby.players.insert(0, player);
+        lobby.players.insert(0.into(), player);
         lobby.game_phase = GamePhase::Playing;
 
         // Make new ClashGame and give it the default lobby
         let mut handle = GuiHandle::dummy();
-        let mut game = ClashGame::new(provider, 0);
+        let mut game = ClashGame::new(provider, 0.into());
         game.update_lobby(lobby, &mut handle);
         game
     }
@@ -293,7 +293,7 @@ mod tests {
         game.lobby.game_state.spatulas.insert(
             Spatula::CowaBungee,
             SpatulaState {
-                collection_vec: vec![1],
+                collection_vec: vec![1.into()],
             },
         );
         update_and_check(&mut game, None);

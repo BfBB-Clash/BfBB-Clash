@@ -1,5 +1,6 @@
 use crate::lobby::{LobbyOptions, NetworkedLobby};
 use crate::player::PlayerOptions;
+use crate::{LobbyId, PlayerId};
 use bfbb::{Level, Spatula};
 use serde::{Deserialize, Serialize};
 
@@ -10,9 +11,9 @@ use super::ProtocolError;
 pub enum Message {
     Error { error: ProtocolError },
     Version { version: String },
-    ConnectionAccept { player_id: u32 },
+    ConnectionAccept { player_id: PlayerId },
     GameHost,
-    GameJoin { lobby_id: u32 },
+    GameJoin { lobby_id: LobbyId },
     Lobby(LobbyMessage),
     GameLobbyInfo { lobby: NetworkedLobby },
 }

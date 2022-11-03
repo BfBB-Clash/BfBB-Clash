@@ -46,7 +46,7 @@ impl GuiHandle {
 impl GuiHandle {
     pub fn send(&mut self, msg: impl Into<GuiMessage>) {
         if let Err(e) = self.sender.send(msg.into()) {
-            log::error!("Failed to send message to GUI\n{e:?}");
+            tracing::error!("Failed to send message to GUI\n{e:?}");
         }
         self.context.request_repaint();
     }

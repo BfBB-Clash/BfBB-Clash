@@ -3,6 +3,8 @@
     windows_subsystem = "windows"
 )]
 
+use tracing::metadata::LevelFilter;
+
 mod game;
 mod gui;
 mod net;
@@ -19,7 +21,9 @@ fn main() {
     //     .filter_level(log::LevelFilter::Debug)
     //     .parse_env("CLASH_LOG")
     //     .init();
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_max_level(LevelFilter::DEBUG)
+        .init();
 
     // Start gui on the main thread
     gui::run();

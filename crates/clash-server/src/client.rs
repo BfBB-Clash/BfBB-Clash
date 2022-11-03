@@ -108,7 +108,7 @@ impl ConnectingClient {
                 player_id: self.player_id,
             })
             .await?;
-        tracing::info!("New connection for player id {:#X} opened", self.player_id);
+        tracing::info!("New connection for player id {} opened", self.player_id);
 
         let lobby_handle = match self.conn_rx.read_frame().await? {
             Some(Message::GameHost) => {
@@ -173,7 +173,7 @@ impl Client {
                 Ok(Some(Message::Lobby(x))) => x,
                 Ok(Some(m)) => {
                     tracing::error!(
-                        "Invalid message received from Player {:#X}: \n{m:?}",
+                        "Invalid message received from Player {}: \n{m:?}",
                         self.player_id
                     );
                     let _ = self
@@ -189,7 +189,7 @@ impl Client {
                 }
                 Err(e) => {
                     tracing::error!(
-                        "Error reading message from player id {:#X}. Closing connection\n{e:?}",
+                        "Error reading message from player id {}. Closing connection\n{e:?}",
                         self.player_id
                     );
                     break;
@@ -197,13 +197,13 @@ impl Client {
             };
 
             tracing::debug!(
-                "Received message from player id {:#X} \nMessage: {incoming:#X?}",
+                "Received message from player id {} \nMessage: {incoming:?}",
                 self.player_id,
             );
             match self.process(incoming).await {
                 Ok(()) => (),
                 Err(e) => {
-                    tracing::error!("Player {:#X} encountered error {e:?}", self.player_id);
+                    tracing::error!("Player {} encountered error {e:?}", self.player_id);
                     let _ = self
                         .local_tx
                         .send(Message::Error {
@@ -213,7 +213,7 @@ impl Client {
                 }
             }
         }
-        tracing::info!("Player {:#X} disconnected", self.player_id);
+        tracing::info!("Player {} disconnected", self.player_id);
     }
 
     async fn process(&mut self, msg: LobbyMessage) -> Result<(), LobbyError> {
