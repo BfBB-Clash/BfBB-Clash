@@ -4,6 +4,7 @@ use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
 use clash_lib::{LobbyId, PlayerId, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
+use tracing::instrument;
 
 use crate::state::ServerState;
 
@@ -78,7 +79,9 @@ impl LobbyActor {
         }
     }
 
+    #[instrument(skip_all, fields(lobby_id = %self.shared.lobby_id))]
     pub async fn run(mut self) {
+        tracing::info!("Lobby opened");
         while let Some(msg) = self.receiver.recv().await {
             match msg {
                 LobbyAction::ResetLobby { respond_to, id } => {
@@ -132,7 +135,7 @@ impl LobbyActor {
         // Remove this lobby from the server
         let state = &mut *self.state.lock().unwrap();
         state.lobbies.remove(&self.shared.lobby_id);
-        tracing::info!("Closing lobby {}", self.shared.lobby_id);
+        tracing::info!("Closing lobby");
     }
 
     fn send_lobby(&mut self) {
@@ -146,6 +149,7 @@ impl LobbyActor {
 // Message Handlers
 // ----------------------------------------------------------------------------
 impl LobbyActor {
+    #[instrument(skip(self))]
     fn reset_lobby(&mut self, player_id: PlayerId) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
@@ -153,19 +157,18 @@ impl LobbyActor {
 
         self.shared.reset();
         self.send_lobby();
+        tracing::info!("Reset lobby");
         Ok(())
     }
 
+    #[instrument(skip(self))]
     fn start_game(&mut self, player_id: PlayerId) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
         }
 
         if !self.shared.can_start() {
-            tracing::warn!(
-                "Lobby {} attempted to start when some players aren't able to start.",
-                self.shared.lobby_id
-            );
+            tracing::warn!("Attempted to start lobby when some players aren't able to start.");
             // Maybe this should be an error, I'm not sure
             return Ok(());
         }
@@ -178,13 +181,26 @@ impl LobbyActor {
             .send(Message::Lobby(LobbyMessage::GameBegin))
             .is_err()
         {
-            tracing::warn!(
-                "Lobby {} started with no players in lobby.",
-                self.shared.lobby_id
-            )
+            tracing::warn!("Lobby started with no players in lobby.")
         }
 
+        tracing::info!("Started lobby");
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    fn stop_game(&mut self) {
+        self.shared.game_phase = GamePhase::Setup;
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
+        if self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameEnd))
+            .is_err()
+        {
+            tracing::warn!("Lobby finished with no players in lobby.")
+        }
     }
 
     /// Adds a new player to this lobby. If there is currently no host, they will become it.
@@ -194,6 +210,7 @@ impl LobbyActor {
     /// # Errors
     ///
     /// This function will return an error if the lobby is already full
+    #[instrument(skip_all)]
     fn add_player(&mut self, player_id: PlayerId) -> LobbyResult<broadcast::Receiver<Message>> {
         if self.shared.players.len() >= MAX_PLAYERS {
             return Err(LobbyError::LobbyFull);
@@ -212,6 +229,7 @@ impl LobbyActor {
             self.shared.host_id = Some(player_id);
         }
 
+        tracing::info!("Player joined lobby");
         // Subscribe early so that this player will receive the lobby update that adds them
         let recv = self.sender.subscribe();
 
@@ -221,19 +239,18 @@ impl LobbyActor {
     }
 
     /// Removes a player from the lobby. If the host is removed, a new host is assigned randomly.
+    #[instrument(skip(self))]
     fn rem_player(&mut self, player_id: PlayerId) {
         if self.shared.players.remove(&player_id).is_none() {
-            tracing::warn!(
-                "Attempted to remove player {:#} from lobby {:#} who isn't in it",
-                player_id,
-                self.shared.lobby_id
-            );
+            tracing::warn!("Attempted to remove player from lobby who isn't in it");
             return;
         }
+        tracing::info!("Player left lobby");
         if self.shared.host_id == Some(player_id) {
             // Pass host to first remaining player in list (effectively random with a HashMap)
             // NOTE: We could consider passing host based on join order
             self.shared.host_id = self.shared.players.iter().next().map(|(&id, _)| id);
+            tracing::info!("Player {:?} is now the host", self.shared.host_id);
         }
 
         // Update remaining clients of the change
@@ -247,6 +264,7 @@ impl LobbyActor {
         }
     }
 
+    #[instrument(skip(self, options))]
     fn set_player_options(
         &mut self,
         player_id: PlayerId,
@@ -261,11 +279,13 @@ impl LobbyActor {
         // TODO: Unhardcode player color
         options.color = player.options.color;
         player.options = options;
+        tracing::info!("Updated player options to {:#?}", player.options);
 
         self.send_lobby();
         Ok(())
     }
 
+    #[instrument(skip(self, can_start))]
     fn set_player_can_start(&mut self, player_id: PlayerId, can_start: bool) -> LobbyResult<()> {
         let player = self
             .shared
@@ -274,10 +294,15 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.ready_to_start = can_start;
+        tracing::info!(
+            "Player is {}ready to start",
+            if can_start { "" } else { "not " }
+        );
         self.send_lobby();
         Ok(())
     }
 
+    #[instrument(skip(self, level))]
     fn set_player_level(&mut self, player_id: PlayerId, level: Option<Level>) -> LobbyResult<()> {
         let player = self
             .shared
@@ -286,12 +311,13 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.current_level = level;
-        tracing::info!("Player {} entered {level:?}", player_id);
+        tracing::info!("Player entered level {level:?}");
 
         self.send_lobby();
         Ok(())
     }
 
+    #[instrument(skip(self, item))]
     fn player_collected_item(&mut self, player_id: PlayerId, item: Item) -> LobbyResult<()> {
         let player = self
             .shared
@@ -306,9 +332,7 @@ impl LobbyActor {
                 // This can happen in rare situations where the player colllected an exhausted spatula
                 // before receiving the lobby update that exhausted it. We should just ignore this case
                 if state.collection_vec.len() == self.shared.options.tier_count.into() {
-                    tracing::info!(
-                        "Player {player_id} tried to collect exhausted spatula {spat:?}.",
-                    );
+                    tracing::info!("Player tried to collect exhausted spatula {spat:?}.",);
                     return Ok(());
                 }
 
@@ -318,7 +342,7 @@ impl LobbyActor {
 
                 state.collection_vec.push(player_id);
                 tracing::info!(
-                    "Player {player_id} collected {spat:?} with tier {:?}",
+                    "Player collected {spat:?} with tier {:?}",
                     state.collection_vec.len()
                 );
 
@@ -349,11 +373,13 @@ impl LobbyActor {
         Ok(())
     }
 
+    #[instrument(skip(self, options))]
     fn set_game_options(&mut self, player_id: PlayerId, options: LobbyOptions) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
         }
         self.shared.options = options;
+        tracing::info!("Set lobby options to {:#?}", self.shared.options);
 
         self.send_lobby();
         Ok(())

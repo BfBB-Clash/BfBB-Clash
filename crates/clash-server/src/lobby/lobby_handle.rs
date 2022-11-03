@@ -39,7 +39,7 @@ impl LobbyHandle {
         msg: LobbyAction,
         rx: oneshot::Receiver<Result<T, LobbyError>>,
     ) -> Result<T, LobbyError> {
-        // Ignore first error, if there is an error, rx.await will fail aswell since it's sender
+        // Ignore first error, if there is an error, rx.await will fail as well since it's sender
         // will have been dropped
         let _ = self.sender.send(msg).await;
         rx.await.unwrap_or(Err(LobbyError::HandleInvalid))
@@ -74,14 +74,7 @@ impl LobbyHandle {
             respond_to: tx,
             id: self.player_id,
         };
-        self.execute(msg, rx).await.map(|recv| {
-            tracing::info!(
-                "Player {} has joined lobby {}",
-                self.player_id,
-                self.lobby_id,
-            );
-            recv
-        })
+        self.execute(msg, rx).await
     }
 
     // Removes a player from the lobby, if it exists, returning the number of player's remaining

@@ -7,6 +7,7 @@ use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
+use tracing::instrument;
 
 use crate::lobby::lobby_handle::LobbyHandle;
 use crate::lobby::LobbyError;
@@ -19,24 +20,6 @@ pub async fn handle_new_connection(state: ServerState, socket: TcpStream) {
         None => return,
     };
     client.run().await;
-}
-
-async fn send_task(
-    mut conn_tx: ConnectionTx,
-    mut lobby_rx: tokio::sync::broadcast::Receiver<Message>,
-    mut local_rx: tokio::sync::mpsc::Receiver<Message>,
-) {
-    loop {
-        let m = select! {
-            Ok(m) = lobby_rx.recv() => m,
-            Some(m) = local_rx.recv() => m,
-            else => return,
-        };
-
-        if conn_tx.write_frame(m).await.is_err() {
-            return;
-        }
-    }
 }
 
 /// Represents a client who just connected and still needs to tell the server what they want to do.
@@ -135,6 +118,24 @@ impl ConnectingClient {
     }
 }
 
+async fn send_task(
+    mut conn_tx: ConnectionTx,
+    mut lobby_rx: tokio::sync::broadcast::Receiver<Message>,
+    mut local_rx: tokio::sync::mpsc::Receiver<Message>,
+) {
+    loop {
+        let m = select! {
+            Ok(m) = lobby_rx.recv() => m,
+            Some(m) = local_rx.recv() => m,
+            else => return,
+        };
+
+        if conn_tx.write_frame(m).await.is_err() {
+            return;
+        }
+    }
+}
+
 /// Used to represent a client who is in a lobby.
 struct Client {
     state: ServerState,
@@ -167,15 +168,13 @@ impl Client {
 
     /// Takes ownership of self to guarantee that client will be dropped when it's
     /// message loop ends
+    #[instrument(skip_all, fields(player_id = %self.player_id))]
     pub async fn run(mut self) {
         loop {
             let incoming = match self.conn_rx.read_frame().await {
                 Ok(Some(Message::Lobby(x))) => x,
                 Ok(Some(m)) => {
-                    tracing::error!(
-                        "Invalid message received from Player {}: \n{m:?}",
-                        self.player_id
-                    );
+                    tracing::error!("Invalid message received: {m:?}");
                     let _ = self
                         .local_tx
                         .send(Message::Error {
@@ -188,22 +187,16 @@ impl Client {
                     break;
                 }
                 Err(e) => {
-                    tracing::error!(
-                        "Error reading message from player id {}. Closing connection\n{e:?}",
-                        self.player_id
-                    );
+                    tracing::error!("Error reading message, Closing connection\n{e:?}",);
                     break;
                 }
             };
 
-            tracing::debug!(
-                "Received message from player id {} \nMessage: {incoming:?}",
-                self.player_id,
-            );
+            tracing::debug!("Received message: {incoming:#?}");
             match self.process(incoming).await {
                 Ok(()) => (),
                 Err(e) => {
-                    tracing::error!("Player {} encountered error {e:?}", self.player_id);
+                    tracing::error!("Encountered error processing message: {e:?}");
                     let _ = self
                         .local_tx
                         .send(Message::Error {
@@ -213,36 +206,28 @@ impl Client {
                 }
             }
         }
-        tracing::info!("Player {} disconnected", self.player_id);
+        tracing::info!("Player disconnected");
     }
 
     async fn process(&mut self, msg: LobbyMessage) -> Result<(), LobbyError> {
         match msg {
             LobbyMessage::PlayerOptions { options } => {
-                self.lobby_handle.set_player_options(options).await?;
+                self.lobby_handle.set_player_options(options).await
             }
-            LobbyMessage::PlayerCanStart(val) => {
-                self.lobby_handle.set_player_can_start(val).await?;
-            }
-            LobbyMessage::ResetLobby => {
-                self.lobby_handle.reset_lobby().await?;
-            }
+            LobbyMessage::PlayerCanStart(val) => self.lobby_handle.set_player_can_start(val).await,
+            LobbyMessage::ResetLobby => self.lobby_handle.reset_lobby().await,
             LobbyMessage::GameOptions { options } => {
-                self.lobby_handle.set_game_options(options).await?;
+                self.lobby_handle.set_game_options(options).await
             }
-            LobbyMessage::GameBegin => {
-                self.lobby_handle.start_game().await?;
-            }
+            LobbyMessage::GameBegin => self.lobby_handle.start_game().await,
             LobbyMessage::GameCurrentLevel { level } => {
-                self.lobby_handle.set_player_level(level).await?;
+                self.lobby_handle.set_player_level(level).await
             }
             LobbyMessage::GameItemCollected { item } => {
-                self.lobby_handle.player_collected_item(item).await?;
+                self.lobby_handle.player_collected_item(item).await
             }
             LobbyMessage::GameEnd => todo!(),
         }
-
-        Ok(())
     }
 }
 

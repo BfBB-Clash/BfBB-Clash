@@ -4,13 +4,16 @@ mod state;
 
 use state::ServerState;
 use tokio::net::TcpListener;
+use tracing::metadata::LevelFilter;
 
 const VERSION: &str = env!("CLASH_VERSION");
 const DEFAULT_PORT: u16 = 42932;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_max_level(LevelFilter::DEBUG)
+        .init();
     // Builder::new()
     //     .format_level(true)
     //     .format_module_path(true)
