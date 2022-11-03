@@ -700,11 +700,7 @@ mod test {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
             let mut actor = LobbyActor::new(Default::default(), rx, 0.into());
-            let handle = LobbyHandleProvider {
-                sender: tx,
-                lobby_id: 0.into(),
-            }
-            .get_handle(0);
+            let handle = LobbyHandleProvider { sender: tx }.get_handle(0);
             actor.add_player(0.into()).unwrap();
             (actor, handle)
         };

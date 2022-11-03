@@ -3,7 +3,7 @@ use clash_lib::{
     lobby::LobbyOptions,
     net::{Item, Message},
     player::PlayerOptions,
-    LobbyId, PlayerId,
+    PlayerId,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -13,14 +13,12 @@ use super::LobbyError;
 #[derive(Debug)]
 pub struct LobbyHandleProvider {
     pub(super) sender: mpsc::Sender<LobbyAction>,
-    pub(super) lobby_id: LobbyId,
 }
 
 impl LobbyHandleProvider {
     pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> LobbyHandle {
         LobbyHandle {
             sender: self.sender.clone(),
-            lobby_id: self.lobby_id,
             player_id: player_id.into(),
         }
     }
@@ -29,7 +27,6 @@ impl LobbyHandleProvider {
 #[derive(Clone, Debug)]
 pub struct LobbyHandle {
     sender: mpsc::Sender<LobbyAction>,
-    lobby_id: LobbyId,
     player_id: PlayerId,
 }
 
@@ -151,7 +148,6 @@ mod test {
         let (tx, rx) = mpsc::channel(2);
         let handle = LobbyHandle {
             sender: tx,
-            lobby_id: 0.into(),
             player_id: 123.into(),
         };
         (rx, handle)
@@ -161,7 +157,6 @@ mod test {
     fn lobby_provider_provides_new_handle() {
         let handle_provider = LobbyHandleProvider {
             sender: mpsc::channel(2).0,
-            lobby_id: 0.into(),
         };
 
         let handle = handle_provider.get_handle(123);
