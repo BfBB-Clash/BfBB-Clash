@@ -118,7 +118,8 @@ fn process_action(action: LobbyMessage, logic_sender: &Sender<Message>) {
         LobbyMessage::GameEnd => {
             // This message isn't supposed to do anything until the GUI gets updated.
         }
-        // We aren't yet doing partial
+        // We aren't yet doing partial updates
+        LobbyMessage::ResetLobby => todo!(),
         LobbyMessage::PlayerOptions { options: _ } => todo!(),
         LobbyMessage::PlayerCanStart(_) => todo!(),
         LobbyMessage::GameOptions { options: _ } => todo!(),

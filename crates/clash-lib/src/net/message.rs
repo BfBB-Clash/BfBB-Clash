@@ -27,6 +27,7 @@ impl From<LobbyMessage> for Message {
 pub enum LobbyMessage {
     PlayerOptions { options: PlayerOptions },
     PlayerCanStart(bool),
+    ResetLobby,
     GameBegin,
     GameEnd,
     GameOptions { options: LobbyOptions },

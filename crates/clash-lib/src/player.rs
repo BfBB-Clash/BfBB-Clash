@@ -37,7 +37,7 @@ impl NetworkedPlayer {
         }
     }
 
-    pub fn reset_state(&mut self) {
+    pub fn reset(&mut self) {
         self.score = 0;
     }
 }

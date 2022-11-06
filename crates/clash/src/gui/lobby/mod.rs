@@ -129,7 +129,7 @@ impl App for Game {
                 GamePhase::Playing => {
                     Tracker::new(&self.state, &self.lobby, self.local_player_id).ui(ui);
                 }
-                GamePhase::Finished => todo!(),
+                GamePhase::Finished => self.paint_end(ui),
             }
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
                 ui.with_layout(Layout::right_to_left(Align::BOTTOM), |ui| {
@@ -250,8 +250,28 @@ impl Game {
         if start_game_response.clicked() {
             self.lobby_data
                 .network_sender
-                .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin {})))
+                .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::GameBegin)))
                 .unwrap();
         }
+    }
+
+    fn paint_end(&mut self, ui: &mut Ui) {
+        Tracker::new(&self.state, &self.lobby, self.local_player_id).ui(ui);
+
+        ui.vertical_centered(|ui| {
+            // Calculate who won the game, eventually this may be determined by the server or logic thread,
+            // as it may differ by gamemode
+            // TODO: Handle tie-breaker
+            if let Some(winner) = self.lobby.players.values().max_by_key(|&p| p.score) {
+                ui.label(format!("{} Wins!", winner.options.name));
+            }
+
+            if ui.button("Reset").clicked() {
+                self.lobby_data
+                    .network_sender
+                    .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::ResetLobby)))
+                    .unwrap();
+            }
+        });
     }
 }
