@@ -39,6 +39,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/release/clash${{ startsWith(matrix.os, 'windows') && '.exe' }}
-            target/release/clash-server${{ startsWith(matrix.os, 'windows') && '.exe' }}
+            target/release/clash${{ (startsWith(matrix.os, 'windows') && '.exe') || '' }}
+            target/release/clash-server${{ (startsWith(matrix.os, 'windows') && '.exe') || '' }}
           prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
