@@ -1,0 +1,44 @@
+on:
+  push:
+    tags:
+      - v*
+
+name: Release
+concurrency: release-${{ github.ref }}
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: -D warnings
+
+jobs:
+  release-matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install Linux build-dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt update -qq
+          sudo apt install -y libxcb-shape0-dev libxcb-xfixes0-dev
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Build binaries
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --locked
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/release/clash*
+            target/release/clash-server*
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
