@@ -9,7 +9,7 @@ use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::PlayerId;
 use log::info;
 
-use crate::gui::GuiSender;
+use crate::gui::handle::GuiHandle;
 use crate::net::{NetCommand, NetCommandSender};
 
 use super::game_mode::GameMode;
@@ -140,19 +140,17 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
         })
     }
 
-    fn message(&mut self, message: LobbyMessage, gui_sender: &mut GuiSender) {
+    fn message(&mut self, message: LobbyMessage, gui_handle: &mut GuiHandle) {
         match message {
             LobbyMessage::GameBegin => {
                 self.local_spat_state.clear();
-                let lobby = &mut self.lobby;
+                let lobby = &self.lobby;
 
                 let _ = self.provider.do_with_interface(|i| {
                     i.powers.start_with_powers(lobby.options.ng_plus)?;
                     i.start_new_game()
                 });
-                gui_sender
-                    .send((self.player_id, lobby.clone()))
-                    .expect("GUI has crashed and so will we");
+                gui_handle.send(lobby.clone());
             }
             // We're not yet doing partial updates
             LobbyMessage::ResetLobby => todo!(),
@@ -165,7 +163,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
         }
     }
 
-    fn update_lobby(&mut self, new_lobby: NetworkedLobby, gui_sender: &mut GuiSender) {
+    fn update_lobby(&mut self, new_lobby: NetworkedLobby, gui_sender: &mut GuiHandle) {
         // This could fail if the user is restarting dolphin, but that will desync a lot of other things as well
         // so it's fine to just wait for a future lobby update to correct the issue
         let _ = self.provider.do_with_interface(|i| {
@@ -173,9 +171,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                 .set(new_lobby.game_state.spatulas.len() as u32)
         });
         self.lobby = new_lobby.clone();
-        gui_sender
-            .send((self.player_id, new_lobby))
-            .expect("GUI has crashed and so will we");
+        gui_sender.send(new_lobby);
     }
 }
 
@@ -196,7 +192,7 @@ mod tests {
         Level, Spatula,
     };
 
-    use crate::{game::game_mode::GameMode, net::NetCommand};
+    use crate::{game::game_mode::GameMode, gui::handle::GuiHandle, net::NetCommand};
 
     use super::ClashGame;
 
@@ -215,9 +211,9 @@ mod tests {
         lobby.game_phase = GamePhase::Playing;
 
         // Make new ClashGame and give it the default lobby
-        let (mut dummy_sender, _r) = std::sync::mpsc::channel();
+        let mut handle = GuiHandle::dummy();
         let mut game = ClashGame::new(provider, 0);
-        game.update_lobby(lobby, &mut dummy_sender);
+        game.update_lobby(lobby, &mut handle);
         game
     }
 
@@ -327,13 +323,13 @@ mod tests {
         });
         game.lobby.options.ng_plus = true;
 
-        let (mut dummy_sender, _r) = std::sync::mpsc::channel();
-        game.message(LobbyMessage::GameBegin, &mut dummy_sender);
+        let mut handle = GuiHandle::dummy();
+        game.message(LobbyMessage::GameBegin, &mut handle);
         assert!(game.provider.powers.initial_bubble_bowl.value);
         assert!(game.provider.powers.initial_cruise_bubble.value);
 
         game.lobby.options.ng_plus = false;
-        game.message(LobbyMessage::GameBegin, &mut dummy_sender);
+        game.message(LobbyMessage::GameBegin, &mut handle);
         assert!(!game.provider.powers.initial_bubble_bowl.value);
         assert!(!game.provider.powers.initial_cruise_bubble.value);
     }

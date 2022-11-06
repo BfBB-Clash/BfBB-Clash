@@ -17,10 +17,10 @@ use crate::net::{NetCommand, NetCommandSender};
 use player_ui::PlayerUi;
 use tracker::Tracker;
 
+use super::handle::{GuiMessage, GuiReceiver};
 use super::main_menu::MainMenu;
 use super::option_editor::OptionEditor;
 use super::val_text::ValText;
-use super::GuiReceiver;
 
 mod player_ui;
 mod tracker;
@@ -96,18 +96,24 @@ impl Game {
 impl App for Game {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // Receive gamestate updates
-        while let Ok((local_player_id, new_lobby)) = self.lobby_data.gui_receiver.try_recv() {
-            self.local_player_id = local_player_id;
-            self.is_host = new_lobby.host_id == Some(local_player_id);
-            self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
-            self.tier_count.set_val(new_lobby.options.tier_count);
-            self.scores
-                .resize_with(new_lobby.options.tier_count as usize, ValText::default);
-            for (i, buf) in self.scores.iter_mut().enumerate() {
-                buf.set_val(new_lobby.options.spat_scores[i]);
-            }
+        while let Ok(msg) = self.lobby_data.gui_receiver.try_recv() {
+            match msg {
+                GuiMessage::LocalPlayer(id) => {
+                    self.local_player_id = id;
+                }
+                GuiMessage::LobbyUpdate(new_lobby) => {
+                    self.is_host = new_lobby.host_id == Some(self.local_player_id);
+                    self.lab_door_cost.set_val(new_lobby.options.lab_door_cost);
+                    self.tier_count.set_val(new_lobby.options.tier_count);
+                    self.scores
+                        .resize_with(new_lobby.options.tier_count as usize, ValText::default);
+                    for (i, buf) in self.scores.iter_mut().enumerate() {
+                        buf.set_val(new_lobby.options.spat_scores[i]);
+                    }
 
-            self.lobby = new_lobby;
+                    self.lobby = new_lobby;
+                }
+            }
         }
 
         SidePanel::left("Player List")

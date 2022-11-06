@@ -4,14 +4,13 @@ mod game_mode;
 use bfbb::game_interface::dolphin::DolphinInterface;
 use bfbb::game_interface::{InterfaceError, InterfaceProvider};
 use clash_lib::net::LobbyMessage;
-use clash_lib::{lobby::NetworkedLobby, net::Message, PlayerId};
-use eframe::egui::Context;
+use clash_lib::net::Message;
 use spin_sleep::LoopHelper;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::Receiver;
 use tokio::sync::oneshot::error::TryRecvError;
 
 use crate::net::NetCommandSender;
-use crate::{gui::GuiSender, net::NetCommand};
+use crate::{gui::handle::GuiHandle, net::NetCommand};
 
 use self::{clash_game::ClashGame, game_mode::GameMode};
 
@@ -19,8 +18,7 @@ pub type ShutdownSender = tokio::sync::oneshot::Sender<()>;
 pub type ShutdownReceiver = tokio::sync::oneshot::Receiver<()>;
 
 pub fn start_game(
-    gui_sender: Sender<(PlayerId, NetworkedLobby)>,
-    gui_ctx: eframe::egui::Context,
+    gui_handle: GuiHandle,
     network_sender: NetCommandSender,
     logic_receiver: Receiver<Message>,
     mut shutdown_receiver: ShutdownReceiver,
@@ -30,8 +28,7 @@ pub fn start_game(
         .build_with_target_rate(126);
 
     let mut logic: Logic<DolphinInterface> = Logic {
-        gui_ctx,
-        gui_sender,
+        gui_handle,
         network_sender,
         logic_receiver,
         game: None,
@@ -48,8 +45,7 @@ pub fn start_game(
 }
 
 struct Logic<I> {
-    gui_ctx: Context,
-    gui_sender: GuiSender,
+    gui_handle: GuiHandle,
     network_sender: NetCommandSender,
     logic_receiver: Receiver<Message>,
     game: Option<ClashGame<I>>,
@@ -83,11 +79,12 @@ impl<I: InterfaceProvider> Logic<I> {
             let action = match msg {
                 Message::ConnectionAccept { player_id } => {
                     self.game = Some(ClashGame::new(I::default(), player_id));
+                    self.gui_handle.send(player_id);
                     continue;
                 }
                 Message::GameLobbyInfo { lobby } => {
                     if let Some(g) = self.game.as_mut() {
-                        g.update_lobby(lobby, &mut self.gui_sender);
+                        g.update_lobby(lobby, &mut self.gui_handle);
                     }
                     continue;
                 }
@@ -98,10 +95,7 @@ impl<I: InterfaceProvider> Logic<I> {
             self.game
                 .as_mut()
                 .expect("Tried to process a LobbyAction without having a gamemode setup")
-                .message(action, &mut self.gui_sender);
-
-            // Signal the UI to update
-            self.gui_ctx.request_repaint();
+                .message(action, &mut self.gui_handle);
         }
         Ok(())
     }

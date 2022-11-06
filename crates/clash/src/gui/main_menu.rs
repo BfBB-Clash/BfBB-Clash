@@ -17,6 +17,7 @@ use crate::{
 };
 
 use super::{
+    handle::GuiHandle,
     lobby::{Game, LobbyData},
     val_text::ValText,
 };
@@ -167,6 +168,10 @@ impl MainMenu {
 
         // Start Game Thread
         let (gui_sender, gui_receiver) = std::sync::mpsc::channel();
+        let gui_handle = GuiHandle {
+            context: gui_ctx,
+            sender: gui_sender,
+        };
         let (game_shutdown, shutdown_receiver) = tokio::sync::oneshot::channel();
         let game_thread = {
             let network_sender = network_sender.clone();
@@ -174,8 +179,7 @@ impl MainMenu {
                 .name("Logic".into())
                 .spawn(move || {
                     game::start_game(
-                        gui_sender,
-                        gui_ctx,
+                        gui_handle,
                         network_sender,
                         logic_receiver,
                         shutdown_receiver,
