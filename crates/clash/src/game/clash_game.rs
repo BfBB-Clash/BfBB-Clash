@@ -155,6 +155,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                     .expect("GUI has crashed and so will we");
             }
             // We're not yet doing partial updates
+            LobbyMessage::ResetLobby => todo!(),
             LobbyMessage::PlayerOptions { options: _ } => todo!(),
             LobbyMessage::GameOptions { options: _ } => todo!(),
             LobbyMessage::GameEnd => todo!(),

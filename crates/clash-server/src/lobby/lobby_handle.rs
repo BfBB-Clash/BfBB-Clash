@@ -45,6 +45,15 @@ impl LobbyHandle {
         rx.await.unwrap_or(Err(LobbyError::HandleInvalid))
     }
 
+    pub async fn reset_lobby(&self) -> Result<(), LobbyError> {
+        let (tx, rx) = oneshot::channel();
+        let msg = LobbyAction::ResetLobby {
+            respond_to: tx,
+            id: self.player_id,
+        };
+        self.execute(msg, rx).await
+    }
+
     pub async fn start_game(&self) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
         let msg = LobbyAction::StartGame {
@@ -164,6 +173,20 @@ mod test {
 
         let handle = handle_provider.get_handle(123);
         assert_eq!(handle.player_id, 123);
+    }
+
+    #[tokio::test]
+    async fn reset_lobby() {
+        let (mut rx, handle) = setup();
+        let actor = tokio::spawn(async move {
+            let m = rx.recv().await.unwrap();
+            let LobbyAction::ResetLobby { respond_to: _, id } = m else {
+                panic!("Incorrect LobbyAction produced");
+            };
+            assert_eq!(id, 123);
+        });
+        let _ = handle.reset_lobby().await;
+        actor.await.unwrap();
     }
 
     #[tokio::test]

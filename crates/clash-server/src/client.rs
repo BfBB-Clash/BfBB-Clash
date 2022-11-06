@@ -224,6 +224,9 @@ impl Client {
             LobbyMessage::PlayerCanStart(val) => {
                 self.lobby_handle.set_player_can_start(val).await?;
             }
+            LobbyMessage::ResetLobby => {
+                self.lobby_handle.reset_lobby().await?;
+            }
             LobbyMessage::GameOptions { options } => {
                 self.lobby_handle.set_game_options(options).await?;
             }

@@ -53,6 +53,12 @@ impl NetworkedLobby {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.game_state.reset();
+        self.game_phase = GamePhase::Setup;
+        self.players.values_mut().for_each(NetworkedPlayer::reset);
+    }
+
     /// True when all connected players are on the Main Menu
     pub fn can_start(&self) -> bool {
         // TODO: Now find a way to skip/remove the demo cutscene to make it easier to start a game
@@ -62,8 +68,13 @@ impl NetworkedLobby {
 
 #[cfg(test)]
 mod tests {
-    use super::NetworkedLobby;
-    use crate::player::{NetworkedPlayer, PlayerOptions};
+    use bfbb::Spatula;
+
+    use super::{GamePhase, NetworkedLobby};
+    use crate::{
+        game_state::SpatulaState,
+        player::{NetworkedPlayer, PlayerOptions},
+    };
 
     #[test]
     fn can_start() {
@@ -84,5 +95,29 @@ mod tests {
 
         lobby.players.get_mut(&1).unwrap().ready_to_start = true;
         assert!(lobby.can_start());
+    }
+
+    #[test]
+    fn reset() {
+        let mut lobby = NetworkedLobby::new(0);
+        let player_0 = lobby
+            .players
+            .entry(0)
+            .or_insert_with(|| NetworkedPlayer::new(PlayerOptions::default(), 0));
+
+        lobby.game_phase = GamePhase::Playing;
+        player_0.score = 100;
+        lobby.game_state.spatulas.insert(
+            Spatula::SpongebobsCloset,
+            SpatulaState {
+                collection_vec: vec![0],
+            },
+        );
+
+        lobby.reset();
+        assert_eq!(lobby.game_phase, GamePhase::Setup);
+        assert!(lobby.game_state.spatulas.is_empty());
+        assert_eq!(lobby.players.len(), 1);
+        assert_eq!(lobby.players.get(&0).unwrap().score, 0);
     }
 }

@@ -19,6 +19,10 @@ pub struct LobbyActor {
 
 #[derive(Debug)]
 pub enum LobbyAction {
+    ResetLobby {
+        respond_to: oneshot::Sender<LobbyResult<()>>,
+        id: PlayerId,
+    },
     StartGame {
         respond_to: oneshot::Sender<LobbyResult<()>>,
         id: PlayerId,
@@ -77,6 +81,9 @@ impl LobbyActor {
     pub async fn run(mut self) {
         while let Some(msg) = self.receiver.recv().await {
             match msg {
+                LobbyAction::ResetLobby { respond_to, id } => {
+                    let _ = respond_to.send(self.reset_lobby(id));
+                }
                 LobbyAction::StartGame { respond_to, id } => {
                     let _ = respond_to.send(self.start_game(id));
                 }
@@ -128,12 +135,25 @@ impl LobbyActor {
         log::info!("Closing lobby {:#X}", self.shared.lobby_id);
     }
 
-    fn reset_game(&mut self) {
-        self.shared.game_state.reset_state();
-        self.shared
-            .players
-            .values_mut()
-            .for_each(NetworkedPlayer::reset_state);
+    fn send_lobby(&mut self) {
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Message Handlers
+// ----------------------------------------------------------------------------
+impl LobbyActor {
+    fn reset_lobby(&mut self, player_id: PlayerId) -> LobbyResult<()> {
+        if self.shared.host_id != Some(player_id) {
+            return Err(LobbyError::NeedsHost);
+        }
+
+        self.shared.reset();
+        self.send_lobby();
+        Ok(())
     }
 
     fn start_game(&mut self, player_id: PlayerId) -> LobbyResult<()> {
@@ -150,11 +170,9 @@ impl LobbyActor {
             return Ok(());
         }
 
-        self.reset_game();
+        self.shared.reset();
         self.shared.game_phase = GamePhase::Playing;
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
+        self.send_lobby();
         if self
             .sender
             .send(Message::Lobby(LobbyMessage::GameBegin))
@@ -167,23 +185,6 @@ impl LobbyActor {
         }
 
         Ok(())
-    }
-
-    fn stop_game(&mut self) {
-        self.shared.game_phase = GamePhase::Setup;
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
-        if self
-            .sender
-            .send(Message::Lobby(LobbyMessage::GameEnd))
-            .is_err()
-        {
-            log::warn!(
-                "Lobby {:#X} finished with no players in lobby.",
-                self.shared.lobby_id
-            )
-        }
     }
 
     /// Adds a new player to this lobby. If there is currently no host, they will become it.
@@ -214,9 +215,7 @@ impl LobbyActor {
         // Subscribe early so that this player will receive the lobby update that adds them
         let recv = self.sender.subscribe();
 
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
+        self.send_lobby();
 
         Ok(recv)
     }
@@ -238,9 +237,7 @@ impl LobbyActor {
         }
 
         // Update remaining clients of the change
-        let _ = self.sender.send(Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        });
+        self.send_lobby();
 
         // Close the lobby after the last player leaves by closing our receiver.
         // This will cause the run loop to consume all remaining messages,
@@ -265,10 +262,7 @@ impl LobbyActor {
         options.color = player.options.color;
         player.options = options;
 
-        let message = Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        };
-        let _ = self.sender.send(message);
+        self.send_lobby();
         Ok(())
     }
 
@@ -280,10 +274,7 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.ready_to_start = can_start;
-        let message = Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        };
-        let _ = self.sender.send(message);
+        self.send_lobby();
         Ok(())
     }
 
@@ -297,10 +288,7 @@ impl LobbyActor {
         player.current_level = level;
         log::info!("Player {:#X} entered {level:?}", player_id);
 
-        let message = Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        };
-        let _ = self.sender.send(message);
+        self.send_lobby();
         Ok(())
     }
 
@@ -335,10 +323,18 @@ impl LobbyActor {
                 );
 
                 if spat == Spatula::TheSmallShallRuleOrNot {
-                    self.stop_game();
-                    return Ok(());
-                }
-                if spat != Spatula::KahRahTae {
+                    self.shared.game_phase = GamePhase::Finished;
+                    if self
+                        .sender
+                        .send(Message::Lobby(LobbyMessage::GameEnd))
+                        .is_err()
+                    {
+                        log::warn!(
+                            "Lobby {:#X} finished with no players in lobby.",
+                            self.shared.lobby_id
+                        )
+                    }
+                } else if spat != Spatula::KahRahTae {
                     player.score += self
                         .shared
                         .options
@@ -347,10 +343,7 @@ impl LobbyActor {
                         .unwrap_or(&0);
                 }
 
-                let message = Message::GameLobbyInfo {
-                    lobby: self.shared.clone(),
-                };
-                let _ = self.sender.send(message);
+                self.send_lobby();
             }
         }
         Ok(())
@@ -362,10 +355,7 @@ impl LobbyActor {
         }
         self.shared.options = options;
 
-        let message = Message::GameLobbyInfo {
-            lobby: self.shared.clone(),
-        };
-        let _ = self.sender.send(message);
+        self.send_lobby();
         Ok(())
     }
 }
@@ -386,6 +376,21 @@ mod test {
     fn setup() -> LobbyActor {
         let (_, rx) = mpsc::channel(2);
         LobbyActor::new(Default::default(), rx, 0)
+    }
+
+    #[test]
+    fn reset_lobby() {
+        let mut lobby = setup();
+        lobby.add_player(0).unwrap();
+        lobby.add_player(1).unwrap();
+        lobby.start_game(0).unwrap();
+
+        let Err(LobbyError::NeedsHost) = lobby.reset_lobby(1) else {
+            panic!("Only the host should be able to reset the lobby");
+        };
+        let Ok(()) = lobby.reset_lobby(0) else {
+            panic!("Host was unable to reset lobby");
+        };
     }
 
     #[test]
@@ -505,8 +510,7 @@ mod test {
         assert!(lobby
             .player_collected_item(0, Item::Spatula(Spatula::TheSmallShallRuleOrNot))
             .is_ok());
-        // TODO: This will transition to GamePhase::Finished when the GUI is implemented for it
-        assert_eq!(lobby.shared.game_phase, GamePhase::Setup);
+        assert_eq!(lobby.shared.game_phase, GamePhase::Finished);
     }
 
     #[test]
