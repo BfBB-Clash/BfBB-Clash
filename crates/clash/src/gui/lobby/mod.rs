@@ -134,6 +134,14 @@ impl App for Game {
                 }
                 GamePhase::Playing => {
                     Tracker::new(&self.state, &self.lobby, self.local_player_id).ui(ui);
+                    ui.vertical_centered(|ui| {
+                        if ui.button("Reset").clicked() {
+                            self.lobby_data
+                                .network_sender
+                                .try_send(LobbyMessage::ResetLobby.into())
+                                .unwrap();
+                        }
+                    });
                 }
                 GamePhase::Finished => self.paint_end(ui),
             }
@@ -275,7 +283,7 @@ impl Game {
             if ui.button("Reset").clicked() {
                 self.lobby_data
                     .network_sender
-                    .try_send(NetCommand::Send(Message::Lobby(LobbyMessage::ResetLobby)))
+                    .try_send(LobbyMessage::ResetLobby.into())
                     .unwrap();
             }
         });

@@ -16,9 +16,12 @@ pub enum NetCommand {
     Send(Message),
 }
 
-impl From<Message> for NetCommand {
-    fn from(msg: Message) -> Self {
-        Self::Send(msg)
+impl<T> From<T> for NetCommand
+where
+    Message: From<T>,
+{
+    fn from(msg: T) -> Self {
+        Self::Send(msg.into())
     }
 }
 
