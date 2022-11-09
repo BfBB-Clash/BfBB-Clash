@@ -9,6 +9,7 @@ use clash_lib::PlayerId;
 use eframe::egui::{Align, Button, CentralPanel, Layout, SidePanel, Ui};
 use eframe::App;
 use itertools::intersperse;
+use tracing::instrument;
 
 use crate::game::ShutdownSender;
 use crate::gui::state::State;
@@ -94,6 +95,7 @@ impl Game {
 }
 
 impl App for Game {
+    #[instrument(skip_all)]
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // Receive gamestate updates
         while let Ok(msg) = self.lobby_data.gui_receiver.try_recv() {

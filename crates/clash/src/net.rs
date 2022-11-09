@@ -6,6 +6,7 @@ use clash_lib::net::{
 };
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use tracing::instrument;
 
 pub type NetCommandReceiver = mpsc::Receiver<NetCommand>;
 pub type NetCommandSender = mpsc::Sender<NetCommand>;
@@ -26,6 +27,7 @@ where
 }
 
 #[tokio::main]
+#[instrument(skip_all, name = "Network")]
 pub async fn run(
     mut receiver: NetCommandReceiver,
     logic_sender: Sender<Message>,
@@ -63,6 +65,7 @@ pub async fn run(
     tracing::info!("Disconnected from server.")
 }
 
+#[instrument(skip_all, name = "Network")]
 async fn recv_task(
     mut conn_rx: ConnectionRx,
     error_sender: Sender<anyhow::Error>,

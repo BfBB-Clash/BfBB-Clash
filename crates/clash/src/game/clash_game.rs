@@ -7,6 +7,7 @@ use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::PlayerId;
+use tracing::instrument;
 
 use crate::gui::handle::GuiHandle;
 use crate::net::{NetCommand, NetCommandSender};
@@ -21,6 +22,13 @@ pub struct ClashGame<I> {
     /// than searching to see if we've collected it.
     local_spat_state: HashSet<Spatula>,
     player_id: PlayerId,
+}
+
+impl<I> std::fmt::Debug for ClashGame<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // write!(f, "ClashGame")
+        f.debug_struct("ClashGame").finish_non_exhaustive()
+    }
 }
 
 impl<I> ClashGame<I> {
@@ -38,6 +46,7 @@ impl<I> ClashGame<I> {
 
 impl<I: InterfaceProvider> GameMode for ClashGame<I> {
     /// Process state updates from the server and report back any actions of the local player
+    #[instrument(skip_all, fields(game_mode = ?self))]
     fn update(&mut self, network_sender: &NetCommandSender) -> InterfaceResult<()> {
         self.provider.do_with_interface(|interface| {
             if interface.is_loading.get()? {

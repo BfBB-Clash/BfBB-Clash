@@ -14,15 +14,6 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_max_level(LevelFilter::DEBUG)
         .init();
-    // Builder::new()
-    //     .format_level(true)
-    //     .format_module_path(true)
-    //     .format_target(false)
-    //     .format_indent(Some(4))
-    //     .format_timestamp_secs()
-    //     .filter_level(log::LevelFilter::Debug)
-    //     .parse_env("CLASH_LOG")
-    //     .init();
 
     tracing::info!("Server Version: {}", crate::VERSION);
 

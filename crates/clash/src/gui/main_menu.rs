@@ -9,6 +9,7 @@ use eframe::{
     egui::{Align, Button, CentralPanel, Layout, TextEdit, TopBottomPanel},
     App,
 };
+use tracing::instrument;
 
 use crate::gui::BORDER;
 use crate::{
@@ -56,6 +57,7 @@ impl MainMenu {
 }
 
 impl App for MainMenu {
+    #[instrument(skip_all)]
     fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
         match self.submenu {
             Submenu::Root => {
