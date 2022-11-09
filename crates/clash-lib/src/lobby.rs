@@ -42,10 +42,10 @@ pub struct NetworkedLobby {
 }
 
 impl NetworkedLobby {
-    pub fn new(lobby_id: u32) -> Self {
+    pub fn new(lobby_id: impl Into<LobbyId>) -> Self {
         Self {
             game_state: GameState::default(),
-            lobby_id,
+            lobby_id: lobby_id.into(),
             options: LobbyOptions::default(),
             players: HashMap::new(),
             game_phase: GamePhase::Setup,
@@ -81,7 +81,7 @@ mod tests {
         let mut lobby = NetworkedLobby::new(0);
         let player_0 = lobby
             .players
-            .entry(0)
+            .entry(0.into())
             .or_insert_with(|| NetworkedPlayer::new(PlayerOptions::default(), 0));
         player_0.ready_to_start = true;
 
@@ -89,7 +89,7 @@ mod tests {
 
         lobby
             .players
-            .entry(1)
+            .entry(1.into())
             .or_insert_with(|| NetworkedPlayer::new(PlayerOptions::default(), 1));
         assert!(!lobby.can_start());
 
@@ -102,7 +102,7 @@ mod tests {
         let mut lobby = NetworkedLobby::new(0);
         let player_0 = lobby
             .players
-            .entry(0)
+            .entry(0.into())
             .or_insert_with(|| NetworkedPlayer::new(PlayerOptions::default(), 0));
 
         lobby.game_phase = GamePhase::Playing;
@@ -110,7 +110,7 @@ mod tests {
         lobby.game_state.spatulas.insert(
             Spatula::SpongebobsCloset,
             SpatulaState {
-                collection_vec: vec![0],
+                collection_vec: vec![0.into()],
             },
         );
 

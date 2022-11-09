@@ -6,9 +6,9 @@ publish = false
 
 [dependencies]
 bfbb = { workspace = true, features = ["serde"] }
-log.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 
 bincode = "1"
 bytes = "1"

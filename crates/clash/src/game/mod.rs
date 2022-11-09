@@ -8,6 +8,7 @@ use clash_lib::net::Message;
 use spin_sleep::LoopHelper;
 use std::sync::mpsc::Receiver;
 use tokio::sync::oneshot::error::TryRecvError;
+use tracing::instrument;
 
 use crate::net::NetCommandSender;
 use crate::{gui::handle::GuiHandle, net::NetCommand};
@@ -52,25 +53,28 @@ struct Logic<I> {
 }
 
 impl<I: InterfaceProvider> Logic<I> {
+    #[instrument(skip_all, name = "Logic")]
     fn update(&mut self) {
-        let game = match self.game.as_mut() {
-            Some(it) => it,
-            _ => return,
-        };
-        // TODO: Log non-hooking errors
-        if let Err(InterfaceError::Unhooked) = game.update(&self.network_sender) {
-            // We lost dolphin
-            // Our local state will be updated when the client accepts this message and responds.
-            self.network_sender
-                .try_send(NetCommand::Send(Message::Lobby(
-                    LobbyMessage::GameCurrentLevel { level: None },
-                )))
-                .unwrap();
-            self.network_sender
-                .try_send(NetCommand::Send(Message::Lobby(
-                    LobbyMessage::PlayerCanStart(false),
-                )))
-                .unwrap();
+        let Some(game) = self.game.as_mut() else { return };
+        match game.update(&self.network_sender) {
+            Err(InterfaceError::Unhooked) => {
+                // We lost dolphin
+                // Our local state will be updated when the client accepts this message and responds.
+                self.network_sender
+                    .try_send(NetCommand::Send(Message::Lobby(
+                        LobbyMessage::GameCurrentLevel { level: None },
+                    )))
+                    .unwrap();
+                self.network_sender
+                    .try_send(NetCommand::Send(Message::Lobby(
+                        LobbyMessage::PlayerCanStart(false),
+                    )))
+                    .unwrap();
+            }
+            Err(InterfaceError::HookingFailed) => (),
+            Err(InterfaceError::Other) => tracing::error!("Unexpected InterfaceError encountered"),
+            Err(e) => tracing::error!("{e:?}"),
+            Ok(()) => (),
         }
     }
 

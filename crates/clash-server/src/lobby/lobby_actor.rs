@@ -4,6 +4,7 @@ use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::player::{NetworkedPlayer, PlayerOptions};
 use clash_lib::{LobbyId, PlayerId, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
+use tracing::instrument;
 
 use crate::state::ServerState;
 
@@ -78,7 +79,9 @@ impl LobbyActor {
         }
     }
 
+    #[instrument(skip_all, fields(lobby_id = %self.shared.lobby_id))]
     pub async fn run(mut self) {
+        tracing::info!("Lobby opened");
         while let Some(msg) = self.receiver.recv().await {
             match msg {
                 LobbyAction::ResetLobby { respond_to, id } => {
@@ -132,7 +135,7 @@ impl LobbyActor {
         // Remove this lobby from the server
         let state = &mut *self.state.lock().unwrap();
         state.lobbies.remove(&self.shared.lobby_id);
-        log::info!("Closing lobby {:#X}", self.shared.lobby_id);
+        tracing::info!("Closing lobby");
     }
 
     fn send_lobby(&mut self) {
@@ -146,6 +149,7 @@ impl LobbyActor {
 // Message Handlers
 // ----------------------------------------------------------------------------
 impl LobbyActor {
+    #[instrument(skip(self))]
     fn reset_lobby(&mut self, player_id: PlayerId) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
@@ -153,19 +157,18 @@ impl LobbyActor {
 
         self.shared.reset();
         self.send_lobby();
+        tracing::info!("Reset lobby");
         Ok(())
     }
 
+    #[instrument(skip(self))]
     fn start_game(&mut self, player_id: PlayerId) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
         }
 
         if !self.shared.can_start() {
-            log::warn!(
-                "Lobby {:#X} attempted to start when some players aren't able to start.",
-                self.shared.lobby_id
-            );
+            tracing::warn!("Attempted to start lobby when some players aren't able to start.");
             // Maybe this should be an error, I'm not sure
             return Ok(());
         }
@@ -178,13 +181,26 @@ impl LobbyActor {
             .send(Message::Lobby(LobbyMessage::GameBegin))
             .is_err()
         {
-            log::warn!(
-                "Lobby {:#X} started with no players in lobby.",
-                self.shared.lobby_id
-            )
+            tracing::warn!("Lobby started with no players in lobby.")
         }
 
+        tracing::info!("Started lobby");
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    fn stop_game(&mut self) {
+        self.shared.game_phase = GamePhase::Setup;
+        let _ = self.sender.send(Message::GameLobbyInfo {
+            lobby: self.shared.clone(),
+        });
+        if self
+            .sender
+            .send(Message::Lobby(LobbyMessage::GameEnd))
+            .is_err()
+        {
+            tracing::warn!("Lobby finished with no players in lobby.")
+        }
     }
 
     /// Adds a new player to this lobby. If there is currently no host, they will become it.
@@ -194,6 +210,7 @@ impl LobbyActor {
     /// # Errors
     ///
     /// This function will return an error if the lobby is already full
+    #[instrument(skip_all)]
     fn add_player(&mut self, player_id: PlayerId) -> LobbyResult<broadcast::Receiver<Message>> {
         if self.shared.players.len() >= MAX_PLAYERS {
             return Err(LobbyError::LobbyFull);
@@ -212,6 +229,7 @@ impl LobbyActor {
             self.shared.host_id = Some(player_id);
         }
 
+        tracing::info!("Player joined lobby");
         // Subscribe early so that this player will receive the lobby update that adds them
         let recv = self.sender.subscribe();
 
@@ -221,19 +239,18 @@ impl LobbyActor {
     }
 
     /// Removes a player from the lobby. If the host is removed, a new host is assigned randomly.
+    #[instrument(skip(self))]
     fn rem_player(&mut self, player_id: PlayerId) {
         if self.shared.players.remove(&player_id).is_none() {
-            log::warn!(
-                "Attempted to remove player {:#} from lobby {:#} who isn't in it",
-                player_id,
-                self.shared.lobby_id
-            );
+            tracing::warn!("Attempted to remove player from lobby who isn't in it");
             return;
         }
+        tracing::info!("Player left lobby");
         if self.shared.host_id == Some(player_id) {
             // Pass host to first remaining player in list (effectively random with a HashMap)
             // NOTE: We could consider passing host based on join order
             self.shared.host_id = self.shared.players.iter().next().map(|(&id, _)| id);
+            tracing::info!("Player {:?} is now the host", self.shared.host_id);
         }
 
         // Update remaining clients of the change
@@ -247,6 +264,7 @@ impl LobbyActor {
         }
     }
 
+    #[instrument(skip(self, options))]
     fn set_player_options(
         &mut self,
         player_id: PlayerId,
@@ -261,11 +279,13 @@ impl LobbyActor {
         // TODO: Unhardcode player color
         options.color = player.options.color;
         player.options = options;
+        tracing::info!("Updated player options to {:#?}", player.options);
 
         self.send_lobby();
         Ok(())
     }
 
+    #[instrument(skip(self, can_start))]
     fn set_player_can_start(&mut self, player_id: PlayerId, can_start: bool) -> LobbyResult<()> {
         let player = self
             .shared
@@ -274,10 +294,15 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.ready_to_start = can_start;
+        tracing::info!(
+            "Player is {}ready to start",
+            if can_start { "" } else { "not " }
+        );
         self.send_lobby();
         Ok(())
     }
 
+    #[instrument(skip(self, level))]
     fn set_player_level(&mut self, player_id: PlayerId, level: Option<Level>) -> LobbyResult<()> {
         let player = self
             .shared
@@ -286,12 +311,13 @@ impl LobbyActor {
             .ok_or(LobbyError::PlayerInvalid(player_id))?;
 
         player.current_level = level;
-        log::info!("Player {:#X} entered {level:?}", player_id);
+        tracing::info!("Player entered level {level:?}");
 
         self.send_lobby();
         Ok(())
     }
 
+    #[instrument(skip(self, item))]
     fn player_collected_item(&mut self, player_id: PlayerId, item: Item) -> LobbyResult<()> {
         let player = self
             .shared
@@ -306,9 +332,7 @@ impl LobbyActor {
                 // This can happen in rare situations where the player colllected an exhausted spatula
                 // before receiving the lobby update that exhausted it. We should just ignore this case
                 if state.collection_vec.len() == self.shared.options.tier_count.into() {
-                    log::info!(
-                        "Player {player_id:#X} tried to collect exhausted spatula {spat:?}.",
-                    );
+                    tracing::info!("Player tried to collect exhausted spatula {spat:?}.",);
                     return Ok(());
                 }
 
@@ -317,8 +341,8 @@ impl LobbyActor {
                 }
 
                 state.collection_vec.push(player_id);
-                log::info!(
-                    "Player {player_id:#X} collected {spat:?} with tier {:?}",
+                tracing::info!(
+                    "Player collected {spat:?} with tier {:?}",
                     state.collection_vec.len()
                 );
 
@@ -329,8 +353,8 @@ impl LobbyActor {
                         .send(Message::Lobby(LobbyMessage::GameEnd))
                         .is_err()
                     {
-                        log::warn!(
-                            "Lobby {:#X} finished with no players in lobby.",
+                        tracing::warn!(
+                            "Lobby {} finished with no players in lobby.",
                             self.shared.lobby_id
                         )
                     }
@@ -349,11 +373,13 @@ impl LobbyActor {
         Ok(())
     }
 
+    #[instrument(skip(self, options))]
     fn set_game_options(&mut self, player_id: PlayerId, options: LobbyOptions) -> LobbyResult<()> {
         if self.shared.host_id != Some(player_id) {
             return Err(LobbyError::NeedsHost);
         }
         self.shared.options = options;
+        tracing::info!("Set lobby options to {:#?}", self.shared.options);
 
         self.send_lobby();
         Ok(())
@@ -375,20 +401,20 @@ mod test {
 
     fn setup() -> LobbyActor {
         let (_, rx) = mpsc::channel(2);
-        LobbyActor::new(Default::default(), rx, 0)
+        LobbyActor::new(Default::default(), rx, 0.into())
     }
 
     #[test]
     fn reset_lobby() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
-        lobby.start_game(0).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
+        lobby.start_game(0.into()).unwrap();
 
-        let Err(LobbyError::NeedsHost) = lobby.reset_lobby(1) else {
+        let Err(LobbyError::NeedsHost) = lobby.reset_lobby(1.into()) else {
             panic!("Only the host should be able to reset the lobby");
         };
-        let Ok(()) = lobby.reset_lobby(0) else {
+        let Ok(()) = lobby.reset_lobby(0.into()) else {
             panic!("Host was unable to reset lobby");
         };
     }
@@ -396,20 +422,20 @@ mod test {
     #[test]
     fn start_game() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
 
         // Only the host can start a game
-        assert_eq!(lobby.start_game(1), Err(LobbyError::NeedsHost));
+        assert_eq!(lobby.start_game(1.into()), Err(LobbyError::NeedsHost));
 
         // Starting while not all players are on the main menu silently fails (at least for now)
-        lobby.set_player_can_start(0, true).unwrap();
-        assert!(lobby.start_game(0).is_ok());
+        lobby.set_player_can_start(0.into(), true).unwrap();
+        assert!(lobby.start_game(0.into()).is_ok());
         assert_eq!(lobby.shared.game_phase, GamePhase::Setup);
 
         // Now we can start
-        lobby.set_player_can_start(1, true).unwrap();
-        assert!(lobby.start_game(0).is_ok());
+        lobby.set_player_can_start(1.into(), true).unwrap();
+        assert!(lobby.start_game(0.into()).is_ok());
         assert_eq!(lobby.shared.game_phase, GamePhase::Playing);
     }
 
@@ -418,41 +444,44 @@ mod test {
         let mut lobby = setup();
 
         for i in 0..clash_lib::MAX_PLAYERS as u32 {
-            assert!(lobby.add_player(i).is_ok());
+            assert!(lobby.add_player(i.into()).is_ok());
             assert!(lobby.shared.players.contains_key(&i));
         }
-        assert_eq!(lobby.shared.host_id, Some(0));
+        assert_eq!(lobby.shared.host_id, Some(0.into()));
 
         // Adding a seventh player will fail
-        assert!(matches!(lobby.add_player(6), Err(LobbyError::LobbyFull)));
+        assert!(matches!(
+            lobby.add_player(6.into()),
+            Err(LobbyError::LobbyFull)
+        ));
     }
 
     #[test]
     fn remove_player() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
 
         // Removing the host will assign a new one
-        lobby.rem_player(0);
+        lobby.rem_player(0.into());
         assert!(!lobby.shared.players.contains_key(&0));
-        assert_eq!(lobby.shared.host_id, Some(1));
+        assert_eq!(lobby.shared.host_id, Some(1.into()));
 
         // Removing the last player will close the lobby
-        lobby.rem_player(1);
+        lobby.rem_player(1.into());
         assert!(lobby.shared.players.is_empty());
     }
 
     #[test]
     fn set_player_options() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
 
         // Can't set options for a non-existant player
         assert_eq!(
-            lobby.set_player_options(1337, Default::default()),
-            Err(LobbyError::PlayerInvalid(1337))
+            lobby.set_player_options(1337.into(), Default::default()),
+            Err(LobbyError::PlayerInvalid(1337.into()))
         );
 
         let square = PlayerOptions {
@@ -463,8 +492,8 @@ mod test {
             name: "Rectangle".to_owned(),
             ..Default::default()
         };
-        assert!(lobby.set_player_options(0, square).is_ok());
-        assert!(lobby.set_player_options(1, rectangle).is_ok());
+        assert!(lobby.set_player_options(0.into(), square).is_ok());
+        assert!(lobby.set_player_options(1.into(), rectangle).is_ok());
 
         assert_eq!(
             lobby.shared.players.get(&0).unwrap().options.name,
@@ -479,17 +508,21 @@ mod test {
     #[test]
     fn set_player_level() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
 
         // Can't set level for a non-existant player
         assert_eq!(
-            lobby.set_player_level(1337, Default::default()),
-            Err(LobbyError::PlayerInvalid(1337))
+            lobby.set_player_level(1337.into(), Default::default()),
+            Err(LobbyError::PlayerInvalid(1337.into()))
         );
 
-        assert!(lobby.set_player_level(0, Some(Level::BikiniBottom)).is_ok());
-        assert!(lobby.set_player_level(1, Some(Level::ShadyShoals)).is_ok());
+        assert!(lobby
+            .set_player_level(0.into(), Some(Level::BikiniBottom))
+            .is_ok());
+        assert!(lobby
+            .set_player_level(1.into(), Some(Level::ShadyShoals))
+            .is_ok());
 
         assert_eq!(
             lobby.shared.players.get(&0).unwrap().current_level,
@@ -504,11 +537,11 @@ mod test {
     #[test]
     fn collect_small_shall_rule() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
+        lobby.add_player(0.into()).unwrap();
 
         // Collecting Small Shall Rule finishes the match
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::TheSmallShallRuleOrNot))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::TheSmallShallRuleOrNot))
             .is_ok());
         assert_eq!(lobby.shared.game_phase, GamePhase::Finished);
     }
@@ -516,17 +549,17 @@ mod test {
     #[test]
     fn player_collected_item_state() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
 
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::SpongebobsCloset))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
         assert!(lobby
-            .player_collected_item(1, Item::Spatula(Spatula::SpongebobsCloset))
+            .player_collected_item(1.into(), Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
         assert!(lobby
-            .player_collected_item(1, Item::Spatula(Spatula::OnTopOfThePineapple))
+            .player_collected_item(1.into(), Item::Spatula(Spatula::OnTopOfThePineapple))
             .is_ok());
 
         // Only two unique spatulas were collected
@@ -546,43 +579,43 @@ mod test {
     #[test]
     fn player_collected_item_score() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
-        lobby.add_player(2).unwrap();
-        lobby.add_player(3).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
+        lobby.add_player(2.into()).unwrap();
+        lobby.add_player(3.into()).unwrap();
 
         // Non-existant player can't collect an item
         assert_eq!(
-            lobby.player_collected_item(1337, Item::Spatula(Spatula::CowaBungee)),
-            Err(LobbyError::PlayerInvalid(1337))
+            lobby.player_collected_item(1337.into(), Item::Spatula(Spatula::CowaBungee)),
+            Err(LobbyError::PlayerInvalid(1337.into()))
         );
 
         // CBL Spats are worth 0 points
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::KahRahTae))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::KahRahTae))
             .is_ok());
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::TheSmallShallRuleOrNot))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::TheSmallShallRuleOrNot))
             .is_ok());
         assert_eq!(lobby.shared.players.get(&0).unwrap().score, 0);
 
         // Collecting a spatula first grants highest score
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::SpongebobsCloset))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
         assert!(lobby
-            .player_collected_item(1, Item::Spatula(Spatula::OnTopOfThePineapple))
+            .player_collected_item(1.into(), Item::Spatula(Spatula::OnTopOfThePineapple))
             .is_ok());
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::CowaBungee))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::CowaBungee))
             .is_ok());
 
         // A new player collecting a spatula again gives fewer points
         assert!(lobby
-            .player_collected_item(1, Item::Spatula(Spatula::SpongebobsCloset))
+            .player_collected_item(1.into(), Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
         assert!(lobby
-            .player_collected_item(2, Item::Spatula(Spatula::SpongebobsCloset))
+            .player_collected_item(2.into(), Item::Spatula(Spatula::SpongebobsCloset))
             .is_ok());
 
         let points = &lobby.shared.options.spat_scores;
@@ -598,20 +631,20 @@ mod test {
     #[test]
     fn player_collected_item_max() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
-        lobby.add_player(1).unwrap();
-        lobby.add_player(2).unwrap();
-        lobby.add_player(3).unwrap();
+        lobby.add_player(0.into()).unwrap();
+        lobby.add_player(1.into()).unwrap();
+        lobby.add_player(2.into()).unwrap();
+        lobby.add_player(3.into()).unwrap();
 
         for i in 0..=2 {
             assert!(lobby
-                .player_collected_item(i, Item::Spatula(Spatula::SpongebobsCloset))
+                .player_collected_item(i.into(), Item::Spatula(Spatula::SpongebobsCloset))
                 .is_ok());
         }
 
         // A new player collecting an exhausted spatula will simply be ignored
         assert_eq!(
-            lobby.player_collected_item(3, Item::Spatula(Spatula::SpongebobsCloset)),
+            lobby.player_collected_item(3.into(), Item::Spatula(Spatula::SpongebobsCloset)),
             Ok(())
         );
         let closet_state = lobby
@@ -620,15 +653,15 @@ mod test {
             .spatulas
             .get(&Spatula::SpongebobsCloset)
             .unwrap();
-        assert!(!closet_state.collection_vec.contains(&3),);
+        assert!(!closet_state.collection_vec.contains(&3.into()),);
         assert_eq!(lobby.shared.players.get(&3).unwrap().score, 0);
 
         lobby.shared.options.tier_count = 1;
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::OnTopOfThePineapple))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::OnTopOfThePineapple))
             .is_ok());
         assert_eq!(
-            lobby.player_collected_item(1, Item::Spatula(Spatula::OnTopOfThePineapple)),
+            lobby.player_collected_item(1.into(), Item::Spatula(Spatula::OnTopOfThePineapple)),
             Ok(())
         );
     }
@@ -636,15 +669,15 @@ mod test {
     #[test]
     fn player_collected_item_twice() {
         let mut lobby = setup();
-        lobby.add_player(0).unwrap();
+        lobby.add_player(0.into()).unwrap();
 
         // Same player can't collect an item that they already collected once
         assert!(lobby
-            .player_collected_item(0, Item::Spatula(Spatula::CowaBungee))
+            .player_collected_item(0.into(), Item::Spatula(Spatula::CowaBungee))
             .is_ok());
         assert_eq!(
-            lobby.player_collected_item(0, Item::Spatula(Spatula::CowaBungee)),
-            Err(LobbyError::InvalidAction(0))
+            lobby.player_collected_item(0.into(), Item::Spatula(Spatula::CowaBungee)),
+            Err(LobbyError::InvalidAction(0.into()))
         );
         assert_eq!(
             lobby
@@ -666,20 +699,16 @@ mod test {
     async fn lobby_dies() {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
-            let mut actor = LobbyActor::new(Default::default(), rx, 0);
-            let handle = LobbyHandleProvider {
-                sender: tx,
-                lobby_id: 0,
-            }
-            .get_handle(0);
-            actor.add_player(0).unwrap();
+            let mut actor = LobbyActor::new(Default::default(), rx, 0.into());
+            let handle = LobbyHandleProvider { sender: tx }.get_handle(0);
+            actor.add_player(0.into()).unwrap();
             (actor, handle)
         };
 
         // The lobby will run for as long as handles remain
         {
             let (actor, handle) = get_lobby();
-            timeout(Duration::from_secs(1), actor.run())
+            timeout(Duration::from_millis(50), actor.run())
                 .await
                 .expect_err("Lobby closed with handles still remaining");
             // Explicitly drop handle to ensure it's not dropped early
@@ -691,7 +720,7 @@ mod test {
             let (actor, handle) = get_lobby();
 
             drop(handle);
-            timeout(Duration::from_secs(1), actor.run())
+            timeout(Duration::from_millis(50), actor.run())
                 .await
                 .expect("Lobby failed to close");
         }
@@ -700,8 +729,8 @@ mod test {
         {
             let (mut actor, handle) = get_lobby();
 
-            actor.rem_player(0);
-            timeout(Duration::from_secs(1), actor.run())
+            actor.rem_player(0.into());
+            timeout(Duration::from_millis(50), actor.run())
                 .await
                 .expect("Lobby failed to close");
             // Explicitly drop handle to ensure it's not dropped early

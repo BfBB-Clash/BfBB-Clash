@@ -7,7 +7,7 @@ use bfbb::{IntoEnumIterator, Level, Spatula};
 use clash_lib::lobby::{GamePhase, NetworkedLobby};
 use clash_lib::net::{Item, LobbyMessage, Message};
 use clash_lib::PlayerId;
-use log::info;
+use tracing::instrument;
 
 use crate::gui::handle::GuiHandle;
 use crate::net::{NetCommand, NetCommandSender};
@@ -22,6 +22,13 @@ pub struct ClashGame<I> {
     /// than searching to see if we've collected it.
     local_spat_state: HashSet<Spatula>,
     player_id: PlayerId,
+}
+
+impl<I> std::fmt::Debug for ClashGame<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // write!(f, "ClashGame")
+        f.debug_struct("ClashGame").finish_non_exhaustive()
+    }
 }
 
 impl<I> ClashGame<I> {
@@ -39,6 +46,7 @@ impl<I> ClashGame<I> {
 
 impl<I: InterfaceProvider> GameMode for ClashGame<I> {
     /// Process state updates from the server and report back any actions of the local player
+    #[instrument(skip_all, fields(game_mode = ?self))]
     fn update(&mut self, network_sender: &NetCommandSender) -> InterfaceResult<()> {
         self.provider.do_with_interface(|interface| {
             if interface.is_loading.get()? {
@@ -119,7 +127,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                             },
                         )))
                         .unwrap();
-                    info!("Collected (from menu) {spat:?}");
+                    tracing::info!("Collected (from menu) {spat:?}");
                 }
 
                 // Detect spatula collection events
@@ -132,7 +140,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                             },
                         )))
                         .unwrap();
-                    info!("Collected {spat:?}");
+                    tracing::info!("Collected {spat:?}");
                 }
             }
 
@@ -207,12 +215,12 @@ mod tests {
         let mut lobby = NetworkedLobby::new(0);
         let mut player = NetworkedPlayer::new(PlayerOptions::default(), 0);
         player.current_level = Some(Level::SpongebobHouse);
-        lobby.players.insert(0, player);
+        lobby.players.insert(0.into(), player);
         lobby.game_phase = GamePhase::Playing;
 
         // Make new ClashGame and give it the default lobby
         let mut handle = GuiHandle::dummy();
-        let mut game = ClashGame::new(provider, 0);
+        let mut game = ClashGame::new(provider, 0.into());
         game.update_lobby(lobby, &mut handle);
         game
     }
@@ -294,7 +302,7 @@ mod tests {
         game.lobby.game_state.spatulas.insert(
             Spatula::CowaBungee,
             SpatulaState {
-                collection_vec: vec![1],
+                collection_vec: vec![1.into()],
             },
         );
         update_and_check(&mut game, None);

@@ -9,6 +9,7 @@ use clash_lib::PlayerId;
 use eframe::egui::{Align, Button, CentralPanel, Layout, SidePanel, Ui};
 use eframe::App;
 use itertools::intersperse;
+use tracing::instrument;
 
 use crate::game::ShutdownSender;
 use crate::gui::state::State;
@@ -78,7 +79,7 @@ impl Game {
             state,
             lobby_data,
             lobby: NetworkedLobby::new(0),
-            local_player_id: 0,
+            local_player_id: 0.into(),
             is_host: false,
             lab_door_cost: ValText::with_validator(|text| {
                 text.parse::<u8>().ok().filter(|&n| n > 0 && n <= 82)
@@ -94,6 +95,7 @@ impl Game {
 }
 
 impl App for Game {
+    #[instrument(skip_all)]
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // Receive gamestate updates
         while let Ok(msg) = self.lobby_data.gui_receiver.try_recv() {
@@ -152,7 +154,7 @@ impl App for Game {
                         .on_hover_text("Copy Lobby ID to Clipboard")
                         .clicked()
                     {
-                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id);
+                        ctx.output().copied_text = format!("{:X}", self.lobby.lobby_id.0);
                     }
                     if ui.button("Leave").clicked() {
                         self.state.change_app(MainMenu::new(self.state.clone()));
@@ -210,7 +212,9 @@ impl Game {
                 })
                 .enabled(self.is_host),
             );
-        });
+        })
+        .header_response
+        .on_hover_text("Options that may be revised or removed in the future.");
 
         if let Cow::Owned(options) = updated_options {
             self.lobby_data

@@ -26,7 +26,7 @@ impl State {
     pub fn add_lobby(&mut self, state: ServerState) -> &mut LobbyHandleProvider {
         let lobby_id = self.gen_lobby_id();
         let handle = lobby::start_new_lobby(state, lobby_id);
-        log::info!("Lobby {lobby_id:#X} opened");
+        tracing::info!("Lobby {lobby_id} opened");
         if let Entry::Vacant(e) = self.lobbies.entry(lobby_id) {
             return e.insert(handle);
         }
@@ -37,7 +37,7 @@ impl State {
     fn gen_player_id(&self) -> PlayerId {
         let mut player_id;
         loop {
-            player_id = thread_rng().gen();
+            player_id = thread_rng().gen::<u32>().into();
             if !self.players.contains(&player_id) {
                 break;
             };
@@ -48,7 +48,7 @@ impl State {
     fn gen_lobby_id(&self) -> LobbyId {
         let mut lobby_id;
         loop {
-            lobby_id = thread_rng().gen();
+            lobby_id = thread_rng().gen::<u32>().into();
             if !self.lobbies.contains_key(&lobby_id) {
                 break;
             };

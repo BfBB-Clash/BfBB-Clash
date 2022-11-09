@@ -5,7 +5,7 @@ use thiserror::Error;
 
 #[derive(Error, Clone, Debug, Serialize, Deserialize)]
 pub enum ProtocolError {
-    #[error("Invalid Lobby ID {0:#X}")]
+    #[error("Invalid Lobby ID {0}")]
     InvalidLobbyId(LobbyId),
     #[error("Invalid Message")]
     InvalidMessage,

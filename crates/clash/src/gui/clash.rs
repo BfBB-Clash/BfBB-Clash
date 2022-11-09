@@ -7,6 +7,7 @@ use eframe::egui::{
 use eframe::emath::Align;
 use eframe::epaint::{Color32, FontFamily, FontId, Vec2};
 use eframe::{App, CreationContext, Frame};
+use tracing::instrument;
 
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::State;
@@ -87,6 +88,7 @@ impl Clash {
 }
 
 impl App for Clash {
+    #[instrument(skip_all)]
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         TopBottomPanel::bottom("toolbar")
             // Margins look better with a "group" frame

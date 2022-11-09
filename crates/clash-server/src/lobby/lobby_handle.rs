@@ -3,7 +3,7 @@ use clash_lib::{
     lobby::LobbyOptions,
     net::{Item, Message},
     player::PlayerOptions,
-    LobbyId, PlayerId,
+    PlayerId,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -13,15 +13,13 @@ use super::LobbyError;
 #[derive(Debug)]
 pub struct LobbyHandleProvider {
     pub(super) sender: mpsc::Sender<LobbyAction>,
-    pub(super) lobby_id: LobbyId,
 }
 
 impl LobbyHandleProvider {
-    pub fn get_handle(&self, player_id: PlayerId) -> LobbyHandle {
+    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> LobbyHandle {
         LobbyHandle {
             sender: self.sender.clone(),
-            lobby_id: self.lobby_id,
-            player_id,
+            player_id: player_id.into(),
         }
     }
 }
@@ -29,7 +27,6 @@ impl LobbyHandleProvider {
 #[derive(Clone, Debug)]
 pub struct LobbyHandle {
     sender: mpsc::Sender<LobbyAction>,
-    lobby_id: LobbyId,
     player_id: PlayerId,
 }
 
@@ -39,7 +36,7 @@ impl LobbyHandle {
         msg: LobbyAction,
         rx: oneshot::Receiver<Result<T, LobbyError>>,
     ) -> Result<T, LobbyError> {
-        // Ignore first error, if there is an error, rx.await will fail aswell since it's sender
+        // Ignore first error, if there is an error, rx.await will fail as well since it's sender
         // will have been dropped
         let _ = self.sender.send(msg).await;
         rx.await.unwrap_or(Err(LobbyError::HandleInvalid))
@@ -74,14 +71,7 @@ impl LobbyHandle {
             respond_to: tx,
             id: self.player_id,
         };
-        self.execute(msg, rx).await.map(|recv| {
-            log::info!(
-                "Player {:#X} has joined lobby {:#X}",
-                self.player_id,
-                self.lobby_id,
-            );
-            recv
-        })
+        self.execute(msg, rx).await
     }
 
     // Removes a player from the lobby, if it exists, returning the number of player's remaining
@@ -147,7 +137,7 @@ impl LobbyHandle {
 #[cfg(test)]
 mod test {
     use bfbb::{Level, Spatula};
-    use clash_lib::{lobby::LobbyOptions, net::Item, player::PlayerOptions};
+    use clash_lib::{lobby::LobbyOptions, net::Item, player::PlayerOptions, PlayerId};
     use tokio::sync::mpsc;
 
     use crate::lobby::{lobby_actor::LobbyAction, LobbyError};
@@ -158,8 +148,7 @@ mod test {
         let (tx, rx) = mpsc::channel(2);
         let handle = LobbyHandle {
             sender: tx,
-            lobby_id: 0,
-            player_id: 123,
+            player_id: 123.into(),
         };
         (rx, handle)
     }
@@ -168,7 +157,6 @@ mod test {
     fn lobby_provider_provides_new_handle() {
         let handle_provider = LobbyHandleProvider {
             sender: mpsc::channel(2).0,
-            lobby_id: 0,
         };
 
         let handle = handle_provider.get_handle(123);
@@ -198,7 +186,7 @@ mod test {
                 m,
                 LobbyAction::StartGame {
                     respond_to: _,
-                    id: 123
+                    id: PlayerId(123),
                 }
             ));
         });
@@ -215,7 +203,7 @@ mod test {
                 m,
                 LobbyAction::AddPlayer {
                     respond_to: _,
-                    id: 123
+                    id: PlayerId(123)
                 }
             ));
         });
@@ -228,7 +216,7 @@ mod test {
         let (mut rx, handle) = setup();
         let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
-            assert!(matches!(m, LobbyAction::RemovePlayer { id: 123 }));
+            assert!(matches!(m, LobbyAction::RemovePlayer { id: PlayerId(123) }));
         });
         let _ = handle.rem_player().await;
         actor.await.unwrap();
@@ -275,7 +263,7 @@ mod test {
                 m,
                 LobbyAction::SetPlayerLevel {
                     respond_to: _,
-                    id: 123,
+                    id: PlayerId(123),
                     level: Some(Level::MainMenu)
                 }
             ));
@@ -293,7 +281,7 @@ mod test {
                 m,
                 LobbyAction::PlayerCollectedItem {
                     respond_to: _,
-                    id: 123,
+                    id: PlayerId(123),
                     item: Item::Spatula(Spatula::OnTopOfThePineapple)
                 }
             ));

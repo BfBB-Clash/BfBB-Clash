@@ -13,10 +13,10 @@ console = []
 anyhow.workspace = true
 bfbb = { workspace = true, features = ["game-interface"] }
 clash_lib.workspace = true
-env_logger.workspace = true
-log.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 eframe = "0.19"
 image = "0.24"

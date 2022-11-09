@@ -30,8 +30,5 @@ pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandleProvider {
     let actor = LobbyActor::new(state, receiver, id);
     tokio::spawn(actor.run());
 
-    LobbyHandleProvider {
-        sender,
-        lobby_id: id,
-    }
+    LobbyHandleProvider { sender }
 }
