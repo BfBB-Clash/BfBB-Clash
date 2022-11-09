@@ -212,7 +212,9 @@ impl Game {
                 })
                 .enabled(self.is_host),
             );
-        });
+        })
+        .header_response
+        .on_hover_text("Options that may be revised or removed in the future.");
 
         if let Cow::Owned(options) = updated_options {
             self.lobby_data
