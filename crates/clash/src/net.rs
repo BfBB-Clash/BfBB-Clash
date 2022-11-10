@@ -7,6 +7,7 @@ use clash_lib::net::{
 };
 use futures::TryFutureExt;
 use once_cell::sync::Lazy;
+use poll_promise::Promise;
 use semver::Version;
 use serde::Deserialize;
 use tokio::sync::mpsc;
@@ -17,22 +18,6 @@ pub type NetCommandReceiver = mpsc::Receiver<NetCommand>;
 pub type NetCommandSender = mpsc::Sender<NetCommand>;
 
 static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
-
-// TODO: There's probably an existing crate to handle this better. Look into it.
-pub enum Task<T> {
-    Waiting(tokio::sync::oneshot::Receiver<T>),
-    Complete(T),
-}
-
-impl<T: Send + 'static> Task<T> {
-    pub fn spawn(future: impl Future<Output = T> + Send + 'static) -> Self {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        RUNTIME.spawn(async move {
-            let _ = tx.send(future.await);
-        });
-        Self::Waiting(rx)
-    }
-}
 
 #[instrument]
 pub async fn check_for_updates() -> Option<String> {
@@ -217,4 +202,11 @@ fn load_ip_address() -> String {
     }
 
     "127.0.0.1:42932".into()
+}
+
+pub fn spawn_in_runtime<T: Send + 'static>(
+    future: impl Future<Output = T> + Send + 'static,
+) -> poll_promise::Promise<T> {
+    let _guard = RUNTIME.enter();
+    Promise::spawn_async(future)
 }

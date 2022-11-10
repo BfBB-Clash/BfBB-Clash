@@ -334,6 +334,7 @@ dependencies = [
  "image",
  "itertools",
  "once_cell",
+ "poll-promise",
  "reqwest",
  "semver",
  "serde",
@@ -2031,6 +2032,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "poll-promise"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcf2a02372dfae23c9c01267fb296b8a3413bb4e45fbd589c3ac73c6dcfbb305"
+dependencies = [
+ "static_assertions",
+ "tokio",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2512,6 +2523,12 @@ dependencies = [
  "once_cell",
  "winapi",
 ]
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "str-buf"
