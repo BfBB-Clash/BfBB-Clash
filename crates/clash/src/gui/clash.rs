@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use eframe::egui::{
     self, Button, CentralPanel, Context, FontData, FontDefinitions, Label, Layout, RichText, Style,
-    TextStyle, TopBottomPanel, Ui,
+    TextStyle, TopBottomPanel, Ui, Window,
 };
 use eframe::emath::Align;
 use eframe::epaint::{Color32, FontFamily, FontId, Vec2};
@@ -12,6 +12,7 @@ use tracing::instrument;
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::State;
 use crate::gui::PADDING;
+use crate::net::{self, Task};
 
 use super::UiExt;
 
@@ -20,10 +21,12 @@ pub struct Clash {
     settings_open: bool,
     curr_app: Box<dyn App>,
     displayed_error: Option<anyhow::Error>,
+    update_task: Task<Option<String>>,
 }
 
 impl Clash {
     pub fn new(cc: &CreationContext<'_>) -> Self {
+        let update_task = Task::spawn(net::check_for_updates());
         Self::setup(&cc.egui_ctx);
 
         let state = Rc::new(State::new(&cc.egui_ctx));
@@ -32,6 +35,7 @@ impl Clash {
             settings_open: false,
             state,
             displayed_error: None,
+            update_task,
         }
     }
 
@@ -141,6 +145,29 @@ impl App for Clash {
             CentralPanel::default().show(ctx, |ui| self.app_settings(ui));
         } else {
             self.curr_app.update(ctx, frame);
+        }
+
+        match self.update_task {
+            Task::Waiting(ref mut rx) => {
+                if let Ok(url) = rx.try_recv() {
+                    self.update_task = Task::Complete(url);
+                }
+            }
+            Task::Complete(Some(ref url)) => {
+                let mut dismiss = true;
+                Window::new("New Update Available")
+                    .collapsible(false)
+                    .resizable(false)
+                    .open(&mut dismiss)
+                    .show(ctx, |ui| {
+                        ui.label("Please visit the download page to get the update.");
+                        ui.hyperlink(url);
+                    });
+                if !dismiss {
+                    self.update_task = Task::Complete(None);
+                }
+            }
+            Task::Complete(None) => (),
         }
     }
 }

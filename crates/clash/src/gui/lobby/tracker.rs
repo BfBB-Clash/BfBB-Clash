@@ -86,7 +86,7 @@ impl Widget for SpatulaStatus<'_> {
             ui.allocate_exact_size(vec2(radius * 2., radius * 2.), Sense::hover());
 
         let (texture, color) = if state.collection_vec.contains(&local_player)
-            || state.collection_vec.len() == lobby.options.tier_count.into()
+            || state.collection_vec.len() == usize::from(lobby.options.tier_count)
         {
             (&app_state.golden_spatula, GOLD)
         } else {
