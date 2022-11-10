@@ -204,7 +204,11 @@ fn load_ip_address() -> String {
     "127.0.0.1:42932".into()
 }
 
-pub fn spawn_in_runtime<T: Send + 'static>(
+/// Spawns a future on the Tokio runtime and returns a [`Promise`] for it.
+///
+/// This is a simple way to spawn an async task and check for it's result at some later time
+/// from synchronous code.
+pub fn spawn_promise<T: Send + 'static>(
     future: impl Future<Output = T> + Send + 'static,
 ) -> poll_promise::Promise<T> {
     let _guard = RUNTIME.enter();
