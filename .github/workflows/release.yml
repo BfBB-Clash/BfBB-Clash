@@ -41,4 +41,5 @@ jobs:
           files: |
             target/release/clash${{ (startsWith(matrix.os, 'windows') && '.exe') || '' }}
             target/release/clash-server${{ (startsWith(matrix.os, 'windows') && '.exe') || '' }}
-          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: true
