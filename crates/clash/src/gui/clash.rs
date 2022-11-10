@@ -27,7 +27,12 @@ pub struct Clash {
 
 impl Clash {
     pub fn new(cc: &CreationContext<'_>) -> Self {
-        let update_task = net::spawn_in_runtime(net::check_for_updates());
+        let url_ctx = cc.egui_ctx.clone();
+        let update_task = net::spawn_in_runtime(async move {
+            let url = net::check_for_updates().await;
+            url_ctx.request_repaint();
+            url
+        });
         Self::setup(&cc.egui_ctx);
 
         let state = Rc::new(State::new(&cc.egui_ctx));
