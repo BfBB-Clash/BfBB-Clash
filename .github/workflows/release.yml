@@ -1,7 +1,8 @@
 on:
   push:
     tags:
-      - v**
+      # Matches semver with optional pre-release
+      - 'v[0-9]+.[0-9]+.[0-9]-?**'
 
 name: Release
 concurrency: release-${{ github.ref }}
