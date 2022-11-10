@@ -1,15 +1,65 @@
+use std::future::Future;
 use std::sync::mpsc::Sender;
 
 use clash_lib::net::{
     connection::{self, ConnectionRx},
     LobbyMessage, Message,
 };
-use tokio::net::TcpStream;
+use futures::TryFutureExt;
+use once_cell::sync::Lazy;
+use poll_promise::Promise;
+use semver::Version;
+use serde::Deserialize;
 use tokio::sync::mpsc;
+use tokio::{net::TcpStream, runtime::Runtime};
 use tracing::instrument;
 
 pub type NetCommandReceiver = mpsc::Receiver<NetCommand>;
 pub type NetCommandSender = mpsc::Sender<NetCommand>;
+
+static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
+
+#[instrument]
+pub async fn check_for_updates() -> Option<String> {
+    #[derive(Deserialize, Debug)]
+    struct Release {
+        html_url: String,
+        tag_name: String,
+    }
+    // Get the latest github release
+    let latest_release = match reqwest::Client::default()
+        .get("https://api.github.com/repos/BfBB-Clash/BfBB-Clash/releases/latest")
+        .header("User-Agent", "BfBB Clash")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .and_then(reqwest::Response::json::<Release>)
+        .await
+    {
+        Ok(it) => it,
+        Err(e) => {
+            tracing::error!("Failed to query releases from GitHub. {e:?}");
+            return None;
+        }
+    };
+
+    // Consider this to be a new release if it has a newer semver than us.
+    // Note: using semver will ignore build metadata (commit hash/dirty flag)
+    let newest_version = Version::parse(
+        latest_release
+            .tag_name
+            .strip_prefix('v')
+            .unwrap_or(&latest_release.tag_name),
+    )
+    .ok()?;
+    let current_version = Version::parse(crate::VERSION).ok()?;
+    if newest_version > current_version {
+        tracing::info!("New release found. {latest_release:?}");
+        Some(latest_release.html_url)
+    } else {
+        tracing::info!("No new updates available");
+        None
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum NetCommand {
@@ -26,9 +76,17 @@ where
     }
 }
 
-#[tokio::main]
+/// Entry point to the network. Runs the networking logic on current thread with the preconfigured [`Runtime`]
+pub fn run(
+    receiver: NetCommandReceiver,
+    logic_sender: Sender<Message>,
+    error_sender: Sender<anyhow::Error>,
+) {
+    RUNTIME.block_on(net_task(receiver, logic_sender, error_sender))
+}
+
 #[instrument(skip_all, name = "Network")]
-pub async fn run(
+async fn net_task(
     mut receiver: NetCommandReceiver,
     logic_sender: Sender<Message>,
     error_sender: Sender<anyhow::Error>,
@@ -144,4 +202,15 @@ fn load_ip_address() -> String {
     }
 
     "127.0.0.1:42932".into()
+}
+
+/// Spawns a future on the Tokio runtime and returns a [`Promise`] for it.
+///
+/// This is a simple way to spawn an async task and check for it's result at some later time
+/// from synchronous code.
+pub fn spawn_promise<T: Send + 'static>(
+    future: impl Future<Output = T> + Send + 'static,
+) -> poll_promise::Promise<T> {
+    let _guard = RUNTIME.enter();
+    Promise::spawn_async(future)
 }

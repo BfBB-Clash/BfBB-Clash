@@ -2,16 +2,18 @@ use std::rc::Rc;
 
 use eframe::egui::{
     self, Button, CentralPanel, Context, FontData, FontDefinitions, Label, Layout, RichText, Style,
-    TextStyle, TopBottomPanel, Ui,
+    TextStyle, TopBottomPanel, Ui, Window,
 };
 use eframe::emath::Align;
 use eframe::epaint::{Color32, FontFamily, FontId, Vec2};
 use eframe::{App, CreationContext, Frame};
+use poll_promise::Promise;
 use tracing::instrument;
 
 use crate::gui::main_menu::MainMenu;
 use crate::gui::state::State;
 use crate::gui::PADDING;
+use crate::net;
 
 use super::UiExt;
 
@@ -20,10 +22,17 @@ pub struct Clash {
     settings_open: bool,
     curr_app: Box<dyn App>,
     displayed_error: Option<anyhow::Error>,
+    update_task: Promise<Option<String>>,
 }
 
 impl Clash {
     pub fn new(cc: &CreationContext<'_>) -> Self {
+        let url_ctx = cc.egui_ctx.clone();
+        let update_task = net::spawn_promise(async move {
+            let url = net::check_for_updates().await;
+            url_ctx.request_repaint();
+            url
+        });
         Self::setup(&cc.egui_ctx);
 
         let state = Rc::new(State::new(&cc.egui_ctx));
@@ -32,6 +41,7 @@ impl Clash {
             settings_open: false,
             state,
             displayed_error: None,
+            update_task,
         }
     }
 
@@ -141,6 +151,21 @@ impl App for Clash {
             CentralPanel::default().show(ctx, |ui| self.app_settings(ui));
         } else {
             self.curr_app.update(ctx, frame);
+        }
+
+        if let Some(Some(url)) = self.update_task.ready() {
+            let mut dismiss = true;
+            Window::new("New Update Available")
+                .collapsible(false)
+                .resizable(false)
+                .open(&mut dismiss)
+                .show(ctx, |ui| {
+                    ui.label("Please visit the download page to get the update.");
+                    ui.hyperlink(url);
+                });
+            if !dismiss {
+                self.update_task = Promise::from_ready(None);
+            }
         }
     }
 }

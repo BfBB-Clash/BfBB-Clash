@@ -53,7 +53,7 @@ pub fn gen_clash_version(manifest_path: impl AsRef<Path>) -> anyhow::Result<()> 
                 .stdout;
             let des = String::from_utf8(des)?;
             println!(
-                "cargo:rustc-env=CLASH_VERSION={}-{}",
+                "cargo:rustc-env=CLASH_VERSION={}+{}",
                 env!("CARGO_PKG_VERSION"),
                 des
             );

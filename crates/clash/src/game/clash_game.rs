@@ -106,7 +106,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                 }
 
                 if let Some(spat_ref) = self.lobby.game_state.spatulas.get_mut(&spat) {
-                    if spat_ref.collection_vec.len() != self.lobby.options.tier_count.into() {
+                    if spat_ref.collection_vec.len() != usize::from(self.lobby.options.tier_count) {
                         interface.unlock_task(spat)?;
                     } else {
                         // Sync collected spatulas
