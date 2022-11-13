@@ -129,9 +129,8 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                         .unwrap();
                     tracing::info!("Collected (from menu) {spat:?}");
                 }
-
                 // Detect spatula collection events
-                if interface.is_spatula_being_collected(spat, local_player.current_level)? {
+                else if interface.is_spatula_being_collected(spat, local_player.current_level)? {
                     self.local_spat_state.insert(spat);
                     network_sender
                         .try_send(NetCommand::Send(Message::Lobby(
