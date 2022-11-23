@@ -86,7 +86,10 @@ impl App for MainMenu {
                 TopBottomPanel::bottom("Host Panel").show(ctx, |ui| {
                     ui.add(TextEdit::singleline(&mut self.player_name).hint_text("Name"));
                     ui.add_enabled_ui(!self.player_name.is_empty(), |ui| {
-                        if ui.button("Host Game").clicked() {
+                        let host_button = ui
+                            .button("Host Game")
+                            .on_disabled_hover_text("Player Name is required");
+                        if host_button.clicked() {
                             let lobby_data = self.spawn_net(ctx.clone());
                             lobby_data
                                 .network_sender
@@ -126,9 +129,18 @@ impl App for MainMenu {
                             .password(true),
                     );
 
-                    let join_button = ui
-                        .add_enabled(self.lobby_id.is_valid(), Button::new("Join Game"))
-                        .on_disabled_hover_text("Lobby ID must be an 8 digit hexadecimal number");
+                    let mut join_button = ui.add_enabled(
+                        self.lobby_id.is_valid() && !self.player_name.is_empty(),
+                        Button::new("Join Game"),
+                    );
+                    if !self.lobby_id.is_valid() {
+                        join_button = join_button.on_disabled_hover_text(
+                            "Lobby ID must be an 8 digit hexadecimal number",
+                        );
+                    }
+                    if self.player_name.is_empty() {
+                        join_button = join_button.on_disabled_hover_text("Player Name is required")
+                    }
                     if join_button.clicked() {
                         let lobby_data = self.spawn_net(ctx.clone());
                         lobby_data
