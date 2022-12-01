@@ -97,9 +97,7 @@ impl ConnectingClient {
             Some(Message::GameHost) => {
                 let state = &mut *self.state.lock().unwrap();
                 state.players.insert(self.player_id);
-                state
-                    .add_lobby(self.state.clone())
-                    .get_handle(self.player_id)
+                state.open_lobby(self.state.clone(), self.player_id)
             }
             Some(Message::GameJoin { lobby_id }) => {
                 let state = &mut *self.state.lock().unwrap();
@@ -109,6 +107,7 @@ impl ConnectingClient {
                     .get_mut(&lobby_id)
                     .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
                     .get_handle(self.player_id)
+                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
             }
             Some(_) => return Err(ProtocolError::InvalidMessage),
             None => return Err(ProtocolError::Disconnected),

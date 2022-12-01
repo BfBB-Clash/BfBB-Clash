@@ -12,22 +12,22 @@ use super::LobbyError;
 
 #[derive(Debug)]
 pub struct LobbyHandleProvider {
-    pub(super) sender: mpsc::Sender<LobbyAction>,
+    pub(super) sender: mpsc::WeakSender<LobbyAction>,
 }
 
 impl LobbyHandleProvider {
-    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> LobbyHandle {
-        LobbyHandle {
-            sender: self.sender.clone(),
+    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> Option<LobbyHandle> {
+        Some(LobbyHandle {
+            sender: self.sender.upgrade()?,
             player_id: player_id.into(),
-        }
+        })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct LobbyHandle {
-    sender: mpsc::Sender<LobbyAction>,
-    player_id: PlayerId,
+    pub(super) sender: mpsc::Sender<LobbyAction>,
+    pub(super) player_id: PlayerId,
 }
 
 impl LobbyHandle {
@@ -155,11 +155,12 @@ mod test {
 
     #[test]
     fn lobby_provider_provides_new_handle() {
+        let (tx, _rx) = mpsc::channel(2);
         let handle_provider = LobbyHandleProvider {
-            sender: mpsc::channel(2).0,
+            sender: tx.downgrade(),
         };
 
-        let handle = handle_provider.get_handle(123);
+        let handle = handle_provider.get_handle(123).unwrap();
         assert_eq!(handle.player_id, 123);
     }
 

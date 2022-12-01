@@ -4,7 +4,10 @@ use tokio::sync::mpsc;
 
 use crate::state::ServerState;
 
-use self::{lobby_actor::LobbyActor, lobby_handle::LobbyHandleProvider};
+use self::{
+    lobby_actor::LobbyActor,
+    lobby_handle::{LobbyHandle, LobbyHandleProvider},
+};
 
 mod lobby_actor;
 pub mod lobby_handle;
@@ -25,10 +28,24 @@ pub enum LobbyError {
 
 pub type LobbyResult<T> = Result<T, LobbyError>;
 
-pub fn start_new_lobby(state: ServerState, id: LobbyId) -> LobbyHandleProvider {
+pub fn start_new_lobby(
+    state: ServerState,
+    id: LobbyId,
+    host_id: PlayerId,
+) -> (LobbyHandleProvider, LobbyHandle) {
     let (sender, receiver) = mpsc::channel(64);
+    let weak_sender = sender.downgrade();
     let actor = LobbyActor::new(state, receiver, id);
+    let handle = LobbyHandle {
+        sender,
+        player_id: host_id,
+    };
     tokio::spawn(actor.run());
 
-    LobbyHandleProvider { sender }
+    (
+        LobbyHandleProvider {
+            sender: weak_sender,
+        },
+        handle,
+    )
 }

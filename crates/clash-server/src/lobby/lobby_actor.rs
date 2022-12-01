@@ -255,13 +255,6 @@ impl LobbyActor {
 
         // Update remaining clients of the change
         self.send_lobby();
-
-        // Close the lobby after the last player leaves by closing our receiver.
-        // This will cause the run loop to consume all remaining messages,
-        // (likely none since the last player just left), and then exit
-        if self.shared.players.is_empty() {
-            self.receiver.close();
-        }
     }
 
     #[instrument(skip(self, options))]
@@ -700,7 +693,10 @@ mod test {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
             let mut actor = LobbyActor::new(Default::default(), rx, 0.into());
-            let handle = LobbyHandleProvider { sender: tx }.get_handle(0);
+            let handle = LobbyHandleProvider {
+                sender: tx.downgrade(),
+            }
+            .get_handle(0);
             actor.add_player(0.into()).unwrap();
             (actor, handle)
         };
@@ -723,18 +719,6 @@ mod test {
             timeout(Duration::from_millis(50), actor.run())
                 .await
                 .expect("Lobby failed to close");
-        }
-
-        // Alternatively, the lobby will die when the last player is removed
-        {
-            let (mut actor, handle) = get_lobby();
-
-            actor.rem_player(0.into());
-            timeout(Duration::from_millis(50), actor.run())
-                .await
-                .expect("Lobby failed to close");
-            // Explicitly drop handle to ensure it's not dropped early
-            assert_eq!(handle.start_game().await, Err(LobbyError::HandleInvalid));
         }
     }
 }
