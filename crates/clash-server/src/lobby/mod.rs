@@ -1,4 +1,4 @@
-use clash_lib::{LobbyId, PlayerId};
+use clash_lib::{net::ProtocolError, LobbyId, PlayerId};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
@@ -24,6 +24,12 @@ pub enum LobbyError {
     NeedsHost,
     #[error("The Lobby Handle is no longer connected to a lobby.")]
     HandleInvalid,
+}
+
+impl From<LobbyError> for ProtocolError {
+    fn from(v: LobbyError) -> Self {
+        Self::Message(v.to_string())
+    }
 }
 
 pub type LobbyResult<T> = Result<T, LobbyError>;

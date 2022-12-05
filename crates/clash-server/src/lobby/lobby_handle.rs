@@ -7,8 +7,8 @@ use clash_lib::{
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-use super::lobby_actor::LobbyAction;
 use super::LobbyError;
+use super::{lobby_actor::LobbyAction, LobbyResult};
 
 #[derive(Debug)]
 pub struct LobbyHandleProvider {
@@ -16,11 +16,20 @@ pub struct LobbyHandleProvider {
 }
 
 impl LobbyHandleProvider {
-    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> Option<LobbyHandle> {
-        Some(LobbyHandle {
-            sender: self.sender.upgrade()?,
+    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> LobbyResult<LobbyHandle> {
+        Ok(LobbyHandle {
+            sender: self.sender.upgrade().ok_or(LobbyError::HandleInvalid)?,
             player_id: player_id.into(),
         })
+    }
+
+    pub async fn spectate(&self) -> LobbyResult<broadcast::Receiver<Message>> {
+        let (tx, rx) = oneshot::channel();
+        let sender = self.sender.upgrade().ok_or(LobbyError::HandleInvalid)?;
+        let _ = sender
+            .send(LobbyAction::AddSpectator { respond_to: tx })
+            .await;
+        rx.await.map_err(|_| LobbyError::HandleInvalid)
     }
 }
 

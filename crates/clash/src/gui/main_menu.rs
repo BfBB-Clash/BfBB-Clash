@@ -129,40 +129,62 @@ impl App for MainMenu {
                             .password(true),
                     );
 
-                    let mut join_button = ui.add_enabled(
-                        self.lobby_id.is_valid() && !self.player_name.is_empty(),
-                        Button::new("Join Game"),
-                    );
-                    if !self.lobby_id.is_valid() {
-                        join_button = join_button.on_disabled_hover_text(
-                            "Lobby ID must be an 8 digit hexadecimal number",
+                    ui.horizontal(|ui| {
+                        let mut join_button = ui.add_enabled(
+                            self.lobby_id.is_valid() && !self.player_name.is_empty(),
+                            Button::new("Join Game"),
                         );
-                    }
-                    if self.player_name.is_empty() {
-                        join_button = join_button.on_disabled_hover_text("Player Name is required")
-                    }
-                    if join_button.clicked() {
-                        let lobby_data = self.spawn_net(ctx.clone());
-                        lobby_data
-                            .network_sender
-                            .try_send(NetCommand::Send(Message::GameJoin {
-                                lobby_id: self.lobby_id.get_val().unwrap(),
-                            }))
-                            .unwrap();
-                        lobby_data
-                            .network_sender
-                            .try_send(NetCommand::Send(Message::Lobby(
-                                LobbyMessage::PlayerOptions {
-                                    options: PlayerOptions {
-                                        name: self.player_name.clone(),
-                                        color: (0, 0, 0),
+                        if !self.lobby_id.is_valid() {
+                            join_button = join_button.on_disabled_hover_text(
+                                "Lobby ID must be an 8 digit hexadecimal number",
+                            );
+                        }
+                        if self.player_name.is_empty() {
+                            join_button =
+                                join_button.on_disabled_hover_text("Player Name is required")
+                        }
+                        if join_button.clicked() {
+                            let lobby_data = self.spawn_net(ctx.clone());
+                            lobby_data
+                                .network_sender
+                                .try_send(NetCommand::Send(Message::GameJoin {
+                                    lobby_id: self.lobby_id.get_val().unwrap(),
+                                    spectate: false,
+                                }))
+                                .unwrap();
+                            lobby_data
+                                .network_sender
+                                .try_send(NetCommand::Send(Message::Lobby(
+                                    LobbyMessage::PlayerOptions {
+                                        options: PlayerOptions {
+                                            name: self.player_name.clone(),
+                                            color: (0, 0, 0),
+                                        },
                                     },
-                                },
-                            )))
-                            .unwrap();
-                        self.state
-                            .change_app(Game::new(self.state.clone(), lobby_data));
-                    }
+                                )))
+                                .unwrap();
+                            self.state
+                                .change_app(Game::new(self.state.clone(), lobby_data));
+                        }
+
+                        let spectate_button = ui
+                            .add_enabled(self.lobby_id.is_valid(), Button::new("Spectate"))
+                            .on_disabled_hover_text(
+                                "Lobby ID must be an 8 digit hexadecimal number",
+                            );
+                        if spectate_button.clicked() {
+                            let lobby_data = self.spawn_net(ctx.clone());
+                            lobby_data
+                                .network_sender
+                                .try_send(NetCommand::Send(Message::GameJoin {
+                                    lobby_id: self.lobby_id.get_val().unwrap(),
+                                    spectate: true,
+                                }))
+                                .unwrap();
+                            self.state
+                                .change_app(Game::new(self.state.clone(), lobby_data));
+                        }
+                    });
 
                     if ui.button("Back").clicked() {
                         self.submenu = Submenu::Root;
