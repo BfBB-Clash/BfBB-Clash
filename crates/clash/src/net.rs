@@ -10,8 +10,8 @@ use once_cell::sync::Lazy;
 use poll_promise::Promise;
 use semver::Version;
 use serde::Deserialize;
-use tokio::sync::mpsc;
 use tokio::{net::TcpStream, runtime::Runtime};
+use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::instrument;
 
 pub type NetCommandReceiver = mpsc::Receiver<NetCommand>;
@@ -76,13 +76,13 @@ where
     }
 }
 
-/// Entry point to the network. Runs the networking logic on current thread with the preconfigured [`Runtime`]
+/// Entry point to the network. Spawns the network task on the preconfigured [`Runtime`]
 pub fn run(
     receiver: NetCommandReceiver,
     logic_sender: Sender<Message>,
     error_sender: Sender<anyhow::Error>,
-) {
-    RUNTIME.block_on(net_task(receiver, logic_sender, error_sender))
+) -> JoinHandle<()> {
+    RUNTIME.spawn(net_task(receiver, logic_sender, error_sender))
 }
 
 #[instrument(skip_all, name = "Network")]

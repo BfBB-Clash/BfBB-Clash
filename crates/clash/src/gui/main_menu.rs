@@ -200,12 +200,11 @@ impl MainMenu {
     fn spawn_net(&self, gui_ctx: eframe::egui::Context) -> LobbyData {
         let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(32);
         let (logic_sender, logic_receiver) = std::sync::mpsc::channel::<Message>();
-        // Create a new thread and start a tokio runtime on it for talking to the server
-        let error_sender = self.state.error_sender.clone();
-        let network_thread = std::thread::Builder::new()
-            .name("Network".into())
-            .spawn(move || net::run(network_receiver, logic_sender, error_sender))
-            .expect("Couldn't start network thread.");
+        let network_thread = net::run(
+            network_receiver,
+            logic_sender,
+            self.state.error_sender.clone(),
+        );
 
         // Start Game Thread
         let (gui_sender, gui_receiver) = std::sync::mpsc::channel();

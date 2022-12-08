@@ -31,7 +31,7 @@ pub struct LobbyData {
     pub network_sender: NetCommandSender,
     pub gui_receiver: GuiReceiver,
     pub game_shutdown: ManuallyDrop<ShutdownSender>,
-    pub network_thread: ManuallyDrop<JoinHandle<()>>,
+    pub network_thread: ManuallyDrop<tokio::task::JoinHandle<()>>,
     pub game_thread: ManuallyDrop<JoinHandle<()>>,
 }
 
@@ -50,15 +50,15 @@ impl Drop for LobbyData {
                 ManuallyDrop::take(&mut self.game_thread),
             )
         };
-        game_shutdown
-            .send(())
-            .expect("Failed to signal game-logic thread to shutdown");
-        network_thread
-            .join()
-            .expect("Network thread failed to join");
-        game_thread
-            .join()
-            .expect("Game logic thread failed to join");
+        let _ = crate::net::spawn_promise(async move {
+            game_shutdown
+                .send(())
+                .expect("Failed to signal game-logic thread to shutdown");
+            network_thread.await.expect("Network thread failed to join");
+            game_thread
+                .join()
+                .expect("Game logic thread failed to join");
+        });
     }
 }
 
