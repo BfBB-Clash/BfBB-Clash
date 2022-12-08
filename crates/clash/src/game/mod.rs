@@ -18,6 +18,36 @@ use self::{clash_game::ClashGame, game_mode::GameMode};
 pub type ShutdownSender = tokio::sync::oneshot::Sender<()>;
 pub type ShutdownReceiver = tokio::sync::oneshot::Receiver<()>;
 
+/// Entry point for a spectator session.
+///
+/// This is a temporary hack that is necessary because the GUI relies on the logic thread
+/// to update it with new lobby information. Having a dedicated thread that only forwards messages
+/// is certainly a bit unecessary but it doesn't really make sense to refactor the GUI to receive
+/// network messages directly. The reasoning being that when we implement partial updates the GUI won't
+/// know how to actually update the lobby in place from those messages.
+pub fn start_spectator(
+    mut gui_handle: GuiHandle,
+    _network_sender: NetCommandSender,
+    logic_receiver: Receiver<Message>,
+    mut shutdown_receiver: ShutdownReceiver,
+) {
+    // Spectator client doesn't need to care about doubling BfBB's framerate
+    let mut loop_helper = LoopHelper::builder().build_with_target_rate(60);
+
+    while let Err(TryRecvError::Empty) = shutdown_receiver.try_recv() {
+        loop_helper.loop_start();
+        while let Ok(msg) = logic_receiver.recv() {
+            match msg {
+                Message::ConnectionAccept { player_id } => gui_handle.send(player_id),
+                Message::GameLobbyInfo { lobby } => gui_handle.send(lobby),
+                _ => continue,
+            }
+        }
+        loop_helper.loop_sleep();
+    }
+}
+
+/// Entry point for lobby logic thread.
 pub fn start_game(
     gui_handle: GuiHandle,
     network_sender: NetCommandSender,

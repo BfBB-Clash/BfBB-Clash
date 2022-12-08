@@ -90,7 +90,7 @@ impl App for MainMenu {
                             .button("Host Game")
                             .on_disabled_hover_text("Player Name is required");
                         if host_button.clicked() {
-                            let lobby_data = self.spawn_net(ctx.clone());
+                            let lobby_data = self.spawn_net(ctx.clone(), false);
                             lobby_data
                                 .network_sender
                                 .try_send(NetCommand::Send(Message::GameHost))
@@ -144,7 +144,7 @@ impl App for MainMenu {
                                 join_button.on_disabled_hover_text("Player Name is required")
                         }
                         if join_button.clicked() {
-                            let lobby_data = self.spawn_net(ctx.clone());
+                            let lobby_data = self.spawn_net(ctx.clone(), false);
                             lobby_data
                                 .network_sender
                                 .try_send(NetCommand::Send(Message::GameJoin {
@@ -173,7 +173,7 @@ impl App for MainMenu {
                                 "Lobby ID must be an 8 digit hexadecimal number",
                             );
                         if spectate_button.clicked() {
-                            let lobby_data = self.spawn_net(ctx.clone());
+                            let lobby_data = self.spawn_net(ctx.clone(), true);
                             lobby_data
                                 .network_sender
                                 .try_send(NetCommand::Send(Message::GameJoin {
@@ -197,7 +197,7 @@ impl App for MainMenu {
 }
 
 impl MainMenu {
-    fn spawn_net(&self, gui_ctx: eframe::egui::Context) -> LobbyData {
+    fn spawn_net(&self, gui_ctx: eframe::egui::Context, spectator: bool) -> LobbyData {
         let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(32);
         let (logic_sender, logic_receiver) = std::sync::mpsc::channel::<Message>();
         let network_thread = net::run(
@@ -218,7 +218,11 @@ impl MainMenu {
             std::thread::Builder::new()
                 .name("Logic".into())
                 .spawn(move || {
-                    game::start_game(
+                    let entry = match spectator {
+                        true => game::start_spectator,
+                        false => game::start_game,
+                    };
+                    entry(
                         gui_handle,
                         network_sender,
                         logic_receiver,
