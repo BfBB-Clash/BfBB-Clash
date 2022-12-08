@@ -53,7 +53,7 @@ impl ConnectingClient {
             Err(error) => {
                 tracing::error!(%error);
                 let _ = self.conn_tx.write_frame(Message::Error { error }).await;
-                return None;
+                None
             }
         }
     }
@@ -142,15 +142,15 @@ enum ConnectedClient {
     Spectator(SpectatingClient),
 }
 
-impl Into<ConnectedClient> for Client {
-    fn into(self) -> ConnectedClient {
-        ConnectedClient::Player(self)
+impl From<Client> for ConnectedClient {
+    fn from(val: Client) -> Self {
+        ConnectedClient::Player(val)
     }
 }
 
-impl Into<ConnectedClient> for SpectatingClient {
-    fn into(self) -> ConnectedClient {
-        ConnectedClient::Spectator(self)
+impl From<SpectatingClient> for ConnectedClient {
+    fn from(val: SpectatingClient) -> Self {
+        ConnectedClient::Spectator(val)
     }
 }
 
