@@ -1,3 +1,4 @@
+use ecolor::Color32;
 use serde::{Deserialize, Serialize};
 
 use bfbb::Level;
@@ -43,7 +44,7 @@ impl NetworkedPlayer {
 }
 
 impl PlayerOptions {
-    pub fn color(&self) -> epaint::Color32 {
-        epaint::Color32::from_rgb(self.color.0, self.color.1, self.color.2)
+    pub fn color(&self) -> Color32 {
+        Color32::from_rgb(self.color.0, self.color.1, self.color.2)
     }
 }

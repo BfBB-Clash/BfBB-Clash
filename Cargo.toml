@@ -30,6 +30,10 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 version_gen = { path = "crates/version-gen" }
 
+# These versions for egui crates always need to match 
+eframe = "0.20"
+ecolor = { version = "0.20", features = ["serde"] }
+
 # Remove unneeded debug info from linux release binaries
 [profile.release]
 strip = true

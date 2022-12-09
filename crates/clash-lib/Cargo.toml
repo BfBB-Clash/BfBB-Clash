@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 bfbb = { workspace = true, features = ["serde"] }
+ecolor.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
@@ -13,4 +14,3 @@ tracing.workspace = true
 
 bincode = "1"
 bytes = "1"
-epaint = "0.19"
