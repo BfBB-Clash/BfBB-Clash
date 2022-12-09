@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use eframe::{
-    egui::{Context, TextureFilter},
+    egui::{Context, TextureOptions},
     epaint::{ColorImage, TextureHandle},
     App,
 };
@@ -25,19 +25,19 @@ impl State {
             "logo",
             load_image_from_memory(include_bytes!("../../res/logo.png"))
                 .expect("The image is in the binary."),
-            TextureFilter::Linear,
+            TextureOptions::LINEAR,
         );
         let golden_spatula = ctx.load_texture(
             "golden spatula",
             load_image_from_memory(include_bytes!("../../res/golden_spatula_60.gif"))
                 .expect("The image is in the binary"),
-            TextureFilter::Linear,
+            TextureOptions::LINEAR,
         );
         let silver_spatula = ctx.load_texture(
             "silver spatula",
             load_image_from_memory(include_bytes!("../../res/silver_spatula_60.gif"))
                 .expect("The image is in the binary."),
-            TextureFilter::Linear,
+            TextureOptions::LINEAR,
         );
         let (error_sender, error_receiver) = std::sync::mpsc::channel();
         Self {
