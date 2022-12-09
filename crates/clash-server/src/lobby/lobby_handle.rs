@@ -10,13 +10,13 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use super::LobbyError;
 use super::{lobby_actor::LobbyAction, LobbyResult};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LobbyHandleProvider {
     pub(super) sender: mpsc::WeakSender<LobbyAction>,
 }
 
 impl LobbyHandleProvider {
-    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> LobbyResult<LobbyHandle> {
+    pub fn into_handle(self, player_id: impl Into<PlayerId>) -> LobbyResult<LobbyHandle> {
         Ok(LobbyHandle {
             sender: self.sender.upgrade().ok_or(LobbyError::HandleInvalid)?,
             player_id: player_id.into(),
@@ -33,7 +33,7 @@ impl LobbyHandleProvider {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct LobbyHandle {
     pub(super) sender: mpsc::Sender<LobbyAction>,
     pub(super) player_id: PlayerId,
@@ -169,7 +169,7 @@ mod test {
             sender: tx.downgrade(),
         };
 
-        let handle = handle_provider.get_handle(123).unwrap();
+        let handle = handle_provider.into_handle(123).unwrap();
         assert_eq!(handle.player_id, 123);
     }
 

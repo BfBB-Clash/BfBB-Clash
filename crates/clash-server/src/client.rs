@@ -101,7 +101,7 @@ impl ConnectingClient {
                     let recv = handle_provider.spectate().await?;
                     return Ok(ClientConstructor::Spectator(recv));
                 } else {
-                    handle_provider.get_handle(self.player_id)?
+                    handle_provider.into_handle(self.player_id)?
                 }
             }
             Some(_) => return Err(ProtocolError::InvalidMessage),
@@ -128,7 +128,7 @@ impl ClientConstructor {
     fn construct(self, client: ConnectingClient) -> ConnectedClient {
         match self {
             ClientConstructor::Player(lobby_handle, lobby_recv) => {
-                Client::from_connecting(client, lobby_handle, lobby_recv).into()
+                PlayerClient::from_connecting(client, lobby_handle, lobby_recv).into()
             }
             ClientConstructor::Spectator(lobby_recv) => {
                 SpectatingClient::from_connecting(client, lobby_recv).into()
@@ -138,12 +138,12 @@ impl ClientConstructor {
 }
 
 enum ConnectedClient {
-    Player(Client),
+    Player(PlayerClient),
     Spectator(SpectatingClient),
 }
 
-impl From<Client> for ConnectedClient {
-    fn from(val: Client) -> Self {
+impl From<PlayerClient> for ConnectedClient {
+    fn from(val: PlayerClient) -> Self {
         ConnectedClient::Player(val)
     }
 }
@@ -182,7 +182,7 @@ async fn send_task(
 }
 
 /// Used to represent a client who is in a lobby.
-struct Client {
+struct PlayerClient {
     state: ServerState,
     player_id: PlayerId,
     conn_rx: ConnectionRx,
@@ -191,7 +191,7 @@ struct Client {
     lobby_handle: ManuallyDrop<LobbyHandle>,
 }
 
-impl Client {
+impl PlayerClient {
     pub fn from_connecting(
         client: ConnectingClient,
         lobby_handle: LobbyHandle,
@@ -201,7 +201,7 @@ impl Client {
         let (tx, rx) = mpsc::channel(64);
         let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx));
 
-        Client {
+        PlayerClient {
             state: client.state,
             player_id: client.player_id,
             conn_rx: client.conn_rx,
@@ -276,7 +276,7 @@ impl Client {
     }
 }
 
-impl Drop for Client {
+impl Drop for PlayerClient {
     fn drop(&mut self) {
         self.task_handle.abort();
 
@@ -292,6 +292,7 @@ impl Drop for Client {
     }
 }
 
+// TODO: Abstract client types and deduplicate code.
 struct SpectatingClient {
     state: ServerState,
     player_id: PlayerId,

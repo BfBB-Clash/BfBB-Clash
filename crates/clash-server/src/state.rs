@@ -11,7 +11,7 @@ pub type ServerState = Arc<Mutex<State>>;
 #[derive(Debug, Default)]
 pub struct State {
     pub players: HashSet<PlayerId>,
-    pub lobbies: HashMap<LobbyId, Arc<LobbyHandleProvider>>,
+    pub lobbies: HashMap<LobbyId, LobbyHandleProvider>,
 }
 
 impl State {
@@ -30,7 +30,7 @@ impl State {
         let lobby_id = self.gen_lobby_id();
         let (handle_provider, handle) = lobby::start_new_lobby(state, lobby_id, host_id);
         tracing::info!("Lobby {lobby_id} opened");
-        self.lobbies.insert(lobby_id, Arc::new(handle_provider));
+        self.lobbies.insert(lobby_id, handle_provider);
         handle
     }
 

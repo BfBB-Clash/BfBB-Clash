@@ -200,7 +200,7 @@ impl MainMenu {
     fn spawn_net(&self, gui_ctx: eframe::egui::Context, spectator: bool) -> LobbyData {
         let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(32);
         let (logic_sender, logic_receiver) = std::sync::mpsc::channel::<Message>();
-        let network_thread = net::run(
+        let network_thread = net::spawn(
             network_receiver,
             logic_sender,
             self.state.error_sender.clone(),

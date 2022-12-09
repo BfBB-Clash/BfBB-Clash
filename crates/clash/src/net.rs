@@ -77,7 +77,7 @@ where
 }
 
 /// Entry point to the network. Spawns the network task on the preconfigured [`Runtime`]
-pub fn run(
+pub fn spawn(
     receiver: NetCommandReceiver,
     logic_sender: Sender<Message>,
     error_sender: Sender<anyhow::Error>,

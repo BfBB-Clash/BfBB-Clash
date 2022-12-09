@@ -725,7 +725,7 @@ mod test {
             let handle = LobbyHandleProvider {
                 sender: tx.downgrade(),
             }
-            .get_handle(0);
+            .into_handle(0);
             actor.add_player(0.into()).unwrap();
             (actor, handle)
         };
