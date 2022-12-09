@@ -13,7 +13,7 @@ pub enum Message {
     Version { version: String },
     ConnectionAccept { player_id: PlayerId },
     GameHost,
-    GameJoin { lobby_id: LobbyId },
+    GameJoin { lobby_id: LobbyId, spectate: bool },
     Lobby(LobbyMessage),
     GameLobbyInfo { lobby: NetworkedLobby },
 }

@@ -32,6 +32,9 @@ pub enum LobbyAction {
         respond_to: oneshot::Sender<LobbyResult<broadcast::Receiver<Message>>>,
         id: PlayerId,
     },
+    AddSpectator {
+        respond_to: oneshot::Sender<broadcast::Receiver<Message>>,
+    },
     RemovePlayer {
         id: PlayerId,
     },
@@ -92,6 +95,9 @@ impl LobbyActor {
                 }
                 LobbyAction::AddPlayer { respond_to, id } => {
                     let _ = respond_to.send(self.add_player(id));
+                }
+                LobbyAction::AddSpectator { respond_to } => {
+                    let _ = respond_to.send(self.add_spectator());
                 }
                 LobbyAction::RemovePlayer { id } => self.rem_player(id),
                 LobbyAction::SetPlayerOptions {
@@ -238,6 +244,20 @@ impl LobbyActor {
         Ok(recv)
     }
 
+    /// Adds a spectator to a lobby.
+    ///
+    /// Currently this does not modify the underlying lobby at all. A simple subscription to the
+    /// broadcast channel is all that happens here, causing the spectator to receive lobby events.
+    /// In the future lobbies may need to become aware of spectators. (Allow/Deny spectating, show
+    /// spectator counts/names, etc.)
+    #[instrument(skip(self))]
+    fn add_spectator(&mut self) -> broadcast::Receiver<Message> {
+        let recv = self.sender.subscribe();
+        tracing::info!("Player is now spectating");
+        self.send_lobby();
+        recv
+    }
+
     /// Removes a player from the lobby. If the host is removed, a new host is assigned randomly.
     #[instrument(skip(self))]
     fn rem_player(&mut self, player_id: PlayerId) {
@@ -255,13 +275,6 @@ impl LobbyActor {
 
         // Update remaining clients of the change
         self.send_lobby();
-
-        // Close the lobby after the last player leaves by closing our receiver.
-        // This will cause the run loop to consume all remaining messages,
-        // (likely none since the last player just left), and then exit
-        if self.shared.players.is_empty() {
-            self.receiver.close();
-        }
     }
 
     #[instrument(skip(self, options))]
@@ -454,6 +467,15 @@ mod test {
             lobby.add_player(6.into()),
             Err(LobbyError::LobbyFull)
         ));
+    }
+
+    #[test]
+    fn add_spectator() {
+        let mut lobby = setup();
+
+        // Adding a spectator does not add a new player.
+        lobby.add_spectator();
+        assert!(lobby.shared.players.is_empty());
     }
 
     #[test]
@@ -700,7 +722,10 @@ mod test {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
             let mut actor = LobbyActor::new(Default::default(), rx, 0.into());
-            let handle = LobbyHandleProvider { sender: tx }.get_handle(0);
+            let handle = LobbyHandleProvider {
+                sender: tx.downgrade(),
+            }
+            .into_handle(0);
             actor.add_player(0.into()).unwrap();
             (actor, handle)
         };
@@ -723,18 +748,6 @@ mod test {
             timeout(Duration::from_millis(50), actor.run())
                 .await
                 .expect("Lobby failed to close");
-        }
-
-        // Alternatively, the lobby will die when the last player is removed
-        {
-            let (mut actor, handle) = get_lobby();
-
-            actor.rem_player(0.into());
-            timeout(Duration::from_millis(50), actor.run())
-                .await
-                .expect("Lobby failed to close");
-            // Explicitly drop handle to ensure it's not dropped early
-            assert_eq!(handle.start_game().await, Err(LobbyError::HandleInvalid));
         }
     }
 }

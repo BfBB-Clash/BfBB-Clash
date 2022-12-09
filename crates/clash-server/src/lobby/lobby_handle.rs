@@ -7,27 +7,36 @@ use clash_lib::{
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-use super::lobby_actor::LobbyAction;
 use super::LobbyError;
+use super::{lobby_actor::LobbyAction, LobbyResult};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LobbyHandleProvider {
-    pub(super) sender: mpsc::Sender<LobbyAction>,
+    pub(super) sender: mpsc::WeakSender<LobbyAction>,
 }
 
 impl LobbyHandleProvider {
-    pub fn get_handle(&self, player_id: impl Into<PlayerId>) -> LobbyHandle {
-        LobbyHandle {
-            sender: self.sender.clone(),
+    pub fn into_handle(self, player_id: impl Into<PlayerId>) -> LobbyResult<LobbyHandle> {
+        Ok(LobbyHandle {
+            sender: self.sender.upgrade().ok_or(LobbyError::HandleInvalid)?,
             player_id: player_id.into(),
-        }
+        })
+    }
+
+    pub async fn spectate(&self) -> LobbyResult<broadcast::Receiver<Message>> {
+        let (tx, rx) = oneshot::channel();
+        let sender = self.sender.upgrade().ok_or(LobbyError::HandleInvalid)?;
+        let _ = sender
+            .send(LobbyAction::AddSpectator { respond_to: tx })
+            .await;
+        rx.await.map_err(|_| LobbyError::HandleInvalid)
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct LobbyHandle {
-    sender: mpsc::Sender<LobbyAction>,
-    player_id: PlayerId,
+    pub(super) sender: mpsc::Sender<LobbyAction>,
+    pub(super) player_id: PlayerId,
 }
 
 impl LobbyHandle {
@@ -155,11 +164,12 @@ mod test {
 
     #[test]
     fn lobby_provider_provides_new_handle() {
+        let (tx, _rx) = mpsc::channel(2);
         let handle_provider = LobbyHandleProvider {
-            sender: mpsc::channel(2).0,
+            sender: tx.downgrade(),
         };
 
-        let handle = handle_provider.get_handle(123);
+        let handle = handle_provider.into_handle(123).unwrap();
         assert_eq!(handle.player_id, 123);
     }
 

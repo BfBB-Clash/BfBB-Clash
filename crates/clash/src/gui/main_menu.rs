@@ -90,7 +90,7 @@ impl App for MainMenu {
                             .button("Host Game")
                             .on_disabled_hover_text("Player Name is required");
                         if host_button.clicked() {
-                            let lobby_data = self.spawn_net(ctx.clone());
+                            let lobby_data = self.spawn_net(ctx.clone(), false);
                             lobby_data
                                 .network_sender
                                 .try_send(NetCommand::Send(Message::GameHost))
@@ -129,40 +129,62 @@ impl App for MainMenu {
                             .password(true),
                     );
 
-                    let mut join_button = ui.add_enabled(
-                        self.lobby_id.is_valid() && !self.player_name.is_empty(),
-                        Button::new("Join Game"),
-                    );
-                    if !self.lobby_id.is_valid() {
-                        join_button = join_button.on_disabled_hover_text(
-                            "Lobby ID must be an 8 digit hexadecimal number",
+                    ui.horizontal(|ui| {
+                        let mut join_button = ui.add_enabled(
+                            self.lobby_id.is_valid() && !self.player_name.is_empty(),
+                            Button::new("Join Game"),
                         );
-                    }
-                    if self.player_name.is_empty() {
-                        join_button = join_button.on_disabled_hover_text("Player Name is required")
-                    }
-                    if join_button.clicked() {
-                        let lobby_data = self.spawn_net(ctx.clone());
-                        lobby_data
-                            .network_sender
-                            .try_send(NetCommand::Send(Message::GameJoin {
-                                lobby_id: self.lobby_id.get_val().unwrap(),
-                            }))
-                            .unwrap();
-                        lobby_data
-                            .network_sender
-                            .try_send(NetCommand::Send(Message::Lobby(
-                                LobbyMessage::PlayerOptions {
-                                    options: PlayerOptions {
-                                        name: self.player_name.clone(),
-                                        color: (0, 0, 0),
+                        if !self.lobby_id.is_valid() {
+                            join_button = join_button.on_disabled_hover_text(
+                                "Lobby ID must be an 8 digit hexadecimal number",
+                            );
+                        }
+                        if self.player_name.is_empty() {
+                            join_button =
+                                join_button.on_disabled_hover_text("Player Name is required")
+                        }
+                        if join_button.clicked() {
+                            let lobby_data = self.spawn_net(ctx.clone(), false);
+                            lobby_data
+                                .network_sender
+                                .try_send(NetCommand::Send(Message::GameJoin {
+                                    lobby_id: self.lobby_id.get_val().unwrap(),
+                                    spectate: false,
+                                }))
+                                .unwrap();
+                            lobby_data
+                                .network_sender
+                                .try_send(NetCommand::Send(Message::Lobby(
+                                    LobbyMessage::PlayerOptions {
+                                        options: PlayerOptions {
+                                            name: self.player_name.clone(),
+                                            color: (0, 0, 0),
+                                        },
                                     },
-                                },
-                            )))
-                            .unwrap();
-                        self.state
-                            .change_app(Game::new(self.state.clone(), lobby_data));
-                    }
+                                )))
+                                .unwrap();
+                            self.state
+                                .change_app(Game::new(self.state.clone(), lobby_data));
+                        }
+
+                        let spectate_button = ui
+                            .add_enabled(self.lobby_id.is_valid(), Button::new("Spectate"))
+                            .on_disabled_hover_text(
+                                "Lobby ID must be an 8 digit hexadecimal number",
+                            );
+                        if spectate_button.clicked() {
+                            let lobby_data = self.spawn_net(ctx.clone(), true);
+                            lobby_data
+                                .network_sender
+                                .try_send(NetCommand::Send(Message::GameJoin {
+                                    lobby_id: self.lobby_id.get_val().unwrap(),
+                                    spectate: true,
+                                }))
+                                .unwrap();
+                            self.state
+                                .change_app(Game::new(self.state.clone(), lobby_data));
+                        }
+                    });
 
                     if ui.button("Back").clicked() {
                         self.submenu = Submenu::Root;
@@ -175,15 +197,14 @@ impl App for MainMenu {
 }
 
 impl MainMenu {
-    fn spawn_net(&self, gui_ctx: eframe::egui::Context) -> LobbyData {
+    fn spawn_net(&self, gui_ctx: eframe::egui::Context, spectator: bool) -> LobbyData {
         let (network_sender, network_receiver) = tokio::sync::mpsc::channel::<NetCommand>(32);
         let (logic_sender, logic_receiver) = std::sync::mpsc::channel::<Message>();
-        // Create a new thread and start a tokio runtime on it for talking to the server
-        let error_sender = self.state.error_sender.clone();
-        let network_thread = std::thread::Builder::new()
-            .name("Network".into())
-            .spawn(move || net::run(network_receiver, logic_sender, error_sender))
-            .expect("Couldn't start network thread.");
+        let network_thread = net::spawn(
+            network_receiver,
+            logic_sender,
+            self.state.error_sender.clone(),
+        );
 
         // Start Game Thread
         let (gui_sender, gui_receiver) = std::sync::mpsc::channel();
@@ -197,7 +218,11 @@ impl MainMenu {
             std::thread::Builder::new()
                 .name("Logic".into())
                 .spawn(move || {
-                    game::start_game(
+                    let entry = match spectator {
+                        true => game::start_spectator,
+                        false => game::start_game,
+                    };
+                    entry(
                         gui_handle,
                         network_sender,
                         logic_receiver,

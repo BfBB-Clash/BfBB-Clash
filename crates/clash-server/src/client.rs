@@ -47,31 +47,18 @@ impl ConnectingClient {
         }
     }
 
-    async fn handshake(mut self) -> Option<Client> {
-        let lobby_handle = match self.try_handshake().await {
-            Ok(it) => it,
+    async fn handshake(mut self) -> Option<ConnectedClient> {
+        match self.try_handshake().await {
+            Ok(it) => Some(it.construct(self)),
             Err(error) => {
+                tracing::error!(%error);
                 let _ = self.conn_tx.write_frame(Message::Error { error }).await;
-                return None;
+                None
             }
-        };
-
-        let lobby_recv = match lobby_handle.join_lobby().await {
-            Ok(it) => it,
-            Err(error) => {
-                let _ = self
-                    .conn_tx
-                    .write_frame(Message::Error {
-                        error: ProtocolError::Message(error.to_string()),
-                    })
-                    .await;
-                return None;
-            }
-        };
-        Some(Client::from_connecting(self, lobby_handle, lobby_recv))
+        }
     }
 
-    async fn try_handshake(&mut self) -> Result<LobbyHandle, ProtocolError> {
+    async fn try_handshake(&mut self) -> Result<ClientConstructor, ProtocolError> {
         let version = match self.conn_rx.read_frame().await? {
             Some(Message::Version { version }) => version,
             Some(_) => return Err(ProtocolError::InvalidMessage),
@@ -97,24 +84,82 @@ impl ConnectingClient {
             Some(Message::GameHost) => {
                 let state = &mut *self.state.lock().unwrap();
                 state.players.insert(self.player_id);
-                state
-                    .add_lobby(self.state.clone())
-                    .get_handle(self.player_id)
+                state.open_lobby(self.state.clone(), self.player_id)
             }
-            Some(Message::GameJoin { lobby_id }) => {
-                let state = &mut *self.state.lock().unwrap();
-                state.players.insert(self.player_id);
-                state
-                    .lobbies
-                    .get_mut(&lobby_id)
-                    .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
-                    .get_handle(self.player_id)
+            Some(Message::GameJoin { lobby_id, spectate }) => {
+                let handle_provider = {
+                    let state = &mut *self.state.lock().unwrap();
+                    state.players.insert(self.player_id);
+                    state
+                        .lobbies
+                        .get_mut(&lobby_id)
+                        .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
+                        .clone()
+                };
+
+                if spectate {
+                    let recv = handle_provider.spectate().await?;
+                    return Ok(ClientConstructor::Spectator(recv));
+                } else {
+                    handle_provider.into_handle(self.player_id)?
+                }
             }
             Some(_) => return Err(ProtocolError::InvalidMessage),
             None => return Err(ProtocolError::Disconnected),
         };
 
-        Ok(lobby_handle)
+        let lobby_recv = lobby_handle
+            .join_lobby()
+            .await
+            .map_err(|err| ProtocolError::Message(err.to_string()))?;
+        Ok(ClientConstructor::Player(lobby_handle, lobby_recv))
+    }
+}
+
+/// Our [`ConnectedClient`] constructors need to take ownership of a [`ConnectedClient`].
+/// This allows us to return what kind of client to construct from `try_handshake` to the caller,
+/// since the caller needs to retain ownership of `self` for error reporting to the client.
+enum ClientConstructor {
+    Player(LobbyHandle, broadcast::Receiver<Message>),
+    Spectator(broadcast::Receiver<Message>),
+}
+
+impl ClientConstructor {
+    fn construct(self, client: ConnectingClient) -> ConnectedClient {
+        match self {
+            ClientConstructor::Player(lobby_handle, lobby_recv) => {
+                PlayerClient::from_connecting(client, lobby_handle, lobby_recv).into()
+            }
+            ClientConstructor::Spectator(lobby_recv) => {
+                SpectatingClient::from_connecting(client, lobby_recv).into()
+            }
+        }
+    }
+}
+
+enum ConnectedClient {
+    Player(PlayerClient),
+    Spectator(SpectatingClient),
+}
+
+impl From<PlayerClient> for ConnectedClient {
+    fn from(val: PlayerClient) -> Self {
+        ConnectedClient::Player(val)
+    }
+}
+
+impl From<SpectatingClient> for ConnectedClient {
+    fn from(val: SpectatingClient) -> Self {
+        ConnectedClient::Spectator(val)
+    }
+}
+
+impl ConnectedClient {
+    async fn run(self) {
+        match self {
+            ConnectedClient::Player(c) => c.run().await,
+            ConnectedClient::Spectator(c) => c.run().await,
+        }
     }
 }
 
@@ -137,7 +182,7 @@ async fn send_task(
 }
 
 /// Used to represent a client who is in a lobby.
-struct Client {
+struct PlayerClient {
     state: ServerState,
     player_id: PlayerId,
     conn_rx: ConnectionRx,
@@ -146,7 +191,7 @@ struct Client {
     lobby_handle: ManuallyDrop<LobbyHandle>,
 }
 
-impl Client {
+impl PlayerClient {
     pub fn from_connecting(
         client: ConnectingClient,
         lobby_handle: LobbyHandle,
@@ -156,7 +201,7 @@ impl Client {
         let (tx, rx) = mpsc::channel(64);
         let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx));
 
-        Client {
+        PlayerClient {
             state: client.state,
             player_id: client.player_id,
             conn_rx: client.conn_rx,
@@ -231,7 +276,7 @@ impl Client {
     }
 }
 
-impl Drop for Client {
+impl Drop for PlayerClient {
     fn drop(&mut self) {
         self.task_handle.abort();
 
@@ -239,6 +284,73 @@ impl Drop for Client {
         // Since we are currently dropping ourself, self.lobby_handle will never be used again.
         let lobby_handle = unsafe { ManuallyDrop::take(&mut self.lobby_handle) };
         tokio::spawn(async move { lobby_handle.rem_player().await });
+
+        // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
+        // and that's fine for now.
+        let state = &mut *self.state.lock().unwrap();
+        state.players.remove(&self.player_id);
+    }
+}
+
+// TODO: Abstract client types and deduplicate code.
+struct SpectatingClient {
+    state: ServerState,
+    player_id: PlayerId,
+    conn_rx: ConnectionRx,
+    local_tx: mpsc::Sender<Message>,
+    task_handle: JoinHandle<()>,
+}
+
+impl SpectatingClient {
+    pub fn from_connecting(
+        client: ConnectingClient,
+        lobby_recv: broadcast::Receiver<Message>,
+    ) -> Self {
+        let (tx, rx) = mpsc::channel(64);
+        let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx));
+
+        Self {
+            state: client.state,
+            player_id: client.player_id,
+            conn_rx: client.conn_rx,
+            local_tx: tx,
+            task_handle,
+        }
+    }
+
+    /// Takes ownership of self to guarantee that client will be dropped when it's
+    /// message loop ends
+    #[instrument(skip_all, fields(player_id = %self.player_id))]
+    pub async fn run(mut self) {
+        loop {
+            match self.conn_rx.read_frame().await {
+                // Spectators should never send a message again after joining
+                Ok(Some(m)) => {
+                    tracing::error!("Invalid message received: {m:?}");
+                    let _ = self
+                        .local_tx
+                        .send(Message::Error {
+                            error: ProtocolError::InvalidMessage,
+                        })
+                        .await;
+                    continue;
+                }
+                Ok(None) => {
+                    break;
+                }
+                Err(e) => {
+                    tracing::error!("Error reading message, Closing connection\n{e:?}",);
+                    break;
+                }
+            };
+        }
+        tracing::info!("Player disconnected");
+    }
+}
+
+impl Drop for SpectatingClient {
+    fn drop(&mut self) {
+        self.task_handle.abort();
 
         // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
         // and that's fine for now.

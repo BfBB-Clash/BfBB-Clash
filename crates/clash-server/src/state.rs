@@ -1,11 +1,10 @@
 use clash_lib::{LobbyId, PlayerId};
-use hash_map::Entry;
 use rand::{thread_rng, Rng};
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use crate::lobby;
-use crate::lobby::lobby_handle::LobbyHandleProvider;
+use crate::lobby::lobby_handle::{LobbyHandle, LobbyHandleProvider};
 
 pub type ServerState = Arc<Mutex<State>>;
 
@@ -22,15 +21,17 @@ impl State {
         player_id
     }
 
+    /// Open a new lobby with the player represented by `host_id` as the only player.
+    ///
+    /// This will add a [`LobbyHandleProvider`] to [`ServerState`]'s lobby list and return a
+    /// concrete `LobbyHandle` for the player who opened the lobby.
     // TODO: Would be nice to not have to pass in a clone of ServerState here
-    pub fn add_lobby(&mut self, state: ServerState) -> &mut LobbyHandleProvider {
+    pub fn open_lobby(&mut self, state: ServerState, host_id: PlayerId) -> LobbyHandle {
         let lobby_id = self.gen_lobby_id();
-        let handle = lobby::start_new_lobby(state, lobby_id);
+        let (handle_provider, handle) = lobby::start_new_lobby(state, lobby_id, host_id);
         tracing::info!("Lobby {lobby_id} opened");
-        if let Entry::Vacant(e) = self.lobbies.entry(lobby_id) {
-            return e.insert(handle);
-        }
-        unreachable!();
+        self.lobbies.insert(lobby_id, handle_provider);
+        handle
     }
 
     // TODO: dedupe this.
