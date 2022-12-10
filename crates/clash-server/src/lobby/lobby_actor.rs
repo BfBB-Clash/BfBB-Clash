@@ -6,12 +6,12 @@ use clash_lib::{LobbyId, PlayerId, MAX_PLAYERS};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::instrument;
 
-use crate::state::ServerState;
+use crate::state::OwnedId;
 
 use super::{LobbyError, LobbyResult};
 
 pub struct LobbyActor {
-    state: ServerState,
+    id: OwnedId<LobbyId>,
     receiver: mpsc::Receiver<LobbyAction>,
     shared: NetworkedLobby,
     sender: broadcast::Sender<Message>,
@@ -66,23 +66,19 @@ pub enum LobbyAction {
 }
 
 impl LobbyActor {
-    pub fn new(
-        state: ServerState,
-        receiver: mpsc::Receiver<LobbyAction>,
-        lobby_id: LobbyId,
-    ) -> Self {
+    pub fn new(receiver: mpsc::Receiver<LobbyAction>, lobby_id: OwnedId<LobbyId>) -> Self {
         let (sender, _) = broadcast::channel(100);
 
         Self {
-            state,
             receiver,
-            shared: NetworkedLobby::new(lobby_id),
+            shared: NetworkedLobby::new(*lobby_id),
+            id: lobby_id,
             sender,
             next_menu_order: 0,
         }
     }
 
-    #[instrument(skip_all, fields(lobby_id = %self.shared.lobby_id))]
+    #[instrument(skip_all, fields(lobby_id = %self.id))]
     pub async fn run(mut self) {
         tracing::info!("Lobby opened");
         while let Some(msg) = self.receiver.recv().await {
@@ -137,11 +133,6 @@ impl LobbyActor {
                 }
             }
         }
-
-        // Remove this lobby from the server
-        let state = &mut *self.state.lock().unwrap();
-        state.lobbies.remove(&self.shared.lobby_id);
-        tracing::info!("Closing lobby");
     }
 
     fn send_lobby(&mut self) {
@@ -366,10 +357,7 @@ impl LobbyActor {
                         .send(Message::Lobby(LobbyMessage::GameEnd))
                         .is_err()
                     {
-                        tracing::warn!(
-                            "Lobby {} finished with no players in lobby.",
-                            self.shared.lobby_id
-                        )
+                        tracing::warn!("Game finished with no players in lobby.")
                     }
                 } else if spat != Spatula::KahRahTae {
                     player.score += self
@@ -405,7 +393,7 @@ mod test {
     use std::time::Duration;
 
     use bfbb::{Level, Spatula};
-    use clash_lib::{lobby::GamePhase, net::Item, player::PlayerOptions};
+    use clash_lib::{lobby::GamePhase, net::Item, player::PlayerOptions, LobbyId};
     use tokio::{sync::mpsc, time::timeout};
 
     use crate::lobby::{lobby_handle::LobbyHandleProvider, LobbyError};
@@ -414,7 +402,7 @@ mod test {
 
     fn setup() -> LobbyActor {
         let (_, rx) = mpsc::channel(2);
-        LobbyActor::new(Default::default(), rx, 0.into())
+        LobbyActor::new(rx, LobbyId(0).into())
     }
 
     #[test]
@@ -721,7 +709,7 @@ mod test {
     async fn lobby_dies() {
         let get_lobby = || {
             let (tx, rx) = mpsc::channel(2);
-            let mut actor = LobbyActor::new(Default::default(), rx, 0.into());
+            let mut actor = LobbyActor::new(rx, LobbyId(0).into());
             let handle = LobbyHandleProvider {
                 sender: tx.downgrade(),
             }

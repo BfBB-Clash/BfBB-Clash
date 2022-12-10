@@ -2,7 +2,7 @@ use clash_lib::{net::ProtocolError, LobbyId, PlayerId};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
-use crate::state::ServerState;
+use crate::state::OwnedId;
 
 use self::{
     lobby_actor::LobbyActor,
@@ -35,13 +35,12 @@ impl From<LobbyError> for ProtocolError {
 pub type LobbyResult<T> = Result<T, LobbyError>;
 
 pub fn start_new_lobby(
-    state: ServerState,
-    id: LobbyId,
+    id: OwnedId<LobbyId>,
     host_id: PlayerId,
 ) -> (LobbyHandleProvider, LobbyHandle) {
     let (sender, receiver) = mpsc::channel(64);
     let weak_sender = sender.downgrade();
-    let actor = LobbyActor::new(state, receiver, id);
+    let actor = LobbyActor::new(receiver, id);
     let handle = LobbyHandle {
         sender,
         player_id: host_id,

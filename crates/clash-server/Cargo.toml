@@ -16,6 +16,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 rand = "0.8"
+abort-on-drop = "0.2.2"
 
 [build-dependencies]
 anyhow.workspace = true
