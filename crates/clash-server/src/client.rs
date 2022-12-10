@@ -166,7 +166,6 @@ async fn send_task(
 
 /// Used to represent a client who is in a lobby.
 struct PlayerClient {
-    state: ServerState,
     player_id: OwnedId<PlayerId>,
     conn_rx: ConnectionRx,
     local_tx: mpsc::Sender<Message>,
@@ -185,7 +184,6 @@ impl PlayerClient {
         let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx)).into();
 
         PlayerClient {
-            state: client.state,
             player_id: client.player_id,
             conn_rx: client.conn_rx,
             local_tx: tx,
@@ -260,7 +258,6 @@ impl PlayerClient {
 
 // TODO: Abstract client types and deduplicate code.
 struct SpectatingClient {
-    state: ServerState,
     player_id: OwnedId<PlayerId>,
     conn_rx: ConnectionRx,
     local_tx: mpsc::Sender<Message>,
@@ -276,7 +273,6 @@ impl SpectatingClient {
         let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx)).into();
 
         Self {
-            state: client.state,
             player_id: client.player_id,
             conn_rx: client.conn_rx,
             local_tx: tx,
