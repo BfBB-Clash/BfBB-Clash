@@ -19,6 +19,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330223a1aecc308757b9926e9391c9b47f8ef2dbd8aea9df88312aea18c5e8d6"
 
 [[package]]
+name = "abort-on-drop"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dd6d700ad9af641490c1f7d67980d2de4d1433016e5b12f819448d3c832142a"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "accesskit"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -444,6 +453,7 @@ dependencies = [
 name = "clash-server"
 version = "0.2.0-rc.2"
 dependencies = [
+ "abort-on-drop",
  "anyhow",
  "bfbb",
  "clash_lib",

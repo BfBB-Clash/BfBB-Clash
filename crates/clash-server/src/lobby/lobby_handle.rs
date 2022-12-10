@@ -83,15 +83,6 @@ impl LobbyHandle {
         self.execute(msg, rx).await
     }
 
-    // Removes a player from the lobby, if it exists, returning the number of player's remaining
-    pub async fn rem_player(&self) -> Result<(), LobbyError> {
-        // TODO: Do this with self.execute somehow?
-        self.sender
-            .send(LobbyAction::RemovePlayer { id: self.player_id })
-            .await
-            .map_err(|_| LobbyError::HandleInvalid)
-    }
-
     pub async fn set_player_options(&self, options: PlayerOptions) -> Result<(), LobbyError> {
         let (tx, rx) = oneshot::channel();
         let msg = LobbyAction::SetPlayerOptions {
@@ -143,6 +134,18 @@ impl LobbyHandle {
     }
 }
 
+impl Drop for LobbyHandle {
+    fn drop(&mut self) {
+        let tx = self.sender.clone();
+        let id = self.player_id;
+        tokio::spawn(async move {
+            if let Err(e) = tx.send(LobbyAction::RemovePlayer { id }).await {
+                tracing::warn!(%e, "Failed to remove player from their lobby.");
+            }
+        });
+    }
+}
+
 #[cfg(test)]
 mod test {
     use bfbb::{Level, Spatula};
@@ -162,8 +165,8 @@ mod test {
         (rx, handle)
     }
 
-    #[test]
-    fn lobby_provider_provides_new_handle() {
+    #[tokio::test]
+    async fn lobby_provider_provides_new_handle() {
         let (tx, _rx) = mpsc::channel(2);
         let handle_provider = LobbyHandleProvider {
             sender: tx.downgrade(),
@@ -222,13 +225,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn rem_player() {
+    async fn rem_player_on_drop() {
         let (mut rx, handle) = setup();
         let actor = tokio::spawn(async move {
             let m = rx.recv().await.unwrap();
             assert!(matches!(m, LobbyAction::RemovePlayer { id: PlayerId(123) }));
         });
-        let _ = handle.rem_player().await;
+        drop(handle);
         actor.await.unwrap();
     }
 

@@ -1,12 +1,10 @@
-use std::mem::ManuallyDrop;
-
+use abort_on_drop::ChildTask;
 use clash_lib::net::connection::{self, ConnectionRx, ConnectionTx};
 use clash_lib::net::{LobbyMessage, Message, ProtocolError};
 use clash_lib::PlayerId;
 use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
 use tracing::instrument;
 
 use crate::lobby::lobby_handle::LobbyHandle;
@@ -172,8 +170,8 @@ struct PlayerClient {
     player_id: OwnedId<PlayerId>,
     conn_rx: ConnectionRx,
     local_tx: mpsc::Sender<Message>,
-    task_handle: JoinHandle<()>,
-    lobby_handle: ManuallyDrop<LobbyHandle>,
+    _send_task: ChildTask<()>,
+    lobby_handle: LobbyHandle,
 }
 
 impl PlayerClient {
@@ -182,16 +180,16 @@ impl PlayerClient {
         lobby_handle: LobbyHandle,
         lobby_recv: broadcast::Receiver<Message>,
     ) -> Self {
-        let lobby_handle = ManuallyDrop::new(lobby_handle);
+        let lobby_handle = lobby_handle;
         let (tx, rx) = mpsc::channel(64);
-        let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx));
+        let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx)).into();
 
         PlayerClient {
             state: client.state,
             player_id: client.player_id,
             conn_rx: client.conn_rx,
             local_tx: tx,
-            task_handle,
+            _send_task: task_handle,
             lobby_handle,
         }
     }
@@ -260,24 +258,13 @@ impl PlayerClient {
     }
 }
 
-impl Drop for PlayerClient {
-    fn drop(&mut self) {
-        self.task_handle.abort();
-
-        // SAFETY: ManuallyDrop::take requires us to never use the ManuallyDrop container again.
-        // Since we are currently dropping ourself, self.lobby_handle will never be used again.
-        let lobby_handle = unsafe { ManuallyDrop::take(&mut self.lobby_handle) };
-        tokio::spawn(async move { lobby_handle.rem_player().await });
-    }
-}
-
 // TODO: Abstract client types and deduplicate code.
 struct SpectatingClient {
     state: ServerState,
     player_id: OwnedId<PlayerId>,
     conn_rx: ConnectionRx,
     local_tx: mpsc::Sender<Message>,
-    task_handle: JoinHandle<()>,
+    _send_task: ChildTask<()>,
 }
 
 impl SpectatingClient {
@@ -286,14 +273,14 @@ impl SpectatingClient {
         lobby_recv: broadcast::Receiver<Message>,
     ) -> Self {
         let (tx, rx) = mpsc::channel(64);
-        let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx));
+        let task_handle = tokio::spawn(send_task(client.conn_tx, lobby_recv, rx)).into();
 
         Self {
             state: client.state,
             player_id: client.player_id,
             conn_rx: client.conn_rx,
             local_tx: tx,
-            task_handle,
+            _send_task: task_handle,
         }
     }
 
@@ -324,11 +311,5 @@ impl SpectatingClient {
             };
         }
         tracing::info!("Player disconnected");
-    }
-}
-
-impl Drop for SpectatingClient {
-    fn drop(&mut self) {
-        self.task_handle.abort();
     }
 }
