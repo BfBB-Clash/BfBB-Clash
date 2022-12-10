@@ -11,7 +11,7 @@ use tracing::instrument;
 
 use crate::lobby::lobby_handle::LobbyHandle;
 use crate::lobby::LobbyError;
-use crate::state::ServerState;
+use crate::state::{OwnedId, ServerState};
 
 /// Take a socket for a newly connected client and begin serving it.
 pub async fn handle_new_connection(state: ServerState, socket: TcpStream) {
@@ -25,7 +25,7 @@ pub async fn handle_new_connection(state: ServerState, socket: TcpStream) {
 /// Represents a client who just connected and still needs to tell the server what they want to do.
 struct ConnectingClient {
     state: ServerState,
-    player_id: PlayerId,
+    player_id: OwnedId<PlayerId>,
     conn_tx: ConnectionTx,
     conn_rx: ConnectionRx,
 }
@@ -33,10 +33,7 @@ struct ConnectingClient {
 impl ConnectingClient {
     fn new(state: ServerState, socket: TcpStream) -> Self {
         // Add new player
-        let player_id = {
-            let mut state = state.lock().unwrap();
-            state.add_player()
-        };
+        let player_id = state.add_player();
 
         let (conn_tx, conn_rx) = connection::from_socket(socket);
         Self {
@@ -75,33 +72,21 @@ impl ConnectingClient {
         // Inform player of their PlayerId
         self.conn_tx
             .write_frame(Message::ConnectionAccept {
-                player_id: self.player_id,
+                player_id: *self.player_id,
             })
             .await?;
-        tracing::info!("New connection for player id {} opened", self.player_id);
+        tracing::info!("New connection for player id {} opened", *self.player_id);
 
         let lobby_handle = match self.conn_rx.read_frame().await? {
-            Some(Message::GameHost) => {
-                let state = &mut *self.state.lock().unwrap();
-                state.players.insert(self.player_id);
-                state.open_lobby(self.state.clone(), self.player_id)
-            }
+            Some(Message::GameHost) => self.state.open_lobby(*self.player_id),
             Some(Message::GameJoin { lobby_id, spectate }) => {
-                let handle_provider = {
-                    let state = &mut *self.state.lock().unwrap();
-                    state.players.insert(self.player_id);
-                    state
-                        .lobbies
-                        .get_mut(&lobby_id)
-                        .ok_or(ProtocolError::InvalidLobbyId(lobby_id))?
-                        .clone()
-                };
+                let handle_provider = self.state.get_lobby_handle_provider(lobby_id)?;
 
                 if spectate {
                     let recv = handle_provider.spectate().await?;
                     return Ok(ClientConstructor::Spectator(recv));
                 } else {
-                    handle_provider.into_handle(self.player_id)?
+                    handle_provider.into_handle(*self.player_id)?
                 }
             }
             Some(_) => return Err(ProtocolError::InvalidMessage),
@@ -184,7 +169,7 @@ async fn send_task(
 /// Used to represent a client who is in a lobby.
 struct PlayerClient {
     state: ServerState,
-    player_id: PlayerId,
+    player_id: OwnedId<PlayerId>,
     conn_rx: ConnectionRx,
     local_tx: mpsc::Sender<Message>,
     task_handle: JoinHandle<()>,
@@ -251,7 +236,6 @@ impl PlayerClient {
                 }
             }
         }
-        tracing::info!("Player disconnected");
     }
 
     async fn process(&mut self, msg: LobbyMessage) -> Result<(), LobbyError> {
@@ -284,18 +268,13 @@ impl Drop for PlayerClient {
         // Since we are currently dropping ourself, self.lobby_handle will never be used again.
         let lobby_handle = unsafe { ManuallyDrop::take(&mut self.lobby_handle) };
         tokio::spawn(async move { lobby_handle.rem_player().await });
-
-        // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
-        // and that's fine for now.
-        let state = &mut *self.state.lock().unwrap();
-        state.players.remove(&self.player_id);
     }
 }
 
 // TODO: Abstract client types and deduplicate code.
 struct SpectatingClient {
     state: ServerState,
-    player_id: PlayerId,
+    player_id: OwnedId<PlayerId>,
     conn_rx: ConnectionRx,
     local_tx: mpsc::Sender<Message>,
     task_handle: JoinHandle<()>,
@@ -351,10 +330,5 @@ impl SpectatingClient {
 impl Drop for SpectatingClient {
     fn drop(&mut self) {
         self.task_handle.abort();
-
-        // This will crash the program if we're dropping due to a previous panic caused by a poisoned lock,
-        // and that's fine for now.
-        let state = &mut *self.state.lock().unwrap();
-        state.players.remove(&self.player_id);
     }
 }
