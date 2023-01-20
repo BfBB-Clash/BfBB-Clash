@@ -97,7 +97,7 @@ async fn net_task(
     let ip = load_ip_address();
     tracing::info!("Connecting to server at '{ip}'");
 
-    let addr = { SERVER_ADDRESS.lock().unwrap().clone() };
+    let addr = { *SERVER_ADDRESS.lock().unwrap() };
     let sock = TcpStream::connect(addr).await.unwrap();
     let (mut conn_tx, conn_rx) = connection::from_socket(sock);
     conn_tx
