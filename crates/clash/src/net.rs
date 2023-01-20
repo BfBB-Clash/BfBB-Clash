@@ -1,5 +1,7 @@
-use std::future::Future;
+use std::net::ToSocketAddrs;
 use std::sync::mpsc::Sender;
+use std::sync::Mutex;
+use std::{future::Future, net::SocketAddr};
 
 use clash_lib::net::{
     connection::{self, ConnectionRx},
@@ -18,6 +20,7 @@ pub type NetCommandReceiver = mpsc::Receiver<NetCommand>;
 pub type NetCommandSender = mpsc::Sender<NetCommand>;
 
 static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
+pub static SERVER_ADDRESS: Lazy<Mutex<SocketAddr>> = Lazy::new(|| Mutex::new(load_ip_address()));
 
 #[instrument]
 pub async fn check_for_updates() -> Option<String> {
@@ -94,7 +97,8 @@ async fn net_task(
     let ip = load_ip_address();
     tracing::info!("Connecting to server at '{ip}'");
 
-    let sock = TcpStream::connect(&ip).await.unwrap();
+    let addr = { SERVER_ADDRESS.lock().unwrap().clone() };
+    let sock = TcpStream::connect(addr).await.unwrap();
     let (mut conn_tx, conn_rx) = connection::from_socket(sock);
     conn_tx
         .write_frame(Message::Version {
@@ -192,16 +196,22 @@ fn process_action(action: LobbyMessage, logic_sender: &Sender<Message>) {
     }
 }
 
-fn load_ip_address() -> String {
+fn load_ip_address() -> SocketAddr {
     if let Ok(mut exe_path) = std::env::current_exe() {
         exe_path.pop();
         exe_path.push("ipaddress");
         if let Ok(ip) = std::fs::read_to_string(exe_path) {
-            return ip.trim().to_string();
+            return ip
+                .trim()
+                .to_string()
+                .to_socket_addrs()
+                .expect("Invalid server address specified")
+                .next()
+                .expect("Couldn't resolve server address");
         }
     }
 
-    "127.0.0.1:42932".into()
+    "127.0.0.1:42932".to_socket_addrs().unwrap().next().unwrap()
 }
 
 /// Spawns a future on the Tokio runtime and returns a [`Promise`] for it.
