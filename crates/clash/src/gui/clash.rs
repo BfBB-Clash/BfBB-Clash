@@ -1,3 +1,4 @@
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::rc::Rc;
 
 use eframe::egui::{
@@ -15,6 +16,7 @@ use crate::gui::state::State;
 use crate::gui::PADDING;
 use crate::net;
 
+use super::val_text::ValText;
 use super::UiExt;
 
 pub struct Clash {
@@ -23,6 +25,7 @@ pub struct Clash {
     curr_app: Box<dyn App>,
     displayed_error: Option<anyhow::Error>,
     update_task: Promise<Option<String>>,
+    address: ValText<SocketAddr>,
 }
 
 impl Clash {
@@ -42,6 +45,9 @@ impl Clash {
             state,
             displayed_error: None,
             update_task,
+            address: ValText::with_validator(|s| {
+                s.to_socket_addrs().ok().and_then(|mut x| x.next())
+            }),
         }
     }
 
@@ -172,6 +178,13 @@ impl App for Clash {
 
 impl Clash {
     fn app_settings(&mut self, ui: &mut Ui) {
+        // FIXME: This will attempt to resolve the address over the network for every character that is typed if
+        //        the current string is a valid address (ip:port). ValText either needs to support validating only
+        //        on loss of focus or we'll need to handle validation manually here.
+        //        Additionally, this will be considered invalid if the host is temporarily unreachable
+        ui.add_option("Server Address", &mut self.address, |addr| {
+            *net::SERVER_ADDRESS.lock().unwrap() = addr
+        });
         ui.add_option(
             "Use icons for spatula tracker",
             self.state.use_icons.get(),
