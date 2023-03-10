@@ -59,7 +59,7 @@ impl<I: InterfaceProvider> GameMode for ClashGame<I> {
                 .lobby
                 .players
                 .get_mut(&self.player_id)
-                .ok_or(InterfaceError::Other)?;
+                .ok_or(InterfaceError::DataUnavailable)?;
 
             // Detect level changes
             let level = Some(interface.get_current_level()?);

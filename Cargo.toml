@@ -12,7 +12,7 @@ edition = "2021"
 
 [workspace.dependencies]
 anyhow = "1"
-bfbb = "0.3.0-beta.1"
+bfbb = "0.3.0"
 clash_lib = { path = "crates/clash-lib" }
 futures = { version = "0.3.25", default-features = false }
 serde = { version = "1", features = ["derive"] }
