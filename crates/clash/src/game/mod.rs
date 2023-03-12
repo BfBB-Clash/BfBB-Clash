@@ -101,8 +101,7 @@ impl<I: InterfaceProvider> Logic<I> {
                     )))
                     .unwrap();
             }
-            Err(InterfaceError::HookingFailed) => (),
-            Err(InterfaceError::Other) => tracing::error!("Unexpected InterfaceError encountered"),
+            Err(InterfaceError::ProcessNotFound | InterfaceError::EmulationNotRunning) => (),
             Err(e) => tracing::error!("{e:?}"),
             Ok(()) => (),
         }
